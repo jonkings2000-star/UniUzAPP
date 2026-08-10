@@ -1,39 +1,97 @@
+# ============================================================
+# UniUZ SERVER
+# Mini App + API
+# ============================================================
+
 import os
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+
+from flask import send_from_directory
+
+from web_api import app
 
 
-PORT = int(os.environ.get("PORT", "8080"))
+# ============================================================
+# PATH
+# ============================================================
+
+BASE_DIR = os.path.dirname(
+    os.path.abspath(__file__)
+)
 
 
-class UniUZHandler(SimpleHTTPRequestHandler):
+# ============================================================
+# MINI APP
+# ============================================================
 
-    def do_GET(self):
-        if self.path == "/":
-            self.path = "/index.html"
+@app.get("/")
+def mini_app():
 
-        return super().do_GET()
-
-    def log_message(self, format, *args):
-        print(f"[MiniApp] {format % args}")
-
-
-def main():
-    server = ThreadingHTTPServer(
-        ("0.0.0.0", PORT),
-        UniUZHandler
+    return send_from_directory(
+        BASE_DIR,
+        "index.html"
     )
 
-    print(f"UniUZ Mini App started on port {PORT}")
-    print("Server: 0.0.0.0")
-    print("Mini App is ready")
 
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        server.server_close()
+@app.get("/style.css")
+def style_css():
 
+    return send_from_directory(
+        BASE_DIR,
+        "style.css"
+    )
+
+
+@app.get("/app.js")
+def app_js():
+
+    return send_from_directory(
+        BASE_DIR,
+        "app.js"
+    )
+
+
+# ============================================================
+# OPTIONAL FAVICON
+# ============================================================
+
+@app.get("/favicon.ico")
+def favicon():
+
+    favicon_path = os.path.join(
+        BASE_DIR,
+        "favicon.ico"
+    )
+
+    if os.path.exists(favicon_path):
+
+        return send_from_directory(
+            BASE_DIR,
+            "favicon.ico"
+        )
+
+    return "", 204
+
+
+# ============================================================
+# RUN
+# ============================================================
 
 if __name__ == "__main__":
-    main()
+
+    port = int(
+        os.getenv(
+            "PORT",
+            "8080"
+        )
+    )
+
+    print("=" * 50)
+    print("UniUZ Server started")
+    print(f"Port: {port}")
+    print("Mini App + API are running together")
+    print("=" * 50)
+
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
