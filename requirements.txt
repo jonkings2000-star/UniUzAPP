@@ -1,1 +1,4 @@
-# No external Python packages are required for the first Mini App stage.
+aiogram
+python-dotenv
+openai
+aiohttp
