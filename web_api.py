@@ -544,6 +544,7 @@ def homework():
     user = require_user()
 
 
+
     if not user:
 
         return jsonify({
@@ -552,6 +553,7 @@ def homework():
             "Unauthorized"
 
         }),401
+
 
 
 
@@ -568,9 +570,52 @@ def homework():
         return jsonify({
 
             "items":
+
             []
 
         })
+
+
+
+
+    group = profile["group_name"]
+
+
+
+    if not group:
+
+        return jsonify({
+
+            "items":
+
+            []
+
+        })
+
+
+
+
+    items = database.get_group_homework(
+
+        group
+
+    )
+
+
+
+    return jsonify({
+
+        "items":
+
+        [
+
+            dict(item)
+
+            for item in items
+
+        ]
+
+    })
 
 
 
