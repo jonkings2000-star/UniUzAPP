@@ -1,55 +1,11 @@
-// ============================================================
-// UniUZ Mini App
-// ============================================================
-
-// ==========================
-// API
-// ==========================
-
 const API_URL = "https://uniuz-production.up.railway.app";
-
-
-// ==========================
-// TELEGRAM WEB APP
-// ==========================
 
 const tg = window.Telegram?.WebApp || null;
 
 if (tg) {
-    try {
-        tg.ready();
-        tg.expand();
-
-        // Цвета Telegram
-        if (tg.setHeaderColor) {
-            tg.setHeaderColor("#111827");
-        }
-
-        if (tg.setBackgroundColor) {
-            tg.setBackgroundColor("#0b1120");
-        }
-
-        if (tg.setBottomBarColor) {
-            tg.setBottomBarColor("#16202b");
-        }
-
-        console.log("Telegram WebApp initialized");
-    } catch (error) {
-        console.warn("Telegram WebApp init error:", error);
-    }
+    tg.ready();
+    tg.expand();
 }
-
-
-// ==========================
-// INIT DATA
-// ==========================
-
-const initData = tg?.initData || "";
-
-console.log(
-    "Telegram initData:",
-    initData ? "available" : "empty"
-);
 
 
 // ============================================================
@@ -57,328 +13,191 @@ console.log(
 // ============================================================
 
 const translations = {
-
     ru: {
-        loading: "Загрузка...",
-        error: "⚠️ Не удалось загрузить данные UniUZ.",
-        offline: "⚠️ API временно недоступно.",
-        noHomework: "📚 Нет заданий",
-        noAnnouncements: "📢 Нет объявлений",
-
+        welcome: "Добро пожаловать 👋",
         home: "Главная",
         schedule: "Расписание",
         homework: "Задания",
         ai: "ИИ",
         profile: "Профиль",
-
-        refresh: "Обновить",
-
         student: "Студент",
+        nextLesson: "Следующая пара",
+        scheduleSoon: "Расписание будет подключено",
+        noHomework: "Нет заданий",
+        noAnnouncements: "Нет объявлений",
+        announcements: "Объявления",
+        quickActions: "Быстрые действия",
+        today: "Сегодня",
+        deadlines: "Дедлайны",
+        news: "Новости",
+        university: "Университет",
+        department: "Факультет",
+        group: "Группа",
         notSelected: "Не выбрано",
-        university: "Ajou University in Tashkent"
+        loading: "Загрузка...",
+        apiError: "Не удалось загрузить данные"
     },
 
     en: {
-        loading: "Loading...",
-        error: "⚠️ Failed to load UniUZ data.",
-        offline: "⚠️ API is temporarily unavailable.",
-        noHomework: "📚 No homework",
-        noAnnouncements: "📢 No announcements",
-
+        welcome: "Welcome 👋",
         home: "Home",
         schedule: "Schedule",
         homework: "Homework",
         ai: "AI",
         profile: "Profile",
-
-        refresh: "Refresh",
-
         student: "Student",
+        nextLesson: "Next class",
+        scheduleSoon: "Schedule will be connected",
+        noHomework: "No homework",
+        noAnnouncements: "No announcements",
+        announcements: "Announcements",
+        quickActions: "Quick actions",
+        today: "Today",
+        deadlines: "Deadlines",
+        news: "News",
+        university: "University",
+        department: "Department",
+        group: "Group",
         notSelected: "Not selected",
-        university: "Ajou University in Tashkent"
+        loading: "Loading...",
+        apiError: "Failed to load data"
     },
 
     ko: {
-        loading: "로딩 중...",
-        error: "⚠️ UniUZ 데이터를 불러오지 못했습니다.",
-        offline: "⚠️ API를 일시적으로 사용할 수 없습니다.",
-        noHomework: "📚 과제가 없습니다",
-        noAnnouncements: "📢 공지가 없습니다",
-
+        welcome: "환영합니다 👋",
         home: "홈",
         schedule: "시간표",
         homework: "과제",
         ai: "AI",
         profile: "프로필",
-
-        refresh: "새로고침",
-
         student: "학생",
+        nextLesson: "다음 수업",
+        scheduleSoon: "시간표가 연결됩니다",
+        noHomework: "과제가 없습니다",
+        noAnnouncements: "공지가 없습니다",
+        announcements: "공지사항",
+        quickActions: "빠른 실행",
+        today: "오늘",
+        deadlines: "마감일",
+        news: "뉴스",
+        university: "대학교",
+        department: "학과",
+        group: "그룹",
         notSelected: "선택되지 않음",
-        university: "Ajou University in Tashkent"
+        loading: "로딩 중...",
+        apiError: "데이터를 불러오지 못했습니다"
     }
 };
 
 
 // ============================================================
-// CURRENT LANGUAGE
+// LANGUAGE STORAGE
 // ============================================================
 
-// ВАЖНО:
-// Если язык ещё не выбран — используем русский.
-// Благодаря этому приложение не зависает на пустом экране.
-
 let currentLanguage =
-    localStorage.getItem("uniuz_language") || "ru";
+    localStorage.getItem("uniuz_language");
 
 
-// Проверяем корректность языка
-if (!["ru", "en", "ko"].includes(currentLanguage)) {
-    currentLanguage = "ru";
-    localStorage.setItem(
-        "uniuz_language",
-        "ru"
-    );
-}
+// ============================================================
+// DATA
+// ============================================================
+
+let profileData = null;
+let homeworkData = [];
+let announcementsData = [];
 
 
-function getLanguage() {
-    return currentLanguage || "ru";
-}
-
+// ============================================================
+// HELPERS
+// ============================================================
 
 function t(key) {
-    const language = getLanguage();
-
     return (
-        translations[language]?.[key] ??
-        translations.ru[key] ??
+        translations[currentLanguage]?.[key] ||
+        translations.ru[key] ||
         key
     );
 }
 
 
-// ============================================================
-// LANGUAGE SCREEN
-// ============================================================
-
-function findLanguageScreen() {
-
-    const selectors = [
-        "#language-screen",
-        ".language-screen",
-        "#language-selection",
-        ".language-selection",
-        "#language-container",
-        ".language-container"
-    ];
-
-    for (const selector of selectors) {
-
-        const element =
-            document.querySelector(selector);
-
-        if (element) {
-            return element;
-        }
-    }
-
-
-    // Если ID класса нет,
-    // ищем блок с тремя языковыми кнопками.
-
-    const buttons =
-        [...document.querySelectorAll("button")];
-
-    const languageButtons =
-        buttons.filter(button => {
-
-            const text =
-                (button.textContent || "")
-                    .toLowerCase();
-
-            return (
-                text.includes("рус") ||
-                text.includes("english") ||
-                text.includes("한국") ||
-                text.includes("korean")
-            );
-        });
-
-
-    if (languageButtons.length >= 3) {
-
-        let parent =
-            languageButtons[0].parentElement;
-
-        for (
-            let i = 0;
-            i < 8 && parent;
-            i++
-        ) {
-
-            const count =
-                parent.querySelectorAll(
-                    "button"
-                ).length;
-
-            if (count >= 3) {
-                return parent;
-            }
-
-            parent =
-                parent.parentElement;
-        }
-    }
-
-
-    return null;
-}
-
-
-// ============================================================
-// HIDE LANGUAGE SCREEN
-// ============================================================
-
-function hideLanguageScreen() {
-
-    const screen =
-        findLanguageScreen();
-
-    if (screen) {
-
-        screen.style.display = "none";
-
-        console.log(
-            "Language screen hidden"
-        );
-    }
-}
-
-
-// ============================================================
-// SHOW MAIN APPLICATION
-// ============================================================
-
-function showMainApplication() {
-
-    const possibleScreens = [
-
-        "#app",
-        "#main-app",
-        ".app",
-        ".main-app",
-        "#main",
-        "main"
-    ];
-
-
-    let found = false;
-
-
-    for (
-        const selector
-        of possibleScreens
-    ) {
-
-        const element =
-            document.querySelector(
-                selector
-            );
-
-        if (element) {
-
-            element.style.display = "";
-
-            found = true;
-        }
-    }
-
-
-    // Основной экран
-
-    const screen =
-        document.querySelector(
-            "#screen"
-        );
-
-    if (screen) {
-        screen.style.display = "";
-        found = true;
-    }
-
-
-    // Нижняя навигация
-
-    const nav =
-        document.querySelector(
-            ".bottom-nav"
-        );
-
-    if (nav) {
-        nav.style.display = "";
-    }
-
-
-    console.log(
-        "Main application:",
-        found ? "shown" : "not found"
-    );
-}
-
-
-// ============================================================
-// SELECT LANGUAGE
-// ============================================================
-
-async function selectLanguage(language) {
+function escapeHtml(value) {
 
     if (
-        !["ru", "en", "ko"]
-            .includes(language)
+        value === null ||
+        value === undefined
     ) {
-        console.warn(
-            "Unknown language:",
-            language
-        );
+        return "";
+    }
 
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+
+// ============================================================
+// LANGUAGE
+// ============================================================
+
+function selectLanguage(language) {
+
+    if (
+        !["ru", "en", "ko"].includes(language)
+    ) {
         return;
     }
 
-
-    currentLanguage =
-        language;
-
+    currentLanguage = language;
 
     localStorage.setItem(
         "uniuz_language",
         language
     );
 
-
     console.log(
-        "UniUZ language:",
+        "Selected language:",
         language
     );
 
+    const languageScreen =
+        document.getElementById(
+            "languageScreen"
+        );
 
-    hideLanguageScreen();
-
-    showMainApplication();
-
-
-    // Обновляем тексты навигации
-
-    updateTranslations();
+    const app =
+        document.getElementById(
+            "app"
+        );
 
 
-    // Загружаем приложение
+    // Скрываем выбор языка
+    if (languageScreen) {
+        languageScreen.classList.add("hidden");
+        languageScreen.style.display = "none";
+    }
 
-    await initializeUniUZ();
+
+    // ПОКАЗЫВАЕМ ПРИЛОЖЕНИЕ
+    if (app) {
+
+        // Главное исправление
+        app.classList.remove("hidden");
+
+        app.style.display = "flex";
+    }
+
+
+    updateNavigation();
+
+    renderHome();
+
+    initializeApp();
 }
 
 
-// Доступно для HTML onclick=""
 window.selectLanguage =
     selectLanguage;
 
@@ -397,39 +216,14 @@ function setupLanguageButtons() {
 
     buttons.forEach(button => {
 
-        // Убираем старые обработчики
-        // через cloneNode
-
-        const newButton =
-            button.cloneNode(true);
-
-        button.replaceWith(
-            newButton
-        );
-    });
-
-
-    const newButtons =
-        document.querySelectorAll(
-            ".language-btn"
-        );
-
-
-    newButtons.forEach(button => {
-
         button.addEventListener(
             "click",
-            async function() {
+            () => {
 
                 const language =
-                    this.dataset.lang;
+                    button.dataset.lang;
 
-                console.log(
-                    "Language button:",
-                    language
-                );
-
-                await selectLanguage(
+                selectLanguage(
                     language
                 );
             }
@@ -439,199 +233,16 @@ function setupLanguageButtons() {
 
     console.log(
         "Language buttons:",
-        newButtons.length
+        buttons.length
     );
 }
 
 
 // ============================================================
-// FALLBACK LANGUAGE BUTTON DETECTION
+// API
 // ============================================================
 
-document.addEventListener(
-    "click",
-    function(event) {
-
-        const button =
-            event.target.closest(
-                "button"
-            );
-
-
-        if (!button) {
-            return;
-        }
-
-
-        // Если это обычная language-btn,
-        // её уже обработал setupLanguageButtons.
-
-        if (
-            button.classList.contains(
-                "language-btn"
-            )
-        ) {
-            return;
-        }
-
-
-        const text =
-            (
-                button.textContent || ""
-            )
-                .trim()
-                .toLowerCase();
-
-
-        if (
-            text.includes("русский") ||
-            text === "ru"
-        ) {
-
-            selectLanguage("ru");
-
-            return;
-        }
-
-
-        if (
-            text.includes("english") ||
-            text === "en"
-        ) {
-
-            selectLanguage("en");
-
-            return;
-        }
-
-
-        if (
-            text.includes("한국어") ||
-            text.includes("korean") ||
-            text === "ko"
-        ) {
-
-            selectLanguage("ko");
-
-            return;
-        }
-    }
-);
-
-
-// ============================================================
-// HELPERS
-// ============================================================
-
-function escapeHtml(value) {
-
-    if (
-        value === null ||
-        value === undefined
-    ) {
-        return "";
-    }
-
-
-    return String(value)
-
-        .replaceAll(
-            "&",
-            "&amp;"
-        )
-
-        .replaceAll(
-            "<",
-            "&lt;"
-        )
-
-        .replaceAll(
-            ">",
-            "&gt;"
-        )
-
-        .replaceAll(
-            '"',
-            "&quot;"
-        )
-
-        .replaceAll(
-            "'",
-            "&#039;"
-        );
-}
-
-
-function setText(
-    selector,
-    value
-) {
-
-    const element =
-        document.querySelector(
-            selector
-        );
-
-
-    if (element) {
-
-        element.textContent =
-            value ?? "";
-    }
-}
-
-
-// ============================================================
-// UPDATE TRANSLATIONS
-// ============================================================
-
-function updateTranslations() {
-
-    // Все элементы с data-i18n
-
-    const elements =
-        document.querySelectorAll(
-            "[data-i18n]"
-        );
-
-
-    elements.forEach(
-        element => {
-
-            const key =
-                element.dataset.i18n;
-
-            if (!key) {
-                return;
-            }
-
-            element.textContent =
-                t(key);
-        }
-    );
-
-
-    // Main Button Telegram
-
-    if (
-        tg &&
-        tg.MainButton
-    ) {
-
-        tg.MainButton.setText(
-            t("refresh")
-        );
-    }
-}
-
-
-// ============================================================
-// API REQUEST
-// ============================================================
-
-async function apiRequest(
-    path
-) {
+async function apiRequest(path) {
 
     const headers = {
         "Accept":
@@ -639,14 +250,11 @@ async function apiRequest(
     };
 
 
-    // Telegram initData
-    // отправляем только если оно есть
-
-    if (initData) {
+    if (tg?.initData) {
 
         headers[
             "X-Telegram-Init-Data"
-        ] = initData;
+        ] = tg.initData;
     }
 
 
@@ -655,32 +263,20 @@ async function apiRequest(
             `${API_URL}${path}`,
             {
                 method: "GET",
-                headers: headers
+                headers
             }
         );
 
 
-    let data;
-
-
-    try {
-
-        data =
-            await response.json();
-
-    } catch (error) {
-
-        throw new Error(
-            `API returned invalid JSON (${response.status})`
-        );
-    }
+    const data =
+        await response.json();
 
 
     if (!response.ok) {
 
         throw new Error(
-            data?.error ||
-            `API error: ${response.status}`
+            data.error ||
+            `API error ${response.status}`
         );
     }
 
@@ -690,7 +286,7 @@ async function apiRequest(
 
 
 // ============================================================
-// PROFILE
+// LOAD PROFILE
 // ============================================================
 
 async function loadProfile() {
@@ -702,17 +298,17 @@ async function loadProfile() {
 
 
     console.log(
-        "UniUZ profile:",
+        "Profile:",
         data
     );
 
 
     if (!data.ok) {
-
-        throw new Error(
-            "Profile loading failed"
-        );
+        return;
     }
+
+
+    profileData = data;
 
 
     const telegramUser =
@@ -723,454 +319,86 @@ async function loadProfile() {
         data.profile;
 
 
-    // Telegram user
-
-    if (telegramUser) {
-
-        const name =
-            telegramUser.first_name ||
-            telegramUser.username ||
-            t("student");
+    const name =
+        telegramUser?.first_name ||
+        telegramUser?.username ||
+        profile?.full_name ||
+        "UniUZ";
 
 
-        setText(
-            "#user-name",
-            name
+    const avatar =
+        document.getElementById(
+            "avatar"
         );
 
 
-        const avatar =
-            document.querySelector(
-                "#user-avatar"
-            );
+    if (avatar) {
 
-
-        if (avatar) {
-
-            avatar.textContent =
-                (
-                    name[0] ||
-                    "U"
-                ).toUpperCase();
-        }
+        avatar.textContent =
+            (
+                name[0] ||
+                "U"
+            ).toUpperCase();
     }
-
-
-    // Profile
-
-    if (profile) {
-
-        setText(
-            "#profile-name",
-            profile.full_name ||
-            t("student")
-        );
-
-
-        setText(
-            "#profile-username",
-            profile.username
-                ? `@${profile.username}`
-                : ""
-        );
-
-
-        setText(
-            "#profile-university",
-            profile.university ||
-            t("university")
-        );
-
-
-        setText(
-            "#profile-department",
-            profile.department ||
-            t("notSelected")
-        );
-
-
-        setText(
-            "#profile-group",
-            profile.group_name ||
-            t("notSelected")
-        );
-
-
-        setText(
-            "#department",
-            profile.department ||
-            "—"
-        );
-
-
-        setText(
-            "#group",
-            profile.group_name ||
-            "—"
-        );
-
-    } else {
-
-        setText(
-            "#profile-name",
-            telegramUser?.first_name ||
-            t("student")
-        );
-
-
-        setText(
-            "#profile-university",
-            t("university")
-        );
-
-
-        setText(
-            "#profile-department",
-            t("notSelected")
-        );
-
-
-        setText(
-            "#profile-group",
-            t("notSelected")
-        );
-    }
-
-
-    return {
-        telegramUser,
-        profile
-    };
 }
 
 
 // ============================================================
-// HOMEWORK
+// LOAD HOMEWORK
 // ============================================================
 
 async function loadHomework() {
 
-    const data =
-        await apiRequest(
-            "/api/homework"
-        );
-
-
-    console.log(
-        "UniUZ homework:",
-        data
-    );
-
-
-    const container =
-        document.querySelector(
-            "#homework-list"
-        );
-
-
-    if (!container) {
-        return;
-    }
-
-
-    container.innerHTML = "";
-
-
-    if (
-        !data.items ||
-        data.items.length === 0
-    ) {
-
-        container.innerHTML = `
-            <div class="empty-state">
-                ${t("noHomework")}
-            </div>
-        `;
-
-
-        setText(
-            "#homework-count",
-            "0"
-        );
-
-
-        return;
-    }
-
-
-    setText(
-        "#homework-count",
-        String(
-            data.items.length
-        )
-    );
-
-
-    data.items.forEach(
-        item => {
-
-            const card =
-                document.createElement(
-                    "div"
-                );
-
-
-            card.className =
-                "homework-card";
-
-
-            card.innerHTML = `
-
-                <div class="homework-title">
-                    📚 ${escapeHtml(
-                        item.subject_name
-                    )}
-                </div>
-
-                <div class="homework-task">
-                    ${escapeHtml(
-                        item.task_text
-                    )}
-                </div>
-
-                <div class="homework-date">
-
-                    📅 ${escapeHtml(
-                        item.homework_date
-                    )}
-
-                    &nbsp;
-
-                    ⏰ ${escapeHtml(
-                        item.homework_time
-                    )}
-
-                </div>
-            `;
-
-
-            container.appendChild(
-                card
-            );
-        }
-    );
-}
-
-
-// ============================================================
-// ANNOUNCEMENTS
-// ============================================================
-
-async function loadAnnouncements() {
-
-    const data =
-        await apiRequest(
-            "/api/announcements"
-        );
-
-
-    console.log(
-        "UniUZ announcements:",
-        data
-    );
-
-
-    const container =
-        document.querySelector(
-            "#announcement-list"
-        );
-
-
-    if (!container) {
-        return;
-    }
-
-
-    container.innerHTML = "";
-
-
-    if (
-        !data.items ||
-        data.items.length === 0
-    ) {
-
-        container.innerHTML = `
-            <div class="empty-state">
-                ${t("noAnnouncements")}
-            </div>
-        `;
-
-
-        setText(
-            "#announcement-count",
-            "0"
-        );
-
-
-        return;
-    }
-
-
-    setText(
-        "#announcement-count",
-        String(
-            data.items.length
-        )
-    );
-
-
-    data.items.forEach(
-        item => {
-
-            const card =
-                document.createElement(
-                    "div"
-                );
-
-
-            card.className =
-                "announcement-card";
-
-
-            card.innerHTML = `
-
-                <div class="announcement-title">
-
-                    📢 ${escapeHtml(
-                        item.title
-                    )}
-
-                </div>
-
-                <div class="announcement-message">
-
-                    ${escapeHtml(
-                        item.message
-                    )}
-
-                </div>
-            `;
-
-
-            container.appendChild(
-                card
-            );
-        }
-    );
-}
-
-
-// ============================================================
-// API HEALTH
-// ============================================================
-
-async function checkApi() {
-
     try {
 
-        const response =
-            await fetch(
-                `${API_URL}/api/health`,
-                {
-                    method: "GET",
-                    headers: {
-                        "Accept":
-                            "application/json"
-                    }
-                }
+        const data =
+            await apiRequest(
+                "/api/homework"
             );
 
 
-        const data =
-            await response.json();
+        homeworkData =
+            data.items || [];
 
-
-        console.log(
-            "UniUZ API:",
-            data
-        );
-
-
-        return (
-            response.ok &&
-            data.ok === true
-        );
 
     } catch (error) {
 
         console.error(
-            "UniUZ API unavailable:",
+            "Homework error:",
             error
         );
 
-
-        return false;
+        homeworkData = [];
     }
 }
 
 
 // ============================================================
-// LOADING
+// LOAD ANNOUNCEMENTS
 // ============================================================
 
-function showLoading() {
+async function loadAnnouncements() {
 
-    const loading =
-        document.querySelector(
-            "#loading"
+    try {
+
+        const data =
+            await apiRequest(
+                "/api/announcements"
+            );
+
+
+        announcementsData =
+            data.items || [];
+
+
+    } catch (error) {
+
+        console.error(
+            "Announcements error:",
+            error
         );
 
-
-    if (loading) {
-
-        loading.style.display =
-            "flex";
-    }
-}
-
-
-function hideLoading() {
-
-    const loading =
-        document.querySelector(
-            "#loading"
-        );
-
-
-    if (loading) {
-
-        loading.style.display =
-            "none";
-    }
-}
-
-
-// ============================================================
-// ERROR
-// ============================================================
-
-function showError(
-    message
-) {
-
-    console.error(
-        message
-    );
-
-
-    const errorElement =
-        document.querySelector(
-            "#error"
-        );
-
-
-    if (errorElement) {
-
-        errorElement.textContent =
-            message;
-
-        errorElement.style.display =
-            "block";
+        announcementsData = [];
     }
 }
 
@@ -1179,166 +407,848 @@ function showError(
 // NAVIGATION
 // ============================================================
 
-function setupNavigation() {
+function updateNavigation() {
 
-    const navItems =
-        document.querySelectorAll(
+    document
+        .querySelectorAll(
             ".nav-item"
+        )
+        .forEach(button => {
+
+            const key =
+                button.dataset.page;
+
+            const text =
+                button.querySelector(
+                    "[data-i18n]"
+                );
+
+
+            if (text) {
+
+                text.textContent =
+                    t(key);
+            }
+        });
+
+
+    const welcome =
+        document.getElementById(
+            "welcome"
         );
 
 
-    navItems.forEach(
-        item => {
+    if (welcome) {
 
-            item.addEventListener(
-                "click",
-                function() {
-
-                    const page =
-                        this.dataset.page;
-
-
-                    console.log(
-                        "Navigation:",
-                        page
-                    );
-
-
-                    // Active button
-
-                    navItems.forEach(
-                        nav => {
-
-                            nav.classList.remove(
-                                "active"
-                            );
-                        }
-                    );
-
-
-                    this.classList.add(
-                        "active"
-                    );
-
-
-                    // Если в HTML уже есть
-                    // система страниц —
-                    // переключаем классы.
-
-                    document
-                        .querySelectorAll(
-                            "[data-page-content]"
-                        )
-                        .forEach(
-                            screen => {
-
-                                screen.style.display =
-                                    screen.dataset.pageContent === page
-                                        ? ""
-                                        : "none";
-                            }
-                        );
-
-
-                    // Если есть функция renderPage
-                    // из другого JS — используем её.
-
-                    if (
-                        typeof window.renderPage ===
-                        "function"
-                    ) {
-
-                        try {
-
-                            window.renderPage(
-                                page
-                            );
-
-                        } catch (error) {
-
-                            console.error(
-                                "renderPage error:",
-                                error
-                            );
-                        }
-                    }
-                }
-            );
-        }
-    );
-
-
-    console.log(
-        "Navigation items:",
-        navItems.length
-    );
+        welcome.textContent =
+            t("welcome");
+    }
 }
 
 
 // ============================================================
-// INITIALIZE
+// NAVIGATION CLICK
 // ============================================================
 
-async function initializeUniUZ() {
+function setupNavigation() {
 
-    showLoading();
+    document
+        .querySelectorAll(
+            ".nav-item"
+        )
+        .forEach(button => {
+
+            button.addEventListener(
+                "click",
+                () => {
+
+                    const page =
+                        button.dataset.page;
 
 
-    // Сначала показываем интерфейс,
-    // чтобы приложение никогда не оставалось
-    // полностью пустым.
+                    document
+                        .querySelectorAll(
+                            ".nav-item"
+                        )
+                        .forEach(item => {
 
-    hideLanguageScreen();
+                            item.classList.remove(
+                                "active"
+                            );
+                        });
 
-    showMainApplication();
 
-    updateTranslations();
+                    button.classList.add(
+                        "active"
+                    );
 
+
+                    openPage(page);
+                }
+            );
+        });
+}
+
+
+// ============================================================
+// OPEN PAGE
+// ============================================================
+
+function openPage(page) {
+
+    if (page === "home") {
+        renderHome();
+    }
+
+    else if (
+        page === "schedule"
+    ) {
+        renderSchedule();
+    }
+
+    else if (
+        page === "homework"
+    ) {
+        renderHomework();
+    }
+
+    else if (
+        page === "ai"
+    ) {
+        renderAI();
+    }
+
+    else if (
+        page === "profile"
+    ) {
+        renderProfile();
+    }
+}
+
+
+// ============================================================
+// HOME
+// ============================================================
+
+function renderHome() {
+
+    const screen =
+        document.getElementById(
+            "screen"
+        );
+
+
+    if (!screen) {
+        return;
+    }
+
+
+    const telegramUser =
+        profileData?.telegram_user;
+
+
+    const profile =
+        profileData?.profile;
+
+
+    const name =
+        telegramUser?.first_name ||
+        telegramUser?.username ||
+        profile?.full_name ||
+        t("student");
+
+
+    screen.innerHTML = `
+
+        <div class="page">
+
+            <div class="welcome-card">
+
+                <div>
+
+                    <div class="eyebrow">
+                        ${escapeHtml(
+                            t("student")
+                        )}
+                    </div>
+
+                    <h1>
+                        ${escapeHtml(
+                            name
+                        )}
+                    </h1>
+
+                    <p>
+                        ${escapeHtml(
+                            t("welcome")
+                        )}
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="dashboard-grid">
+
+
+                <button
+                    class="dashboard-card"
+                    data-page="schedule"
+                >
+
+                    <span>
+                        📅
+                    </span>
+
+                    <strong>
+                        ${escapeHtml(
+                            t("schedule")
+                        )}
+                    </strong>
+
+                    <small>
+                        ${escapeHtml(
+                            t("today")
+                        )}
+                    </small>
+
+                </button>
+
+
+                <button
+                    class="dashboard-card"
+                    data-page="homework"
+                >
+
+                    <span>
+                        📝
+                    </span>
+
+                    <strong>
+                        ${escapeHtml(
+                            t("homework")
+                        )}
+                    </strong>
+
+                    <small>
+                        ${homeworkData.length}
+                    </small>
+
+                </button>
+
+
+                <button
+                    class="dashboard-card"
+                    data-page="announcements"
+                >
+
+                    <span>
+                        📢
+                    </span>
+
+                    <strong>
+                        ${escapeHtml(
+                            t("announcements")
+                        )}
+                    </strong>
+
+                    <small>
+                        ${announcementsData.length}
+                    </small>
+
+                </button>
+
+
+                <button
+                    class="dashboard-card"
+                    data-page="ai"
+                >
+
+                    <span>
+                        🤖
+                    </span>
+
+                    <strong>
+                        ${escapeHtml(
+                            t("ai")
+                        )}
+                    </strong>
+
+                    <small>
+                        7 / day
+                    </small>
+
+                </button>
+
+            </div>
+
+
+            <div class="info-card">
+
+                <h3>
+                    ${escapeHtml(
+                        t("nextLesson")
+                    )}
+                </h3>
+
+                <p>
+                    ${escapeHtml(
+                        t("scheduleSoon")
+                    )}
+                </p>
+
+            </div>
+
+
+            <div class="quick-card">
+
+                <h3>
+                    ${escapeHtml(
+                        t("quickActions")
+                    )}
+                </h3>
+
+
+                <div class="quick-grid">
+
+                    <button
+                        data-page="schedule"
+                    >
+                        📅
+                        ${escapeHtml(
+                            t("today")
+                        )}
+                    </button>
+
+
+                    <button
+                        data-page="homework"
+                    >
+                        📝
+                        ${escapeHtml(
+                            t("deadlines")
+                        )}
+                    </button>
+
+
+                    <button
+                        data-page="announcements"
+                    >
+                        📢
+                        ${escapeHtml(
+                            t("news")
+                        )}
+                    </button>
+
+
+                    <button
+                        data-page="profile"
+                    >
+                        👤
+                        ${escapeHtml(
+                            t("profile")
+                        )}
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+    `;
+
+
+    setupScreenButtons();
+}
+
+
+// ============================================================
+// SCHEDULE
+// ============================================================
+
+function renderSchedule() {
+
+    const screen =
+        document.getElementById(
+            "screen"
+        );
+
+
+    if (!screen) {
+        return;
+    }
+
+
+    screen.innerHTML = `
+
+        <div class="page">
+
+            <h1>
+                📅
+                ${escapeHtml(
+                    t("schedule")
+                )}
+            </h1>
+
+
+            <div class="info-card">
+
+                <h3>
+                    ${escapeHtml(
+                        t("nextLesson")
+                    )}
+                </h3>
+
+                <p>
+                    ${escapeHtml(
+                        t("scheduleSoon")
+                    )}
+                </p>
+
+            </div>
+
+        </div>
+    `;
+}
+
+
+// ============================================================
+// HOMEWORK
+// ============================================================
+
+function renderHomework() {
+
+    const screen =
+        document.getElementById(
+            "screen"
+        );
+
+
+    if (!screen) {
+        return;
+    }
+
+
+    let html = "";
+
+
+    if (
+        homeworkData.length === 0
+    ) {
+
+        html = `
+
+            <div class="empty-state">
+
+                ${escapeHtml(
+                    t("noHomework")
+                )}
+
+            </div>
+
+        `;
+
+    } else {
+
+        html =
+            homeworkData
+                .map(item => `
+
+                    <div class="info-card">
+
+                        <h3>
+                            📚
+                            ${escapeHtml(
+                                item.subject_name
+                            )}
+                        </h3>
+
+                        <p>
+                            ${escapeHtml(
+                                item.task_text
+                            )}
+                        </p>
+
+                        <small>
+                            📅
+                            ${escapeHtml(
+                                item.homework_date
+                            )}
+
+                            ${
+                                item.homework_time
+                                ? `
+                                    ⏰
+                                    ${escapeHtml(
+                                        item.homework_time
+                                    )}
+                                `
+                                : ""
+                            }
+                        </small>
+
+                    </div>
+
+                `)
+                .join("");
+    }
+
+
+    screen.innerHTML = `
+
+        <div class="page">
+
+            <h1>
+                📝
+                ${escapeHtml(
+                    t("homework")
+                )}
+            </h1>
+
+            ${html}
+
+        </div>
+    `;
+}
+
+
+// ============================================================
+// ANNOUNCEMENTS
+// ============================================================
+
+function renderAnnouncements() {
+
+    const screen =
+        document.getElementById(
+            "screen"
+        );
+
+
+    if (!screen) {
+        return;
+    }
+
+
+    let html = "";
+
+
+    if (
+        announcementsData.length === 0
+    ) {
+
+        html = `
+
+            <div class="empty-state">
+
+                ${escapeHtml(
+                    t("noAnnouncements")
+                )}
+
+            </div>
+
+        `;
+
+    } else {
+
+        html =
+            announcementsData
+                .map(item => `
+
+                    <div class="info-card">
+
+                        <h3>
+                            📢
+                            ${escapeHtml(
+                                item.title
+                            )}
+                        </h3>
+
+                        <p>
+                            ${escapeHtml(
+                                item.message
+                            )}
+                        </p>
+
+                    </div>
+
+                `)
+                .join("");
+    }
+
+
+    screen.innerHTML = `
+
+        <div class="page">
+
+            <h1>
+                📢
+                ${escapeHtml(
+                    t("announcements")
+                )}
+            </h1>
+
+            ${html}
+
+        </div>
+    `;
+}
+
+
+// ============================================================
+// AI
+// ============================================================
+
+function renderAI() {
+
+    const screen =
+        document.getElementById(
+            "screen"
+        );
+
+
+    if (!screen) {
+        return;
+    }
+
+
+    screen.innerHTML = `
+
+        <div class="page">
+
+            <h1>
+                🤖
+                ${escapeHtml(
+                    t("ai")
+                )}
+            </h1>
+
+
+            <div class="info-card">
+
+                <h3>
+                    UniUZ AI Assistant
+                </h3>
+
+                <p>
+                    ${
+                        currentLanguage === "ko"
+                        ? "학업에 관한 질문을 입력하세요."
+                        : currentLanguage === "en"
+                        ? "Ask your study-related question."
+                        : "Задайте вопрос по учебе."
+                    }
+                </p>
+
+            </div>
+
+        </div>
+    `;
+}
+
+
+// ============================================================
+// PROFILE
+// ============================================================
+
+function renderProfile() {
+
+    const screen =
+        document.getElementById(
+            "screen"
+        );
+
+
+    if (!screen) {
+        return;
+    }
+
+
+    const telegramUser =
+        profileData?.telegram_user;
+
+
+    const profile =
+        profileData?.profile;
+
+
+    const name =
+        telegramUser?.first_name ||
+        telegramUser?.username ||
+        profile?.full_name ||
+        t("student");
+
+
+    screen.innerHTML = `
+
+        <div class="page">
+
+            <h1>
+                👤
+                ${escapeHtml(
+                    t("profile")
+                )}
+            </h1>
+
+
+            <div class="profile-card">
+
+                <div class="avatar">
+
+                    ${escapeHtml(
+                        (
+                            name[0] ||
+                            "U"
+                        ).toUpperCase()
+                    )}
+
+                </div>
+
+
+                <h2>
+                    ${escapeHtml(
+                        name
+                    )}
+                </h2>
+
+
+                <p>
+                    ${
+                        profile?.username
+                        ? "@" +
+                          escapeHtml(
+                              profile.username
+                          )
+                        : ""
+                    }
+                </p>
+
+            </div>
+
+
+            <div class="info-card">
+
+                <strong>
+                    ${escapeHtml(
+                        t("university")
+                    )}
+                </strong>
+
+                <p>
+                    ${escapeHtml(
+                        profile?.university ||
+                        "Ajou University in Tashkent"
+                    )}
+                </p>
+
+            </div>
+
+
+            <div class="info-card">
+
+                <strong>
+                    ${escapeHtml(
+                        t("department")
+                    )}
+                </strong>
+
+                <p>
+                    ${escapeHtml(
+                        profile?.department ||
+                        t("notSelected")
+                    )}
+                </p>
+
+            </div>
+
+
+            <div class="info-card">
+
+                <strong>
+                    ${escapeHtml(
+                        t("group")
+                    )}
+                </strong>
+
+                <p>
+                    ${escapeHtml(
+                        profile?.group_name ||
+                        t("notSelected")
+                    )}
+                </p>
+
+            </div>
+
+        </div>
+    `;
+}
+
+
+// ============================================================
+// SCREEN BUTTONS
+// ============================================================
+
+function setupScreenButtons() {
+
+    document
+        .querySelectorAll(
+            "#screen [data-page]"
+        )
+        .forEach(button => {
+
+            button.onclick = () => {
+
+                openPage(
+                    button.dataset.page
+                );
+            };
+        });
+}
+
+
+// ============================================================
+// API INITIALIZATION
+// ============================================================
+
+async function initializeApp() {
 
     try {
 
         console.log(
-            "Starting UniUZ..."
+            "UniUZ API connecting..."
         );
 
 
         // Проверяем API
 
-        const apiOnline =
-            await checkApi();
-
-
-        if (!apiOnline) {
-
-            console.warn(
-                "UniUZ API is offline"
+        const health =
+            await fetch(
+                `${API_URL}/api/health`
             );
 
 
-            // Не блокируем интерфейс.
-            // Пользователь всё равно может
-            // открыть Mini App.
-
-            showError(
-                t("offline")
-            );
+        const healthData =
+            await health.json();
 
 
-            return;
-        }
+        console.log(
+            "API:",
+            healthData
+        );
 
 
-        // Telegram initData
+        if (
+            !health.ok ||
+            !healthData.ok
+        ) {
 
-        if (!initData) {
-
-            console.warn(
-                "Telegram initData is empty."
+            throw new Error(
+                "API unavailable"
             );
         }
 
 
-        // Загружаем профиль
+        // Профиль
 
         try {
 
@@ -1346,46 +1256,32 @@ async function initializeUniUZ() {
 
         } catch (error) {
 
-            console.error(
-                "Profile error:",
+            console.warn(
+                "Profile:",
                 error
             );
         }
 
 
-        // Загружаем задания
+        // Задания
 
-        try {
-
-            await loadHomework();
-
-        } catch (error) {
-
-            console.error(
-                "Homework error:",
-                error
-            );
-        }
+        await loadHomework();
 
 
-        // Загружаем объявления
+        // Объявления
 
-        try {
+        await loadAnnouncements();
 
-            await loadAnnouncements();
 
-        } catch (error) {
+        // Обновляем главный экран
 
-            console.error(
-                "Announcements error:",
-                error
-            );
-        }
+        renderHome();
 
 
         console.log(
-            "UniUZ Mini App initialized successfully."
+            "UniUZ loaded successfully"
         );
+
 
     } catch (error) {
 
@@ -1395,243 +1291,120 @@ async function initializeUniUZ() {
         );
 
 
-        showError(
-            t("error")
-        );
+        // ВАЖНО:
+        // Даже если API не загрузился,
+        // интерфейс всё равно остаётся.
 
-    } finally {
-
-        hideLoading();
+        renderHome();
     }
 }
 
 
 // ============================================================
-// REFRESH
-// ============================================================
-
-async function refreshUniUZ() {
-
-    console.log(
-        "Refreshing UniUZ..."
-    );
-
-
-    try {
-
-        hideError();
-
-
-        const apiOnline =
-            await checkApi();
-
-
-        if (!apiOnline) {
-
-            showError(
-                t("offline")
-            );
-
-            return;
-        }
-
-
-        await loadProfile();
-
-        await loadHomework();
-
-        await loadAnnouncements();
-
-
-        console.log(
-            "UniUZ refreshed."
-        );
-
-    } catch (error) {
-
-        console.error(
-            "Refresh error:",
-            error
-        );
-
-
-        showError(
-            t("error")
-        );
-    }
-}
-
-
-// ============================================================
-// HIDE ERROR
-// ============================================================
-
-function hideError() {
-
-    const errorElement =
-        document.querySelector(
-            "#error"
-        );
-
-
-    if (errorElement) {
-
-        errorElement.style.display =
-            "none";
-
-        errorElement.textContent =
-            "";
-    }
-}
-
-
-// ============================================================
-// TELEGRAM MAIN BUTTON
-// ============================================================
-
-function setupTelegramMainButton() {
-
-    if (
-        !tg ||
-        !tg.MainButton
-    ) {
-        return;
-    }
-
-
-    try {
-
-        tg.MainButton.setText(
-            t("refresh")
-        );
-
-
-        tg.MainButton.onClick(
-            refreshUniUZ
-        );
-
-
-        console.log(
-            "Telegram MainButton ready"
-        );
-
-    } catch (error) {
-
-        console.warn(
-            "Telegram MainButton error:",
-            error
-        );
-    }
-}
-
-
-// ============================================================
-// DOM READY
+// START
 // ============================================================
 
 document.addEventListener(
     "DOMContentLoaded",
-    async function() {
+    () => {
 
         console.log(
             "UniUZ DOM loaded"
         );
 
 
-        // Всегда используем русский,
-        // если язык ранее не был сохранён.
-
-        if (!currentLanguage) {
-
-            currentLanguage =
-                "ru";
-
-            localStorage.setItem(
-                "uniuz_language",
-                "ru"
-            );
-        }
-
-
-        // Подключаем кнопки языка
-
         setupLanguageButtons();
-
-
-        // Навигация
 
         setupNavigation();
 
 
-        // Переводы
+        // ====================================================
+        // ЕСЛИ ЯЗЫК УЖЕ ВЫБРАН
+        // ====================================================
 
-        updateTranslations();
+        if (currentLanguage) {
 
+            const languageScreen =
+                document.getElementById(
+                    "languageScreen"
+                );
 
-        // Показываем приложение
-
-        hideLanguageScreen();
-
-        showMainApplication();
-
-
-        // Telegram Main Button
-
-        setupTelegramMainButton();
-
-
-        // Запускаем UniUZ
-
-        await initializeUniUZ();
-    }
-);
+            const app =
+                document.getElementById(
+                    "app"
+                );
 
 
-// ============================================================
-// PAGE VISIBILITY
-// ============================================================
+            if (languageScreen) {
 
-document.addEventListener(
-    "visibilitychange",
-    function() {
+                languageScreen.classList.add(
+                    "hidden"
+                );
 
-        if (
-            document.visibilityState ===
-            "visible"
-        ) {
+                languageScreen.style.display =
+                    "none";
+            }
 
-            console.log(
-                "UniUZ became visible"
-            );
+
+            if (app) {
+
+                // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ
+                app.classList.remove(
+                    "hidden"
+                );
+
+                app.style.display =
+                    "flex";
+            }
+
+
+            updateNavigation();
+
+
+            renderHome();
+
+
+            initializeApp();
+
+
+        } else {
+
+            // =================================================
+            // ПЕРВЫЙ ЗАПУСК
+            // =================================================
+
+            const app =
+                document.getElementById(
+                    "app"
+                );
+
+
+            if (app) {
+
+                app.classList.add(
+                    "hidden"
+                );
+
+                app.style.display =
+                    "none";
+            }
+
+
+            const languageScreen =
+                document.getElementById(
+                    "languageScreen"
+                );
+
+
+            if (languageScreen) {
+
+                languageScreen.classList.remove(
+                    "hidden"
+                );
+
+                languageScreen.style.display =
+                    "flex";
+            }
         }
     }
-);
-
-
-// ============================================================
-// GLOBAL FUNCTIONS
-// ============================================================
-
-window.UniUZ = {
-
-    API_URL,
-
-    getLanguage,
-
-    selectLanguage,
-
-    refreshUniUZ,
-
-    loadProfile,
-
-    loadHomework,
-
-    loadAnnouncements,
-
-    checkApi
-};
-
-
-console.log(
-    "UniUZ app.js loaded successfully"
 );
