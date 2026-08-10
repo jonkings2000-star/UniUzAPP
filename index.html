@@ -1,52 +1,327 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#0b0f19">
-  <title>UniUZ</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    >
+
+    <meta
+        name="theme-color"
+        content="#0b0f19"
+    >
+
+    <title>UniUZ</title>
+
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+
+    <script
+        src="https://telegram.org/js/telegram-web-app.js"
+    ></script>
+
 </head>
+
+
 <body>
-  <div id="languageScreen" class="language-screen">
-    <div class="language-card">
-      <div class="language-logo">🎓</div>
-      <h1>UniUZ</h1>
-      <p class="language-subtitle">Выберите язык / Choose language / 언어를 선택하세요</p>
 
-      <button class="language-btn" data-lang="ru">
-        🇷🇺 <span>Русский</span>
-      </button>
-      <button class="language-btn" data-lang="en">
-        🇬🇧 <span>English</span>
-      </button>
-      <button class="language-btn" data-lang="ko">
-        🇰🇷 <span>한국어</span>
-      </button>
+
+    <!-- =====================================================
+         LANGUAGE SCREEN
+         ===================================================== -->
+
+    <div
+        id="languageScreen"
+        class="language-screen"
+    >
+
+        <div class="language-card">
+
+            <div class="language-logo">
+                🎓
+            </div>
+
+            <h1>
+                UniUZ
+            </h1>
+
+            <p class="language-subtitle">
+                Выберите язык / Choose language / 언어를 선택하세요
+            </p>
+
+
+            <button
+                class="language-btn"
+                data-lang="ru"
+            >
+                🇷🇺
+                <span>
+                    Русский
+                </span>
+            </button>
+
+
+            <button
+                class="language-btn"
+                data-lang="en"
+            >
+                🇬🇧
+                <span>
+                    English
+                </span>
+            </button>
+
+
+            <button
+                class="language-btn"
+                data-lang="ko"
+            >
+                🇰🇷
+                <span>
+                    한국어
+                </span>
+            </button>
+
+        </div>
+
     </div>
-  </div>
 
-  <div class="app hidden" id="app">
-    <header class="topbar">
-      <div>
-        <div class="brand">🎓 UniUZ</div>
-        <div class="subtitle" id="welcome"></div>
-      </div>
-      <div class="avatar" id="avatar">U</div>
-    </header>
 
-    <main id="screen"></main>
 
-    <nav class="bottom-nav">
-      <button class="nav-item active" data-page="home"><span>🏠</span><small data-i18n="home"></small></button>
-      <button class="nav-item" data-page="schedule"><span>📅</span><small data-i18n="schedule"></small></button>
-      <button class="nav-item" data-page="homework"><span>📝</span><small data-i18n="homework"></small></button>
-      <button class="nav-item" data-page="ai"><span>🤖</span><small data-i18n="ai"></small></button>
-      <button class="nav-item" data-page="profile"><span>👤</span><small data-i18n="profile"></small></button>
-    </nav>
-  </div>
+    <!-- =====================================================
+         ROLE SCREEN
+         ===================================================== -->
 
-  <script src="app.js"></script>
+    <div
+        id="roleScreen"
+        class="language-screen hidden"
+    >
+
+        <div class="language-card">
+
+            <div class="language-logo">
+                🎓
+            </div>
+
+
+            <h1>
+                UniUZ
+            </h1>
+
+
+            <p
+                id="roleSubtitle"
+                class="language-subtitle"
+            >
+                Выберите роль
+            </p>
+
+
+            <button
+                class="role-btn"
+                data-role="student"
+            >
+
+                <span class="role-icon">
+                    🎓
+                </span>
+
+                <span
+                    id="studentRoleText"
+                >
+                    Студент
+                </span>
+
+            </button>
+
+
+            <button
+                class="role-btn"
+                data-role="teacher"
+            >
+
+                <span class="role-icon">
+                    👨‍🏫
+                </span>
+
+                <span
+                    id="teacherRoleText"
+                >
+                    Преподаватель
+                </span>
+
+            </button>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         MAIN APP
+         ===================================================== -->
+
+    <div
+        class="app hidden"
+        id="app"
+    >
+
+
+        <!-- TOP BAR -->
+
+        <header class="topbar">
+
+            <div>
+
+                <div class="brand">
+                    🎓 UniUZ
+                </div>
+
+                <div
+                    class="subtitle"
+                    id="welcome"
+                ></div>
+
+            </div>
+
+
+            <div
+                class="avatar"
+                id="avatar"
+            >
+                U
+            </div>
+
+        </header>
+
+
+
+        <!-- MAIN SCREEN -->
+
+        <main id="screen"></main>
+
+
+
+        <!-- BOTTOM NAV -->
+
+        <nav class="bottom-nav">
+
+            <button
+                class="nav-item active"
+                data-page="home"
+            >
+
+                <span>
+                    🏠
+                </span>
+
+                <small
+                    data-i18n="home"
+                ></small>
+
+            </button>
+
+
+            <button
+                class="nav-item"
+                data-page="schedule"
+            >
+
+                <span>
+                    📅
+                </span>
+
+                <small
+                    data-i18n="schedule"
+                ></small>
+
+            </button>
+
+
+            <button
+                class="nav-item"
+                data-page="homework"
+            >
+
+                <span>
+                    📝
+                </span>
+
+                <small
+                    data-i18n="homework"
+                ></small>
+
+            </button>
+
+
+            <button
+                class="nav-item"
+                data-page="ai"
+            >
+
+                <span>
+                    🤖
+                </span>
+
+                <small
+                    data-i18n="ai"
+                ></small>
+
+            </button>
+
+
+            <button
+                class="nav-item"
+                data-page="profile"
+            >
+
+                <span>
+                    👤
+                </span>
+
+                <small
+                    data-i18n="profile"
+                ></small>
+
+            </button>
+
+        </nav>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         LOADING
+         ===================================================== -->
+
+    <div id="loading">
+
+        <div class="loader"></div>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         ERROR
+         ===================================================== -->
+
+    <div id="error"></div>
+
+
+
+    <script
+        src="app.js"
+    ></script>
+
 </body>
+
 </html>
