@@ -956,6 +956,230 @@ id="createHomeworkBtn"
 
     };
 
+document
+.getElementById("createHomeworkBtn")
+.onclick = ()=>{
+
+    showCreateHomework();
+
+};
+
+
+}
+// ==========================================================
+// CREATE HOMEWORK PAGE
+// ==========================================================
+
+
+function showCreateHomework(){
+
+
+const s = getScreen();
+
+
+
+s.innerHTML = `
+
+
+<div class="page">
+
+
+<div class="info-card">
+
+
+<h2>
+📝 Создать задание
+</h2>
+
+
+
+<input
+
+id="hwTitle"
+
+placeholder="Название задания"
+
+class="input"
+
+/>
+
+
+
+<textarea
+
+id="hwDescription"
+
+placeholder="Описание"
+
+class="input"
+
+></textarea>
+
+
+
+<input
+
+id="hwGroup"
+
+placeholder="Группа"
+
+class="input"
+
+/>
+
+
+
+<input
+
+id="hwDeadline"
+
+placeholder="Дата сдачи"
+
+class="input"
+
+/>
+
+
+
+<button
+
+class="role-button"
+
+id="sendHomework"
+
+>
+
+✅ Опубликовать
+
+</button>
+
+
+
+<button
+
+class="role-button"
+
+id="backTeacher"
+
+>
+
+⬅️ Назад
+
+</button>
+
+
+
+</div>
+
+
+</div>
+
+
+`;
+
+
+
+
+
+document
+.getElementById("sendHomework")
+.onclick = async()=>{
+
+
+const homework = {
+
+
+title:
+
+document
+.getElementById("hwTitle")
+.value,
+
+
+description:
+
+document
+.getElementById("hwDescription")
+.value,
+
+
+group_name:
+
+document
+.getElementById("hwGroup")
+.value,
+
+
+deadline:
+
+document
+.getElementById("hwDeadline")
+.value
+
+
+};
+
+
+
+try{
+
+
+await apiRequest(
+
+"/api/teacher/homework/create",
+
+{
+
+method:"POST",
+
+body: homework
+
+}
+
+);
+
+
+
+alert(
+"Задание опубликовано ✅"
+);
+
+
+
+showTeacherHome();
+
+
+
+}
+
+catch(error){
+
+
+alert(
+error.message
+);
+
+
+}
+
+
+
+};
+
+
+
+
+
+document
+.getElementById("backTeacher")
+.onclick = ()=>{
+
+
+showTeacherHome();
+
+
+};
+
 
 }
 
