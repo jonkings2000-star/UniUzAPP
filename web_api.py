@@ -8,30 +8,24 @@ import json
 
 from urllib.parse import parse_qs
 
-
 from flask import (
     Flask,
     request,
     jsonify
 )
 
-
 from flask_cors import CORS
 
-
 import database
-
 
 
 # ==========================================================
 # APP
 # ==========================================================
 
-
 app = Flask(__name__)
 
 CORS(app)
-
 
 
 database.init_db()
@@ -42,7 +36,6 @@ database.init_db()
 # TELEGRAM AUTH
 # ==========================================================
 
-
 def get_telegram_user():
 
     init_data = request.headers.get(
@@ -51,13 +44,7 @@ def get_telegram_user():
 
 
     if not init_data:
-
-        print(
-            "NO TELEGRAM INIT DATA"
-        )
-
         return None
-
 
 
     try:
@@ -73,9 +60,7 @@ def get_telegram_user():
 
 
         if not user:
-
             return None
-
 
 
         return json.loads(
@@ -83,15 +68,12 @@ def get_telegram_user():
         )
 
 
-
     except Exception as e:
 
-
         print(
-            "Telegram parse error:",
+            "Telegram error:",
             e
         )
-
 
         return None
 
@@ -101,9 +83,7 @@ def get_telegram_user():
 
 def require_user():
 
-
     user = get_telegram_user()
-
 
 
     if not user:
@@ -119,7 +99,6 @@ def require_user():
         username=user.get(
             "username"
         ),
-
 
         full_name=(
 
@@ -158,16 +137,12 @@ def require_user():
 @app.get("/api/health")
 def health():
 
-
     return jsonify({
 
-        "ok":
-        True,
-
+        "ok": True,
 
         "service":
         "UniUZ API",
-
 
         "status":
         "online"
@@ -184,15 +159,12 @@ def health():
 
 
 @app.get("/api/me")
-def profile():
-
+def me():
 
     user = require_user()
 
 
-
     if not user:
-
 
         return jsonify({
 
@@ -203,16 +175,14 @@ def profile():
 
 
 
-    user_db = database.get_user(
+    profile = database.get_user(
         user["id"]
     )
-
 
 
     teacher = database.get_teacher(
         user["id"]
     )
-
 
 
     return jsonify({
@@ -222,15 +192,13 @@ def profile():
 
 
         "profile":
-        dict(user_db)
-        if user_db
-        else None,
+        dict(profile)
+        if profile else None,
 
 
         "teacher_status":
         teacher["status"]
-        if teacher
-        else None,
+        if teacher else None,
 
 
         "is_admin":
@@ -247,12 +215,10 @@ def profile():
 @app.post("/api/teacher/request")
 def teacher_request():
 
-
     user = require_user()
 
 
     if not user:
-
 
         return jsonify({
 
@@ -267,23 +233,25 @@ def teacher_request():
 
 
 
-    teacher = database.get_teacher(
+    existing = database.get_teacher(
         telegram_id
     )
 
 
-
-    if teacher:
-
+    if existing:
 
         return jsonify({
 
             "status":
-            teacher["status"]
+            existing["status"]
 
         })
 
 
+
+    # ВАЖНО:
+    # без username, потому что database.py
+    # его не принимает
 
     database.add_teacher_request(
 
@@ -308,14 +276,10 @@ def teacher_request():
                 ""
             )
 
-        ).strip(),
-
-
-        username=user.get(
-            "username"
-        )
+        ).strip()
 
     )
+
 
 
     return jsonify({
@@ -344,7 +308,6 @@ def teacher_status():
 
     if not user:
 
-
         return jsonify({
 
             "error":
@@ -364,7 +327,6 @@ def teacher_status():
 
 
     if not teacher:
-
 
         return jsonify({
 
@@ -387,7 +349,7 @@ def teacher_status():
 
 
 # ==========================================================
-# ADMIN AUTH
+# ADMIN CHECK
 # ==========================================================
 
 
@@ -426,7 +388,7 @@ def require_admin():
 
 
 @app.get("/api/admin/teacher-requests")
-def admin_requests():
+def admin_teacher_requests():
 
 
     admin = require_admin()
@@ -467,10 +429,6 @@ def admin_requests():
             teacher["full_name"],
 
 
-            "username":
-            teacher["username"],
-
-
             "status":
             teacher["status"]
 
@@ -497,9 +455,7 @@ def admin_requests():
 @app.post(
     "/api/admin/teacher/<int:telegram_id>/approve"
 )
-def approve_teacher(
-    telegram_id
-):
+def approve_teacher(telegram_id):
 
 
     admin = require_admin()
@@ -507,7 +463,6 @@ def approve_teacher(
 
 
     if not admin:
-
 
         return jsonify({
 
@@ -524,7 +479,6 @@ def approve_teacher(
         telegram_id
 
     )
-
 
 
     return jsonify({
@@ -546,9 +500,7 @@ def approve_teacher(
 @app.post(
     "/api/admin/teacher/<int:telegram_id>/reject"
 )
-def reject_teacher(
-    telegram_id
-):
+def reject_teacher(telegram_id):
 
 
     admin = require_admin()
@@ -556,7 +508,6 @@ def reject_teacher(
 
 
     if not admin:
-
 
         return jsonify({
 
@@ -573,7 +524,6 @@ def reject_teacher(
         telegram_id
 
     )
-
 
 
     return jsonify({
@@ -596,14 +546,12 @@ def homework():
 
     if not user:
 
-
         return jsonify({
 
             "error":
             "Unauthorized"
 
         }),401
-
 
 
 
@@ -617,7 +565,6 @@ def homework():
 
     if not profile:
 
-
         return jsonify({
 
             "items":
@@ -627,13 +574,20 @@ def homework():
 
 
 
-    items = database.get_student_homework(
+    try:
 
-        profile["department"],
+        items = database.get_student_homework(
 
-        profile["group_name"]
+            profile["department"],
 
-    )
+            profile["group_name"]
+
+        )
+
+
+    except Exception:
+
+        items = []
 
 
 
@@ -667,9 +621,7 @@ def announcements():
     user = require_user()
 
 
-
     if not user:
-
 
         return jsonify({
 
@@ -691,7 +643,6 @@ def announcements():
 
     if not profile:
 
-
         return jsonify({
 
             "items":
@@ -701,13 +652,20 @@ def announcements():
 
 
 
-    items = database.get_student_announcements(
+    try:
 
-        profile["department"],
+        items = database.get_student_announcements(
 
-        profile["group_name"]
+            profile["department"],
 
-    )
+            profile["group_name"]
+
+        )
+
+
+    except Exception:
+
+        items = []
 
 
 
@@ -735,7 +693,7 @@ def announcements():
 
 
 @app.errorhandler(404)
-def page_not_found(error):
+def not_found(error):
 
 
     return jsonify({
@@ -771,7 +729,7 @@ if __name__ == "__main__":
 
 
     print(
-        "=============================="
+        "================================"
     )
 
     print(
@@ -783,9 +741,8 @@ if __name__ == "__main__":
     )
 
     print(
-        "=============================="
+        "================================"
     )
-
 
 
     app.run(
