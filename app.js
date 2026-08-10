@@ -1,14 +1,4 @@
-// ============================================================
-// UniUZ Mini App
-// app.js
-// ============================================================
-
 const API_URL = "https://uniuz-production.up.railway.app";
-
-
-// ============================================================
-// TELEGRAM
-// ============================================================
 
 const tg = window.Telegram?.WebApp || null;
 
@@ -16,17 +6,10 @@ if (tg) {
     try {
         tg.ready();
         tg.expand();
-    } catch (error) {
-        console.warn("Telegram WebApp init error:", error);
-    }
+    } catch (_) {}
 }
 
 const initData = tg?.initData || "";
-
-
-// ============================================================
-// STATE
-// ============================================================
 
 let currentLanguage =
     localStorage.getItem("uniuz_language") || null;
@@ -35,237 +18,259 @@ let currentRole =
     localStorage.getItem("uniuz_role") || null;
 
 let teacherStatus = null;
+let isAdmin = false;
 
+let cachedProfile = null;
+let cachedHomework = [];
+let cachedAnnouncements = [];
 
-// ============================================================
-// TRANSLATIONS
-// ============================================================
 
 const translations = {
 
     ru: {
+        chooseRole: "Выберите вашу роль",
+        roleSub: "Как вы будете использовать UniUZ?",
+        student: "🎓 Студент",
+        teacher: "👨‍🏫 Преподаватель",
+        admin: "🔐 Панель администратора",
 
-        loading: "Загрузка...",
-
-        error:
-            "⚠️ Не удалось загрузить данные UniUZ.",
-
-        noHomework:
-            "📚 Нет заданий",
-
-        noAnnouncements:
-            "📢 Нет объявлений",
-
-        chooseRole:
-            "Выберите вашу роль",
-
-        studentRole:
-            "Студент",
-
-        teacherRole:
-            "Преподаватель",
-
-        pendingTitle:
-            "Заявка отправлена",
+        pending: "⏳ Заявка отправлена",
 
         pendingText:
-            "Ваша заявка на регистрацию преподавателя отправлена администратору. Дождитесь одобрения.",
+            "Ваша заявка отправлена администратору. Дождитесь одобрения.",
 
-        sendRequest:
-            "📨 Отправить заявку",
+        sendRequest: "📨 Отправить заявку",
+        check: "🔄 Проверить статус",
 
-        checkStatus:
-            "🔄 Проверить статус",
-
-        approvedTitle:
+        approved:
             "✅ Вы одобрены как преподаватель",
 
-        rejectedTitle:
+        rejected:
             "❌ Заявка отклонена",
 
-        rejectedText:
-            "Администратор отклонил вашу заявку. Вы можете отправить её повторно.",
+        retry:
+            "📨 Подать заявку снова",
 
-        requestSent:
-            "✅ Заявка отправлена администратору.",
+        back:
+            "⬅️ Назад к выбору роли",
 
-        requestError:
-            "⚠️ Не удалось отправить заявку.",
+        approve:
+            "✅ Одобрить",
 
-        browserTeacher:
-            "Откройте UniUZ внутри Telegram, чтобы отправить заявку преподавателя.",
+        reject:
+            "❌ Отклонить",
 
-        studentWelcome:
-            "Добро пожаловать в UniUZ 🎓",
+        refresh:
+            "🔄 Обновить",
 
-        teacherWelcome:
-            "Добро пожаловать, преподаватель 👨‍🏫"
+        noRequests:
+            "📭 Новых заявок нет",
+
+        adminTitle:
+            "Заявки преподавателей",
+
+        welcome:
+            "Добро пожаловать 👋",
+
+        schedule:
+            "Расписание",
+
+        homework:
+            "Задания",
+
+        announcements:
+            "Объявления",
+
+        ai:
+            "ИИ",
+
+        profile:
+            "Профиль",
+
+        today:
+            "Сегодня",
+
+        quick:
+            "Быстрые действия",
+
+        apiError:
+            "⚠️ API недоступен"
     },
 
 
     en: {
+        chooseRole: "Choose your role",
+        roleSub: "How will you use UniUZ?",
+        student: "🎓 Student",
+        teacher: "👨‍🏫 Professor",
+        admin: "🔐 Administrator panel",
 
-        loading: "Loading...",
-
-        error:
-            "⚠️ Failed to load UniUZ data.",
-
-        noHomework:
-            "📚 No homework",
-
-        noAnnouncements:
-            "📢 No announcements",
-
-        chooseRole:
-            "Choose your role",
-
-        studentRole:
-            "Student",
-
-        teacherRole:
-            "Teacher",
-
-        pendingTitle:
-            "Request submitted",
+        pending:
+            "⏳ Request submitted",
 
         pendingText:
-            "Your teacher registration request has been sent to the administrator. Please wait for approval.",
+            "Your request was sent to the administrator. Please wait for approval.",
 
         sendRequest:
             "📨 Send request",
 
-        checkStatus:
+        check:
             "🔄 Check status",
 
-        approvedTitle:
-            "✅ You are approved as a teacher",
+        approved:
+            "✅ You are approved as a professor",
 
-        rejectedTitle:
+        rejected:
             "❌ Request rejected",
 
-        rejectedText:
-            "The administrator rejected your request. You can submit it again.",
+        retry:
+            "📨 Submit again",
 
-        requestSent:
-            "✅ Request sent to the administrator.",
+        back:
+            "⬅️ Back to role selection",
 
-        requestError:
-            "⚠️ Failed to send the request.",
+        approve:
+            "✅ Approve",
 
-        browserTeacher:
-            "Open UniUZ inside Telegram to send a teacher request.",
+        reject:
+            "❌ Reject",
 
-        studentWelcome:
-            "Welcome to UniUZ 🎓",
+        refresh:
+            "🔄 Refresh",
 
-        teacherWelcome:
-            "Welcome, teacher 👨‍🏫"
+        noRequests:
+            "📭 No new requests",
+
+        adminTitle:
+            "Teacher requests",
+
+        welcome:
+            "Welcome 👋",
+
+        schedule:
+            "Schedule",
+
+        homework:
+            "Homework",
+
+        announcements:
+            "Announcements",
+
+        ai:
+            "AI",
+
+        profile:
+            "Profile",
+
+        today:
+            "Today",
+
+        quick:
+            "Quick actions",
+
+        apiError:
+            "⚠️ API unavailable"
     },
 
 
     ko: {
-
-        loading: "로딩 중...",
-
-        error:
-            "⚠️ UniUZ 데이터를 불러오지 못했습니다.",
-
-        noHomework:
-            "📚 과제가 없습니다",
-
-        noAnnouncements:
-            "📢 공지가 없습니다",
-
         chooseRole:
             "역할을 선택하세요",
 
-        studentRole:
-            "학생",
+        roleSub:
+            "UniUZ를 어떻게 사용하시겠습니까?",
 
-        teacherRole:
-            "교수님",
+        student:
+            "🎓 학생",
 
-        pendingTitle:
-            "신청이 전송되었습니다",
+        teacher:
+            "👨‍🏫 교수님",
+
+        admin:
+            "🔐 관리자 패널",
+
+        pending:
+            "⏳ 신청이 접수되었습니다",
 
         pendingText:
-            "교수 등록 신청이 관리자에게 전송되었습니다. 승인을 기다려 주세요.",
+            "관리자에게 신청이 전송되었습니다. 승인을 기다려 주세요.",
 
         sendRequest:
             "📨 신청 보내기",
 
-        checkStatus:
+        check:
             "🔄 상태 확인",
 
-        approvedTitle:
+        approved:
             "✅ 교수님으로 승인되었습니다",
 
-        rejectedTitle:
+        rejected:
             "❌ 신청이 거절되었습니다",
 
-        rejectedText:
-            "관리자가 신청을 거절했습니다. 다시 신청할 수 있습니다.",
+        retry:
+            "📨 다시 신청",
 
-        requestSent:
-            "✅ 관리자에게 신청을 보냈습니다.",
+        back:
+            "⬅️ 역할 선택으로 돌아가기",
 
-        requestError:
-            "⚠️ 신청을 보내지 못했습니다.",
+        approve:
+            "✅ 승인",
 
-        browserTeacher:
-            "교수 신청을 보내려면 Telegram에서 UniUZ를 열어 주세요.",
+        reject:
+            "❌ 거절",
 
-        studentWelcome:
-            "UniUZ에 오신 것을 환영합니다 🎓",
+        refresh:
+            "🔄 새로고침",
 
-        teacherWelcome:
-            "교수님, UniUZ에 오신 것을 환영합니다 👨‍🏫"
+        noRequests:
+            "📭 새로운 신청이 없습니다",
+
+        adminTitle:
+            "교수 신청",
+
+        welcome:
+            "환영합니다 👋",
+
+        schedule:
+            "시간표",
+
+        homework:
+            "과제",
+
+        announcements:
+            "공지사항",
+
+        ai:
+            "AI",
+
+        profile:
+            "프로필",
+
+        today:
+            "오늘",
+
+        quick:
+            "빠른 메뉴",
+
+        apiError:
+            "⚠️ API를 사용할 수 없습니다"
     }
 
 };
 
 
-// ============================================================
-// TRANSLATION HELPER
-// ============================================================
-
-function getLanguage() {
-
-    return (
-        currentLanguage &&
-        translations[currentLanguage]
-    )
-        ? currentLanguage
-        : "ru";
-}
-
-
 function T(key) {
 
-    const lang = getLanguage();
-
     return (
-        translations[lang]?.[key] ??
-        translations.ru[key] ??
-        key
-    );
+        translations[currentLanguage] ||
+        translations.ru
+    )[key] || key;
 }
 
-
-// ============================================================
-// HTML ESCAPE
-// ============================================================
 
 function escapeHtml(value) {
 
-    if (
-        value === null ||
-        value === undefined
-    ) {
-        return "";
-    }
-
-    return String(value)
+    return String(value ?? "")
         .replaceAll("&", "&amp;")
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;")
@@ -274,976 +279,68 @@ function escapeHtml(value) {
 }
 
 
-// ============================================================
-// SET TEXT
-// ============================================================
-
-function setText(selector, value) {
-
-    const element =
-        document.querySelector(selector);
-
-    if (element) {
-        element.textContent =
-            value ?? "";
-    }
+function screen() {
+    return document.querySelector("#screen");
 }
 
 
-// ============================================================
-// FIND LANGUAGE SCREEN
-// ============================================================
+function setNav(visible) {
 
-function findLanguageScreen() {
+    const nav =
+        document.querySelector(".bottom-nav");
 
-    const selectors = [
-
-        "#language-screen",
-
-        ".language-screen",
-
-        "#language-selection",
-
-        ".language-selection",
-
-        "#language-container",
-
-        ".language-container"
-
-    ];
-
-
-    for (const selector of selectors) {
-
-        const element =
-            document.querySelector(selector);
-
-        if (element) {
-            return element;
-        }
+    if (nav) {
+        nav.style.display =
+            visible ? "" : "none";
     }
-
-
-    // Fallback
-
-    const buttons =
-        [...document.querySelectorAll("button")];
-
-
-    const languageButtons =
-        buttons.filter(button => {
-
-            const text =
-                (
-                    button.textContent ||
-                    ""
-                ).toLowerCase();
-
-            return (
-
-                text.includes("рус") ||
-
-                text.includes("english") ||
-
-                text.includes("한국") ||
-
-                text.includes("korean")
-
-            );
-        });
-
-
-    if (
-        languageButtons.length >= 3
-    ) {
-
-        let parent =
-            languageButtons[0]
-                .parentElement;
-
-
-        for (
-            let i = 0;
-            i < 6 && parent;
-            i++
-        ) {
-
-            const count =
-                parent.querySelectorAll(
-                    "button"
-                ).length;
-
-
-            if (count >= 3) {
-
-                return parent;
-            }
-
-
-            parent =
-                parent.parentElement;
-        }
-    }
-
-
-    return null;
 }
 
-
-// ============================================================
-// HIDE LANGUAGE SCREEN
-// ============================================================
 
 function hideLanguageScreen() {
 
-    const screen =
-        findLanguageScreen();
+    const el =
+        document.querySelector(
+            "#languageScreen, #language-screen, .language-screen"
+        );
 
-    if (screen) {
-
-        screen.style.display =
-            "none";
+    if (el) {
+        el.style.display = "none";
     }
 }
 
 
-// ============================================================
-// SHOW MAIN APP
-// ============================================================
+function showLoading() {
 
-function showMainApplication() {
+    const el =
+        document.querySelector("#loading");
 
-    const possibleScreens = [
-
-        "#app",
-
-        "#main-app",
-
-        ".app",
-
-        ".main-app",
-
-        "#main",
-
-        "main"
-
-    ];
-
-
-    for (
-        const selector
-        of possibleScreens
-    ) {
-
-        const element =
-            document.querySelector(
-                selector
-            );
-
-
-        if (element) {
-
-            element.style.display =
-                "";
-        }
+    if (el) {
+        el.style.display = "flex";
     }
 }
 
 
-// ============================================================
-// HIDE MAIN APP
-// ============================================================
+function hideLoading() {
 
-function hideMainApplication() {
+    const el =
+        document.querySelector("#loading");
 
-    const possibleScreens = [
-
-        "#app",
-
-        "#main-app",
-
-        ".app",
-
-        ".main-app",
-
-        "#main",
-
-        "main"
-
-    ];
-
-
-    for (
-        const selector
-        of possibleScreens
-    ) {
-
-        const element =
-            document.querySelector(
-                selector
-            );
-
-
-        if (element) {
-
-            element.style.display =
-                "none";
-        }
+    if (el) {
+        el.style.display = "none";
     }
 }
 
 
-// ============================================================
-// LANGUAGE SELECTION
-// ============================================================
+function showError(message) {
 
-async function selectLanguage(language) {
+    console.error(message);
 
-    if (
-        !["ru", "en", "ko"]
-            .includes(language)
-    ) {
-        return;
-    }
-
-
-    currentLanguage =
-        language;
-
-
-    localStorage.setItem(
-        "uniuz_language",
-        language
-    );
-
-
-    console.log(
-        "UniUZ language:",
-        language
-    );
-
-
-    hideLanguageScreen();
-
-
-    // IMPORTANT:
-    // After language we DO NOT
-    // open the application yet.
-    // First we choose role.
-
-    showRoleScreen();
-}
-
-
-// Make available to HTML onclick
-
-window.selectLanguage =
-    selectLanguage;
-
-
-// ============================================================
-// LANGUAGE BUTTONS
-// ============================================================
-
-function setupLanguageButtons() {
-
-    const buttons =
-        document.querySelectorAll(
-            ".language-btn"
-        );
-
-
-    buttons.forEach(button => {
-
-        button.addEventListener(
-            "click",
-            function(event) {
-
-                event.preventDefault();
-                event.stopPropagation();
-
-
-                const language =
-                    button.dataset.lang;
-
-
-                if (language) {
-
-                    selectLanguage(
-                        language
-                    );
-                }
-
-            }
-        );
-
-    });
+    alert(message);
 }
 
 
 // ============================================================
-// ROLE SCREEN STYLES
-// ============================================================
-
-function injectRoleStyles() {
-
-    if (
-        document.getElementById(
-            "uniuz-role-styles"
-        )
-    ) {
-        return;
-    }
-
-
-    const style =
-        document.createElement(
-            "style"
-        );
-
-
-    style.id =
-        "uniuz-role-styles";
-
-
-    style.textContent = `
-
-        #uniuzRoleScreen {
-
-            position: fixed;
-
-            inset: 0;
-
-            z-index: 999999;
-
-            display: flex;
-
-            align-items: center;
-
-            justify-content: center;
-
-            padding: 20px;
-
-            box-sizing: border-box;
-
-            background:
-                radial-gradient(
-                    circle at 50% 0%,
-                    #1b2b49 0%,
-                    #0e1728 42%,
-                    #080e19 100%
-                );
-
-            color: #ffffff;
-
-            font-family:
-                -apple-system,
-                BlinkMacSystemFont,
-                "Segoe UI",
-                Roboto,
-                Arial,
-                sans-serif;
-
-            overflow-y: auto;
-
-        }
-
-
-        #uniuzRoleScreen.hidden {
-
-            display: none !important;
-
-        }
-
-
-        .uniuz-role-card {
-
-            width: 100%;
-
-            max-width: 390px;
-
-            padding: 30px 22px;
-
-            box-sizing: border-box;
-
-            border-radius: 26px;
-
-            background:
-                rgba(
-                    20,
-                    32,
-                    52,
-                    .97
-                );
-
-            border:
-                1px solid
-                rgba(
-                    104,
-                    140,
-                    194,
-                    .34
-                );
-
-            box-shadow:
-                0 25px 70px
-                rgba(
-                    0,
-                    0,
-                    0,
-                    .5
-                );
-
-            text-align: center;
-
-        }
-
-
-        .uniuz-role-logo {
-
-            width: 76px;
-
-            height: 76px;
-
-            margin:
-                0 auto 18px;
-
-            border-radius: 23px;
-
-            display: flex;
-
-            align-items: center;
-
-            justify-content: center;
-
-            font-size: 38px;
-
-            background:
-                linear-gradient(
-                    145deg,
-                    #2a4169,
-                    #182945
-                );
-
-            border:
-                1px solid
-                rgba(
-                    130,
-                    166,
-                    220,
-                    .38
-                );
-
-            box-shadow:
-                0 12px 35px
-                rgba(
-                    0,
-                    0,
-                    0,
-                    .3
-                );
-
-        }
-
-
-        .uniuz-role-card h1 {
-
-            margin: 0;
-
-            font-size: 30px;
-
-            font-weight: 800;
-
-            letter-spacing:
-                -.5px;
-
-        }
-
-
-        .uniuz-role-subtitle {
-
-            margin:
-                10px 0 25px;
-
-            color:
-                #9db0ce;
-
-            font-size: 15px;
-
-        }
-
-
-        .uniuz-role-buttons {
-
-            display: flex;
-
-            flex-direction: column;
-
-            gap: 12px;
-
-        }
-
-
-        .uniuz-role-btn {
-
-            width: 100%;
-
-            min-height: 58px;
-
-            border-radius: 16px;
-
-            border:
-                1px solid
-                rgba(
-                    115,
-                    150,
-                    205,
-                    .35
-                );
-
-            background:
-                linear-gradient(
-                    135deg,
-                    #273f66,
-                    #1b2f50
-                );
-
-            color: #ffffff;
-
-            display: flex;
-
-            align-items: center;
-
-            justify-content: center;
-
-            gap: 10px;
-
-            padding: 0 18px;
-
-            font-size: 16px;
-
-            font-weight: 700;
-
-            cursor: pointer;
-
-            -webkit-tap-highlight-color:
-                transparent;
-
-            transition:
-                transform .12s ease,
-                background .15s ease,
-                border-color .15s ease;
-
-        }
-
-
-        .uniuz-role-btn.teacher {
-
-            background:
-                linear-gradient(
-                    135deg,
-                    #30466f,
-                    #3b2d61
-                );
-
-        }
-
-
-        .uniuz-role-btn:hover {
-
-            border-color:
-                rgba(
-                    150,
-                    185,
-                    235,
-                    .65
-                );
-
-        }
-
-
-        .uniuz-role-btn:active {
-
-            transform:
-                scale(.97);
-
-        }
-
-
-        .uniuz-role-btn:disabled {
-
-            opacity: .55;
-
-            cursor:
-                not-allowed;
-
-        }
-
-
-        .uniuz-role-icon {
-
-            width: 28px;
-
-            font-size: 22px;
-
-            text-align: center;
-
-        }
-
-
-        .uniuz-teacher-status {
-
-            margin-top: 18px;
-
-            padding: 16px;
-
-            box-sizing: border-box;
-
-            border-radius: 16px;
-
-            background:
-                rgba(
-                    7,
-                    14,
-                    26,
-                    .55
-                );
-
-            border:
-                1px solid
-                rgba(
-                    100,
-                    130,
-                    175,
-                    .25
-                );
-
-            color:
-                #c9d5e8;
-
-            font-size: 14px;
-
-            line-height: 1.5;
-
-        }
-
-
-        .uniuz-status-title {
-
-            color: #ffffff;
-
-            font-size: 16px;
-
-            font-weight: 700;
-
-            margin-bottom: 8px;
-
-        }
-
-
-        .uniuz-status-button {
-
-            width: 100%;
-
-            min-height: 48px;
-
-            margin-top: 12px;
-
-            border: 0;
-
-            border-radius: 13px;
-
-            background:
-                linear-gradient(
-                    135deg,
-                    #2b4775,
-                    #27365e
-                );
-
-            color: #ffffff;
-
-            font-size: 14px;
-
-            font-weight: 700;
-
-            cursor: pointer;
-
-        }
-
-
-        .uniuz-status-button:active {
-
-            transform:
-                scale(.98);
-
-        }
-
-    `;
-
-
-    document.head.appendChild(
-        style
-    );
-}
-
-
-// ============================================================
-// CREATE ROLE SCREEN
-// ============================================================
-
-function ensureRoleScreen() {
-
-    injectRoleStyles();
-
-
-    let screen =
-        document.getElementById(
-            "uniuzRoleScreen"
-        );
-
-
-    if (!screen) {
-
-        screen =
-            document.createElement(
-                "div"
-            );
-
-
-        screen.id =
-            "uniuzRoleScreen";
-
-
-        document.body.appendChild(
-            screen
-        );
-    }
-
-
-    screen.innerHTML = `
-
-        <div class="uniuz-role-card">
-
-            <div class="uniuz-role-logo">
-                🎓
-            </div>
-
-
-            <h1>
-                UniUZ
-            </h1>
-
-
-            <div
-                class="uniuz-role-subtitle"
-                id="uniuzRoleSubtitle"
-            ></div>
-
-
-            <div
-                class="uniuz-role-buttons"
-            >
-
-                <button
-                    type="button"
-                    class="uniuz-role-btn"
-                    id="uniuzStudentButton"
-                >
-
-                    <span
-                        class="uniuz-role-icon"
-                    >
-                        🎓
-                    </span>
-
-                    <span
-                        id="uniuzStudentText"
-                    ></span>
-
-                </button>
-
-
-                <button
-                    type="button"
-                    class="uniuz-role-btn teacher"
-                    id="uniuzTeacherButton"
-                >
-
-                    <span
-                        class="uniuz-role-icon"
-                    >
-                        👨‍🏫
-                    </span>
-
-                    <span
-                        id="uniuzTeacherText"
-                    ></span>
-
-                </button>
-
-            </div>
-
-
-            <div
-                id="uniuzTeacherArea"
-            ></div>
-
-        </div>
-
-    `;
-
-
-    updateRoleScreen();
-
-
-    const studentButton =
-        document.getElementById(
-            "uniuzStudentButton"
-        );
-
-
-    const teacherButton =
-        document.getElementById(
-            "uniuzTeacherButton"
-        );
-
-
-    if (studentButton) {
-
-        studentButton.onclick =
-            async function(event) {
-
-                event.preventDefault();
-                event.stopPropagation();
-
-                await selectStudent();
-
-            };
-    }
-
-
-    if (teacherButton) {
-
-        teacherButton.onclick =
-            async function(event) {
-
-                event.preventDefault();
-                event.stopPropagation();
-
-                await handleTeacherRole();
-
-            };
-    }
-
-
-    return screen;
-}
-
-
-// ============================================================
-// UPDATE ROLE SCREEN
-// ============================================================
-
-function updateRoleScreen() {
-
-    const subtitle =
-        document.getElementById(
-            "uniuzRoleSubtitle"
-        );
-
-
-    const student =
-        document.getElementById(
-            "uniuzStudentText"
-        );
-
-
-    const teacher =
-        document.getElementById(
-            "uniuzTeacherText"
-        );
-
-
-    if (subtitle) {
-
-        subtitle.textContent =
-            T("chooseRole");
-    }
-
-
-    if (student) {
-
-        student.textContent =
-            T("studentRole");
-    }
-
-
-    if (teacher) {
-
-        teacher.textContent =
-            T("teacherRole");
-    }
-
-
-    updateTeacherArea();
-}
-
-
-// ============================================================
-// SHOW ROLE SCREEN
-// ============================================================
-
-function showRoleScreen() {
-
-    const screen =
-        ensureRoleScreen();
-
-
-    hideLanguageScreen();
-
-    hideMainApplication();
-
-
-    screen.style.display =
-        "flex";
-
-
-    screen.classList.remove(
-        "hidden"
-    );
-
-
-    updateRoleScreen();
-
-}
-
-
-// ============================================================
-// HIDE ROLE SCREEN
-// ============================================================
-
-function hideRoleScreen() {
-
-    const screen =
-        document.getElementById(
-            "uniuzRoleScreen"
-        );
-
-
-    if (screen) {
-
-        screen.style.display =
-            "none";
-
-        screen.classList.add(
-            "hidden"
-        );
-    }
-}
-
-
-// ============================================================
-// API REQUEST
+// API
 // ============================================================
 
 async function apiRequest(
@@ -1251,42 +348,52 @@ async function apiRequest(
     options = {}
 ) {
 
+    const headers = {
+
+        "X-Telegram-Init-Data":
+            initData,
+
+        ...(options.headers || {})
+
+    };
+
+
+    if (
+        options.body !== undefined
+    ) {
+
+        headers["Content-Type"] =
+            "application/json";
+    }
+
+
     const response =
         await fetch(
-            `${API_URL}${path}`,
+            API_URL + path,
             {
                 method:
-                    options.method ||
-                    "GET",
+                    options.method || "GET",
 
-                headers: {
-
-                    "X-Telegram-Init-Data":
-                        initData,
-
-                    ...(options.headers || {})
-
-                },
+                headers,
 
                 body:
-                    options.body
+                    options.body === undefined
+                        ? undefined
+                        : JSON.stringify(
+                            options.body
+                        )
             }
         );
 
 
-    let data = null;
-
+    let data = {};
 
     try {
 
         data =
             await response.json();
 
-    } catch {
-
-        data = {};
-
-    }
+    } catch (_) {}
 
 
     if (!response.ok) {
@@ -1302,17 +409,14 @@ async function apiRequest(
 }
 
 
-// ============================================================
-// API HEALTH
-// ============================================================
-
 async function checkApi() {
 
     try {
 
         const response =
             await fetch(
-                `${API_URL}/api/health`
+                API_URL +
+                "/api/health"
             );
 
 
@@ -1320,777 +424,18 @@ async function checkApi() {
             await response.json();
 
 
-        console.log(
-            "UniUZ API:",
-            data
-        );
-
-
-        return (
-            data.ok === true
-        );
+        return data.ok === true;
 
     } catch (error) {
 
         console.error(
-            "UniUZ API unavailable:",
+            "API health:",
             error
         );
-
 
         return false;
     }
 }
-
-
-// ============================================================
-// TEACHER STATUS
-// ============================================================
-
-async function getTeacherStatus() {
-
-    // First try the Mini App API.
-
-    try {
-
-        const data =
-            await apiRequest(
-                "/api/teacher/status"
-            );
-
-
-        if (
-            data &&
-            data.status
-        ) {
-
-            return data;
-        }
-
-
-        if (
-            data &&
-            data.teacher &&
-            data.teacher.status
-        ) {
-
-            return {
-
-                status:
-                    data.teacher.status
-
-            };
-        }
-
-
-    } catch (error) {
-
-        console.warn(
-            "Teacher status API unavailable:",
-            error
-        );
-
-    }
-
-
-    // No API endpoint yet.
-    // Return local state.
-
-    return {
-
-        status:
-            teacherStatus
-
-    };
-}
-
-
-// ============================================================
-// TEACHER REQUEST
-// ============================================================
-
-async function sendTeacherRequest() {
-
-    const button =
-        document.getElementById(
-            "uniuzTeacherRequestButton"
-        );
-
-
-    if (button) {
-
-        button.disabled =
-            true;
-
-        button.textContent =
-            T("loading");
-    }
-
-
-    // --------------------------------------------------------
-    // Try backend API first
-    // --------------------------------------------------------
-
-    try {
-
-        const data =
-            await apiRequest(
-                "/api/teacher/request",
-                {
-
-                    method:
-                        "POST",
-
-                    headers: {
-
-                        "Content-Type":
-                            "application/json"
-
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            initData:
-                                initData
-
-                        })
-
-                }
-            );
-
-
-        teacherStatus =
-            data.status ||
-            "pending";
-
-
-        updateTeacherArea();
-
-
-        showTeacherMessage(
-            T("requestSent")
-        );
-
-
-        return;
-
-    } catch (error) {
-
-        console.warn(
-            "Teacher API request unavailable:",
-            error
-        );
-
-    }
-
-
-    // --------------------------------------------------------
-    // Telegram fallback
-    // --------------------------------------------------------
-
-    if (tg) {
-
-        try {
-
-            const user =
-                tg.initDataUnsafe?.user;
-
-
-            const payload = {
-
-                action:
-                    "teacher_request",
-
-                user_id:
-                    user?.id || null,
-
-                username:
-                    user?.username || null,
-
-                first_name:
-                    user?.first_name || null,
-
-                last_name:
-                    user?.last_name || null,
-
-                language:
-                    currentLanguage || "ru"
-
-            };
-
-
-            tg.sendData(
-                JSON.stringify(
-                    payload
-                )
-            );
-
-
-            teacherStatus =
-                "pending";
-
-
-            updateTeacherArea();
-
-
-            showTeacherMessage(
-                T("requestSent")
-            );
-
-
-            return;
-
-        } catch (error) {
-
-            console.error(
-                "Telegram sendData error:",
-                error
-            );
-
-        }
-
-    }
-
-
-    // --------------------------------------------------------
-    // Browser
-    // --------------------------------------------------------
-
-    if (button) {
-
-        button.disabled =
-            false;
-
-        button.textContent =
-            T("sendRequest");
-    }
-
-
-    showTeacherMessage(
-        tg
-            ? T("requestError")
-            : T("browserTeacher")
-    );
-}
-
-
-// ============================================================
-// CHECK TEACHER APPROVAL
-// ============================================================
-
-async function checkTeacherApproval() {
-
-    const button =
-        document.getElementById(
-            "uniuzCheckTeacherButton"
-        );
-
-
-    if (button) {
-
-        button.disabled =
-            true;
-
-        button.textContent =
-            T("loading");
-    }
-
-
-    try {
-
-        const data =
-            await getTeacherStatus();
-
-
-        if (
-            data.status ===
-            "approved"
-        ) {
-
-            teacherStatus =
-                "approved";
-
-
-            currentRole =
-                "teacher";
-
-
-            localStorage.setItem(
-                "uniuz_role",
-                "teacher"
-            );
-
-
-            hideRoleScreen();
-
-            showMainApplication();
-
-
-            await initializeUniUZ();
-
-
-            return;
-        }
-
-
-        teacherStatus =
-            data.status ||
-            "pending";
-
-
-        updateTeacherArea();
-
-
-    } catch (error) {
-
-        console.error(
-            "Teacher approval check:",
-            error
-        );
-
-
-        teacherStatus =
-            "pending";
-
-
-        updateTeacherArea();
-    }
-}
-
-
-// ============================================================
-// TEACHER ROLE BUTTON
-// ============================================================
-
-async function handleTeacherRole() {
-
-    const teacherButton =
-        document.getElementById(
-            "uniuzTeacherButton"
-        );
-
-
-    if (teacherButton) {
-
-        teacherButton.disabled =
-            true;
-    }
-
-
-    try {
-
-        const data =
-            await getTeacherStatus();
-
-
-        // ----------------------------------------------------
-        // APPROVED
-        // ----------------------------------------------------
-
-        if (
-            data.status ===
-            "approved"
-        ) {
-
-            teacherStatus =
-                "approved";
-
-
-            currentRole =
-                "teacher";
-
-
-            localStorage.setItem(
-                "uniuz_role",
-                "teacher"
-            );
-
-
-            hideRoleScreen();
-
-            showMainApplication();
-
-
-            await initializeUniUZ();
-
-
-            return;
-        }
-
-
-        // ----------------------------------------------------
-        // PENDING
-        // ----------------------------------------------------
-
-        if (
-            data.status ===
-            "pending"
-        ) {
-
-            teacherStatus =
-                "pending";
-
-
-            updateTeacherArea();
-
-            return;
-        }
-
-
-        // ----------------------------------------------------
-        // REJECTED
-        // ----------------------------------------------------
-
-        if (
-            data.status ===
-            "rejected"
-        ) {
-
-            teacherStatus =
-                "rejected";
-
-
-            updateTeacherArea();
-
-            return;
-        }
-
-
-        // ----------------------------------------------------
-        // NO APPLICATION
-        // ----------------------------------------------------
-
-        teacherStatus =
-            null;
-
-
-        updateTeacherArea();
-
-    } catch (error) {
-
-        console.warn(
-            "Teacher role status error:",
-            error
-        );
-
-
-        teacherStatus =
-            null;
-
-
-        updateTeacherArea();
-
-    } finally {
-
-        if (teacherButton) {
-
-            teacherButton.disabled =
-                false;
-        }
-    }
-}
-
-
-// ============================================================
-// TEACHER AREA
-// ============================================================
-
-function updateTeacherArea() {
-
-    const area =
-        document.getElementById(
-            "uniuzTeacherArea"
-        );
-
-
-    if (!area) {
-        return;
-    }
-
-
-    // --------------------------------------------------------
-    // PENDING
-    // --------------------------------------------------------
-
-    if (
-        teacherStatus ===
-        "pending"
-    ) {
-
-        area.innerHTML = `
-
-            <div
-                class="uniuz-teacher-status"
-            >
-
-                <div
-                    class="uniuz-status-title"
-                >
-                    ⏳ ${escapeHtml(
-                        T("pendingTitle")
-                    )}
-                </div>
-
-                <div>
-                    ${escapeHtml(
-                        T("pendingText")
-                    )}
-                </div>
-
-
-                <button
-                    type="button"
-                    class="uniuz-status-button"
-                    id="uniuzCheckTeacherButton"
-                >
-                    ${escapeHtml(
-                        T("checkStatus")
-                    )}
-                </button>
-
-            </div>
-
-        `;
-
-
-        document
-            .getElementById(
-                "uniuzCheckTeacherButton"
-            )
-            ?.addEventListener(
-                "click",
-                checkTeacherApproval
-            );
-
-
-        return;
-    }
-
-
-    // --------------------------------------------------------
-    // REJECTED
-    // --------------------------------------------------------
-
-    if (
-        teacherStatus ===
-        "rejected"
-    ) {
-
-        area.innerHTML = `
-
-            <div
-                class="uniuz-teacher-status"
-            >
-
-                <div
-                    class="uniuz-status-title"
-                >
-                    ❌ ${escapeHtml(
-                        T("rejectedTitle")
-                    )}
-                </div>
-
-                <div>
-                    ${escapeHtml(
-                        T("rejectedText")
-                    )}
-                </div>
-
-
-                <button
-                    type="button"
-                    class="uniuz-status-button"
-                    id="uniuzTeacherRequestButton"
-                >
-                    ${escapeHtml(
-                        T("sendRequest")
-                    )}
-                </button>
-
-            </div>
-
-        `;
-
-
-        document
-            .getElementById(
-                "uniuzTeacherRequestButton"
-            )
-            ?.addEventListener(
-                "click",
-                sendTeacherRequest
-            );
-
-
-        return;
-    }
-
-
-    // --------------------------------------------------------
-    // APPROVED
-    // --------------------------------------------------------
-
-    if (
-        teacherStatus ===
-        "approved"
-    ) {
-
-        area.innerHTML = `
-
-            <div
-                class="uniuz-teacher-status"
-            >
-
-                <div
-                    class="uniuz-status-title"
-                >
-                    ${escapeHtml(
-                        T("approvedTitle")
-                    )}
-                </div>
-
-            </div>
-
-        `;
-
-
-        return;
-    }
-
-
-    // --------------------------------------------------------
-    // NO APPLICATION
-    // --------------------------------------------------------
-
-    area.innerHTML = `
-
-        <div
-            class="uniuz-teacher-status"
-        >
-
-            <div
-                class="uniuz-status-title"
-            >
-                👨‍🏫 ${escapeHtml(
-                    T("teacherRole")
-                )}
-            </div>
-
-
-            <div>
-                ${escapeHtml(
-                    T("pendingText")
-                )}
-            </div>
-
-
-            <button
-                type="button"
-                class="uniuz-status-button"
-                id="uniuzTeacherRequestButton"
-            >
-                ${escapeHtml(
-                    T("sendRequest")
-                )}
-            </button>
-
-        </div>
-
-    `;
-
-
-    document
-        .getElementById(
-            "uniuzTeacherRequestButton"
-        )
-        ?.addEventListener(
-            "click",
-            sendTeacherRequest
-        );
-}
-
-
-// ============================================================
-// TEACHER MESSAGE
-// ============================================================
-
-function showTeacherMessage(message) {
-
-    const area =
-        document.getElementById(
-            "uniuzTeacherArea"
-        );
-
-
-    if (!area) {
-        return;
-    }
-
-
-    const messageElement =
-        document.createElement(
-            "div"
-        );
-
-
-    messageElement.className =
-        "uniuz-teacher-status";
-
-
-    messageElement.innerHTML = `
-
-        <div
-            class="uniuz-status-title"
-        >
-            ${escapeHtml(message)}
-        </div>
-
-    `;
-
-
-    area.innerHTML = "";
-
-    area.appendChild(
-        messageElement
-    );
-}
-
-
-// ============================================================
-// STUDENT
-// ============================================================
-
-async function selectStudent() {
-
-    currentRole =
-        "student";
-
-
-    localStorage.setItem(
-        "uniuz_role",
-        "student"
-    );
-
-
-    hideRoleScreen();
-
-    showMainApplication();
-
-
-    console.log(
-        "UniUZ role: student"
-    );
-
-
-    await initializeUniUZ();
-}
-
-
-// Make available globally
-
-window.selectStudent =
-    selectStudent;
 
 
 // ============================================================
@@ -2105,12 +450,6 @@ async function loadProfile() {
         );
 
 
-    console.log(
-        "UniUZ profile:",
-        data
-    );
-
-
     if (!data.ok) {
 
         throw new Error(
@@ -2119,131 +458,60 @@ async function loadProfile() {
     }
 
 
-    const telegramUser =
-        data.telegram_user;
+    cachedProfile =
+        data;
+
+
+    isAdmin =
+        data.is_admin === true;
+
+
+    teacherStatus =
+        data.teacher_status || null;
+
+
+    const user =
+        data.telegram_user || {};
 
 
     const profile =
-        data.profile;
+        data.profile || {};
 
 
-    if (telegramUser) {
+    const name =
+        user.first_name ||
+        user.username ||
+        profile.full_name ||
+        "UniUZ";
 
-        const name =
-            telegramUser.first_name ||
-            telegramUser.username ||
-            "Student";
 
-
-        setText(
-            "#user-name",
-            name
+    const avatar =
+        document.querySelector(
+            "#avatar, #user-avatar"
         );
 
 
-        const avatar =
-            document.querySelector(
-                "#user-avatar"
-            );
+    if (avatar) {
 
-
-        if (avatar) {
-
-            avatar.textContent =
-                (
-                    name[0] ||
-                    "U"
-                ).toUpperCase();
-        }
+        avatar.textContent =
+            (
+                name[0] ||
+                "U"
+            ).toUpperCase();
     }
 
 
-    if (profile) {
-
-        setText(
-            "#profile-name",
-            profile.full_name ||
-            "UniUZ"
+    const welcome =
+        document.querySelector(
+            "#welcome"
         );
 
 
-        setText(
-            "#profile-username",
-            profile.username
-                ? `@${profile.username}`
-                : ""
-        );
+    if (welcome) {
 
-
-        setText(
-            "#profile-university",
-            profile.university ||
-            "Ajou University in Tashkent"
-        );
-
-
-        setText(
-            "#profile-department",
-            profile.department ||
-            "Not selected"
-        );
-
-
-        setText(
-            "#profile-group",
-            profile.group_name ||
-            "Not selected"
-        );
-
-
-        setText(
-            "#department",
-            profile.department ||
-            "—"
-        );
-
-
-        setText(
-            "#group",
-            profile.group_name ||
-            "—"
-        );
-
-    } else {
-
-        setText(
-            "#profile-name",
-            telegramUser?.first_name ||
-            "Student"
-        );
-
-
-        setText(
-            "#profile-university",
-            "Ajou University in Tashkent"
-        );
-
-
-        setText(
-            "#profile-department",
-            "Not selected"
-        );
-
-
-        setText(
-            "#profile-group",
-            "Not selected"
-        );
+        welcome.textContent =
+            T("welcome");
     }
-
-
-    return {
-
-        telegramUser,
-
-        profile
-
-    };
 }
 
 
@@ -2259,119 +527,8 @@ async function loadHomework() {
         );
 
 
-    console.log(
-        "UniUZ homework:",
-        data
-    );
-
-
-    const container =
-        document.querySelector(
-            "#homework-list"
-        );
-
-
-    if (!container) {
-        return;
-    }
-
-
-    container.innerHTML =
-        "";
-
-
-    if (
-        !data.items ||
-        data.items.length === 0
-    ) {
-
-        container.innerHTML = `
-
-            <div
-                class="empty-state"
-            >
-                ${escapeHtml(
-                    T("noHomework")
-                )}
-            </div>
-
-        `;
-
-
-        setText(
-            "#homework-count",
-            "0"
-        );
-
-
-        return;
-    }
-
-
-    setText(
-        "#homework-count",
-        String(
-            data.items.length
-        )
-    );
-
-
-    data.items.forEach(
-        item => {
-
-            const card =
-                document.createElement(
-                    "div"
-                );
-
-
-            card.className =
-                "homework-card";
-
-
-            card.innerHTML = `
-
-                <div
-                    class="homework-title"
-                >
-                    📚 ${escapeHtml(
-                        item.subject_name
-                    )}
-                </div>
-
-
-                <div
-                    class="homework-task"
-                >
-                    ${escapeHtml(
-                        item.task_text
-                    )}
-                </div>
-
-
-                <div
-                    class="homework-date"
-                >
-                    📅 ${escapeHtml(
-                        item.homework_date
-                    )}
-
-                    &nbsp;
-
-                    ⏰ ${escapeHtml(
-                        item.homework_time
-                    )}
-                </div>
-
-            `;
-
-
-            container.appendChild(
-                card
-            );
-
-        }
-    );
+    cachedHomework =
+        data.items || [];
 }
 
 
@@ -2387,201 +544,1175 @@ async function loadAnnouncements() {
         );
 
 
-    console.log(
-        "UniUZ announcements:",
-        data
-    );
+    cachedAnnouncements =
+        data.items || [];
+}
 
 
-    const container =
-        document.querySelector(
-            "#announcement-list"
+// ============================================================
+// TEACHER STATUS
+// ============================================================
+
+async function loadTeacherStatus() {
+
+    const data =
+        await apiRequest(
+            "/api/teacher/status"
         );
 
 
-    if (!container) {
+    teacherStatus =
+        data.status || null;
+
+
+    return data;
+}
+
+
+// ============================================================
+// ROLE CSS
+// ============================================================
+
+function injectRoleStyles() {
+
+    if (
+        document.getElementById(
+            "uniuz-role-style"
+        )
+    ) {
         return;
     }
 
 
-    container.innerHTML =
-        "";
+    const style =
+        document.createElement(
+            "style"
+        );
+
+
+    style.id =
+        "uniuz-role-style";
+
+
+    style.textContent = `
+
+        #uniuz-role-root {
+
+            min-height: 100%;
+
+            padding:
+                24px 16px;
+
+            box-sizing:
+                border-box;
+
+            display: flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+        }
+
+
+        .uniuz-role-card {
+
+            width: 100%;
+
+            max-width: 390px;
+
+            padding:
+                28px 20px;
+
+            border-radius:
+                26px;
+
+            background:
+                rgba(20,32,52,.96);
+
+            border:
+                1px solid
+                rgba(110,145,200,.35);
+
+            box-shadow:
+                0 20px 60px
+                rgba(0,0,0,.35);
+
+            text-align:
+                center;
+
+        }
+
+
+        .uniuz-role-logo {
+
+            width: 72px;
+
+            height: 72px;
+
+            margin:
+                0 auto 16px;
+
+            border-radius:
+                22px;
+
+            display: flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            font-size:
+                36px;
+
+            background:
+                #1d3151;
+
+            border:
+                1px solid
+                rgba(130,165,220,.4);
+
+        }
+
+
+        .uniuz-role-card h1 {
+
+            margin:
+                0 0 8px;
+
+            font-size:
+                30px;
+
+        }
+
+
+        .uniuz-role-sub {
+
+            margin:
+                0 0 24px;
+
+            opacity:
+                .7;
+
+        }
+
+
+        .uniuz-role-btn {
+
+            width:
+                100%;
+
+            padding:
+                18px;
+
+            margin-top:
+                12px;
+
+            border:
+                1px solid
+                rgba(120,155,215,.35);
+
+            border-radius:
+                17px;
+
+            background:
+                #263f68;
+
+            color:
+                #fff;
+
+            font-size:
+                17px;
+
+            font-weight:
+                700;
+
+            cursor:
+                pointer;
+
+        }
+
+
+        .uniuz-role-btn.teacher {
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #30466f,
+                    #493675
+                );
+
+        }
+
+
+        .uniuz-role-btn.admin {
+
+            background:
+                #111827;
+
+        }
+
+
+        .uniuz-status {
+
+            margin-top:
+                16px;
+
+            padding:
+                16px;
+
+            border-radius:
+                16px;
+
+            background:
+                #0d1727;
+
+            border:
+                1px solid
+                rgba(110,145,200,.25);
+
+            line-height:
+                1.5;
+
+        }
+
+
+        .uniuz-status button {
+
+            width:
+                100%;
+
+            margin-top:
+                12px;
+
+            padding:
+                13px;
+
+            border:
+                0;
+
+            border-radius:
+                13px;
+
+            background:
+                #294676;
+
+            color:
+                #fff;
+
+            font-weight:
+                700;
+
+            cursor:
+                pointer;
+
+        }
+
+
+        .uniuz-admin-card {
+
+            padding:
+                16px;
+
+            margin:
+                12px 0;
+
+            border-radius:
+                18px;
+
+            background:
+                #121e31;
+
+            border:
+                1px solid
+                rgba(110,145,200,.25);
+
+        }
+
+
+        .uniuz-admin-actions {
+
+            display:
+                grid;
+
+            grid-template-columns:
+                1fr 1fr;
+
+            gap:
+                8px;
+
+            margin-top:
+                12px;
+
+        }
+
+
+        .uniuz-admin-actions button {
+
+            padding:
+                13px;
+
+            border:
+                0;
+
+            border-radius:
+                12px;
+
+            font-weight:
+                700;
+
+            cursor:
+                pointer;
+
+        }
+
+    `;
+
+
+    document.head.appendChild(
+        style
+    );
+}
+
+
+// ============================================================
+// ROLE SCREEN
+// ============================================================
+
+function showRoleScreen() {
+
+    injectRoleStyles();
+
+    setNav(false);
+
+
+    const s =
+        screen();
+
+
+    if (!s) {
+        return;
+    }
+
+
+    s.innerHTML = `
+
+        <div id="uniuz-role-root">
+
+            <div class="uniuz-role-card">
+
+                <div class="uniuz-role-logo">
+                    🎓
+                </div>
+
+
+                <h1>
+                    UniUZ
+                </h1>
+
+
+                <p class="uniuz-role-sub">
+                    ${escapeHtml(
+                        T("chooseRole")
+                    )}
+                </p>
+
+
+                <button
+                    id="role-student"
+                    class="uniuz-role-btn"
+                >
+                    ${escapeHtml(
+                        T("student")
+                    )}
+                </button>
+
+
+                <button
+                    id="role-teacher"
+                    class="uniuz-role-btn teacher"
+                >
+                    ${escapeHtml(
+                        T("teacher")
+                    )}
+                </button>
+
+
+                ${
+                    isAdmin
+                    ? `
+                        <button
+                            id="role-admin"
+                            class="uniuz-role-btn admin"
+                        >
+                            ${escapeHtml(
+                                T("admin")
+                            )}
+                        </button>
+                    `
+                    : ""
+                }
+
+            </div>
+
+        </div>
+
+    `;
+
+
+    document
+        .getElementById(
+            "role-student"
+        )
+        ?.addEventListener(
+            "click",
+            () => selectRole(
+                "student"
+            )
+        );
+
+
+    document
+        .getElementById(
+            "role-teacher"
+        )
+        ?.addEventListener(
+            "click",
+            () => selectRole(
+                "teacher"
+            )
+        );
+
+
+    document
+        .getElementById(
+            "role-admin"
+        )
+        ?.addEventListener(
+            "click",
+            openAdminPanel
+        );
+}
+
+
+// ============================================================
+// SELECT ROLE
+// ============================================================
+
+async function selectRole(role) {
+
+    if (
+        role === "student"
+    ) {
+
+        currentRole =
+            "student";
+
+
+        localStorage.setItem(
+            "uniuz_role",
+            "student"
+        );
+
+
+        await openStudentApp();
+
+        return;
+    }
 
 
     if (
-        !data.items ||
-        data.items.length === 0
+        role === "teacher"
     ) {
 
-        container.innerHTML = `
-
-            <div
-                class="empty-state"
-            >
-                ${escapeHtml(
-                    T("noAnnouncements")
-                )}
-            </div>
-
-        `;
-
-
-        setText(
-            "#announcement-count",
-            "0"
-        );
-
-
-        return;
-    }
-
-
-    setText(
-        "#announcement-count",
-        String(
-            data.items.length
-        )
-    );
-
-
-    data.items.forEach(
-        item => {
-
-            const card =
-                document.createElement(
-                    "div"
-                );
-
-
-            card.className =
-                "announcement-card";
-
-
-            card.innerHTML = `
-
-                <div
-                    class="announcement-title"
-                >
-                    📢 ${escapeHtml(
-                        item.title
-                    )}
-                </div>
-
-
-                <div
-                    class="announcement-message"
-                >
-                    ${escapeHtml(
-                        item.message
-                    )}
-                </div>
-
-            `;
-
-
-            container.appendChild(
-                card
-            );
-
-        }
-    );
-}
-
-
-// ============================================================
-// LOADING
-// ============================================================
-
-function showLoading() {
-
-    const loading =
-        document.querySelector(
-            "#loading"
-        );
-
-
-    if (loading) {
-
-        loading.style.display =
-            "flex";
-    }
-}
-
-
-function hideLoading() {
-
-    const loading =
-        document.querySelector(
-            "#loading"
-        );
-
-
-    if (loading) {
-
-        loading.style.display =
-            "none";
+        await requestTeacherAccess();
     }
 }
 
 
 // ============================================================
-// ERROR
+// TEACHER REQUEST
 // ============================================================
 
-function showError(message) {
-
-    console.error(
-        message
-    );
-
-
-    const errorElement =
-        document.querySelector(
-            "#error"
-        );
-
-
-    if (errorElement) {
-
-        errorElement.textContent =
-            message;
-
-        errorElement.style.display =
-            "block";
-    }
-}
-
-
-// ============================================================
-// INITIALIZE APP
-// ============================================================
-
-async function initializeUniUZ() {
+async function requestTeacherAccess() {
 
     showLoading();
 
 
     try {
 
-        const apiOnline =
-            await checkApi();
-
-
-        if (!apiOnline) {
-
-            throw new Error(
-                "UniUZ API is unavailable."
+        const data =
+            await apiRequest(
+                "/api/teacher/request",
+                {
+                    method:
+                        "POST"
+                }
             );
-        }
 
 
-        if (!initData) {
+        teacherStatus =
+            data.status ||
+            "pending";
 
-            console.warn(
-                "Telegram initData is empty."
+
+        currentRole =
+            "teacher";
+
+
+        localStorage.setItem(
+            "uniuz_role",
+            "teacher"
+        );
+
+
+        showTeacherStatus();
+
+
+    } catch (error) {
+
+        showError(
+            error.message ||
+            "Не удалось отправить заявку."
+        );
+
+
+    } finally {
+
+        hideLoading();
+    }
+}
+
+
+// ============================================================
+// TEACHER STATUS SCREEN
+// ============================================================
+
+function showTeacherStatus() {
+
+    setNav(false);
+
+
+    const s =
+        screen();
+
+
+    if (!s) {
+        return;
+    }
+
+
+    let title =
+        T("pending");
+
+
+    let text =
+        T("pendingText");
+
+
+    let extra = `
+
+        <button
+            id="teacher-check"
+        >
+            ${escapeHtml(
+                T("check")
+            )}
+        </button>
+
+    `;
+
+
+    if (
+        teacherStatus ===
+        "approved"
+    ) {
+
+        title =
+            T("approved");
+
+        text = "";
+
+        extra = `
+
+            <button
+                id="teacher-open"
+            >
+                ${escapeHtml(
+                    T("teacher")
+                )}
+            </button>
+
+        `;
+
+    }
+
+
+    if (
+        teacherStatus ===
+        "rejected"
+    ) {
+
+        title =
+            T("rejected");
+
+        text =
+            T("pendingText");
+
+        extra = `
+
+            <button
+                id="teacher-retry"
+            >
+                ${escapeHtml(
+                    T("retry")
+                )}
+            </button>
+
+        `;
+    }
+
+
+    s.innerHTML = `
+
+        <div id="uniuz-role-root">
+
+            <div class="uniuz-role-card">
+
+                <div class="uniuz-role-logo">
+                    👨‍🏫
+                </div>
+
+
+                <h1>
+                    ${escapeHtml(
+                        title
+                    )}
+                </h1>
+
+
+                <p class="uniuz-role-sub">
+                    ${escapeHtml(
+                        text
+                    )}
+                </p>
+
+
+                <div class="uniuz-status">
+
+                    ${extra}
+
+                </div>
+
+
+                <button
+                    id="role-back"
+                    class="uniuz-role-btn"
+                >
+                    ${escapeHtml(
+                        T("back")
+                    )}
+                </button>
+
+            </div>
+
+        </div>
+
+    `;
+
+
+    document
+        .getElementById(
+            "teacher-check"
+        )
+        ?.addEventListener(
+            "click",
+            async () => {
+
+                try {
+
+                    await loadTeacherStatus();
+
+
+                    if (
+                        teacherStatus ===
+                        "approved"
+                    ) {
+
+                        await loadProfile();
+
+                        showTeacherHome();
+
+                    } else {
+
+                        showTeacherStatus();
+
+                    }
+
+                } catch (e) {
+
+                    showError(
+                        e.message
+                    );
+                }
+
+            }
+        );
+
+
+    document
+        .getElementById(
+            "teacher-retry"
+        )
+        ?.addEventListener(
+            "click",
+            requestTeacherAccess
+        );
+
+
+    document
+        .getElementById(
+            "teacher-open"
+        )
+        ?.addEventListener(
+            "click",
+            showTeacherHome
+        );
+
+
+    document
+        .getElementById(
+            "role-back"
+        )
+        ?.addEventListener(
+            "click",
+            showRoleScreen
+        );
+}
+
+
+// ============================================================
+// TEACHER HOME
+// ============================================================
+
+function showTeacherHome() {
+
+    setNav(false);
+
+
+    const s =
+        screen();
+
+
+    if (!s) {
+        return;
+    }
+
+
+    const name =
+        cachedProfile?.teacher?.full_name ||
+        cachedProfile?.profile?.full_name ||
+        "Преподаватель";
+
+
+    s.innerHTML = `
+
+        <section
+            class="page"
+            style="padding:18px 16px"
+        >
+
+            <div class="page-header">
+
+                <div>
+
+                    <h1>
+                        👨‍🏫 UniUZ
+                    </h1>
+
+                    <p>
+                        Панель преподавателя
+                    </p>
+
+                </div>
+
+                <div class="avatar">
+                    👨‍🏫
+                </div>
+
+            </div>
+
+
+            <div class="profile-card">
+
+                <div class="eyebrow">
+                    ПРЕПОДАВАТЕЛЬ
+                </div>
+
+                <h2>
+                    ${escapeHtml(
+                        name
+                    )}
+                </h2>
+
+                <p>
+                    Статус: ✅ approved
+                </p>
+
+            </div>
+
+
+            <div
+                class="info-card"
+                style="margin-top:16px"
+            >
+
+                <h3>
+                    📚 Панель преподавателя
+                </h3>
+
+                <p>
+                    Здесь будут функции преподавателя.
+                </p>
+
+            </div>
+
+        </section>
+
+    `;
+}
+
+
+// ============================================================
+// ADMIN PANEL
+// ============================================================
+
+async function openAdminPanel() {
+
+    if (!isAdmin) {
+
+        showRoleScreen();
+
+        return;
+    }
+
+
+    showLoading();
+
+
+    try {
+
+        const data =
+            await apiRequest(
+                "/api/admin/teacher-requests"
             );
-        }
 
+
+        renderAdminPanel(
+            data.items || []
+        );
+
+
+    } catch (error) {
+
+        showError(
+            error.message ||
+            "Не удалось открыть панель администратора."
+        );
+
+
+    } finally {
+
+        hideLoading();
+    }
+}
+
+
+function renderAdminPanel(items) {
+
+    injectRoleStyles();
+
+    setNav(false);
+
+
+    const s =
+        screen();
+
+
+    if (!s) {
+        return;
+    }
+
+
+    const cards =
+        items.length
+
+        ? items.map(
+            teacher => `
+
+                <div
+                    class="uniuz-admin-card"
+                >
+
+                    <h3>
+                        👨‍🏫
+                        ${escapeHtml(
+                            teacher.full_name
+                        )}
+                    </h3>
+
+
+                    <p>
+                        Telegram ID:
+                        ${escapeHtml(
+                            teacher.telegram_id
+                        )}
+                    </p>
+
+
+                    <p
+                        style="opacity:.65"
+                    >
+                        ${escapeHtml(
+                            teacher.created_at || ""
+                        )}
+                    </p>
+
+
+                    <div
+                        class="uniuz-admin-actions"
+                    >
+
+                        <button
+                            class="admin-approve"
+                            data-id="${escapeHtml(
+                                teacher.telegram_id
+                            )}"
+                        >
+                            ${escapeHtml(
+                                T("approve")
+                            )}
+                        </button>
+
+
+                        <button
+                            class="admin-reject"
+                            data-id="${escapeHtml(
+                                teacher.telegram_id
+                            )}"
+                        >
+                            ${escapeHtml(
+                                T("reject")
+                            )}
+                        </button>
+
+                    </div>
+
+                </div>
+
+            `
+        ).join("")
+
+        :
+
+        `
+
+            <div
+                class="uniuz-admin-card"
+            >
+
+                <h3>
+                    ${escapeHtml(
+                        T("noRequests")
+                    )}
+                </h3>
+
+            </div>
+
+        `;
+
+
+    s.innerHTML = `
+
+        <section
+            class="page"
+            style="padding:18px 16px"
+        >
+
+            <div class="page-header">
+
+                <div>
+
+                    <h1>
+                        🔐 Admin
+                    </h1>
+
+                    <p>
+                        ${escapeHtml(
+                            T("adminTitle")
+                        )}
+                    </p>
+
+                </div>
+
+
+                <div class="avatar">
+                    🔐
+                </div>
+
+            </div>
+
+
+            ${cards}
+
+
+            <button
+                id="admin-refresh"
+                style="
+                    width:100%;
+                    padding:15px;
+                    border:0;
+                    border-radius:15px;
+                    font-weight:700;
+                "
+            >
+                ${escapeHtml(
+                    T("refresh")
+                )}
+            </button>
+
+
+            <button
+                id="admin-back"
+                style="
+                    width:100%;
+                    margin-top:10px;
+                    padding:15px;
+                    border:0;
+                    border-radius:15px;
+                "
+            >
+                ${escapeHtml(
+                    T("back")
+                )}
+            </button>
+
+        </section>
+
+    `;
+
+
+    document
+        .getElementById(
+            "admin-refresh"
+        )
+        ?.addEventListener(
+            "click",
+            openAdminPanel
+        );
+
+
+    document
+        .getElementById(
+            "admin-back"
+        )
+        ?.addEventListener(
+            "click",
+            showRoleScreen
+        );
+
+
+    document
+        .querySelectorAll(
+            ".admin-approve"
+        )
+        .forEach(
+            button => {
+
+                button.addEventListener(
+                    "click",
+                    () =>
+                        changeTeacherStatus(
+                            button.dataset.id,
+                            "approve"
+                        )
+                );
+
+            }
+        );
+
+
+    document
+        .querySelectorAll(
+            ".admin-reject"
+        )
+        .forEach(
+            button => {
+
+                button.addEventListener(
+                    "click",
+                    () =>
+                        changeTeacherStatus(
+                            button.dataset.id,
+                            "reject"
+                        )
+                );
+
+            }
+        );
+}
+
+
+async function changeTeacherStatus(
+    telegramId,
+    action
+) {
+
+    if (!isAdmin) {
+        return;
+    }
+
+
+    try {
+
+        await apiRequest(
+            `/api/admin/teacher/${encodeURIComponent(
+                telegramId
+            )}/${action}`,
+            {
+                method:
+                    "POST"
+            }
+        );
+
+
+        await openAdminPanel();
+
+
+    } catch (error) {
+
+        showError(
+            error.message ||
+            "Не удалось изменить статус."
+        );
+    }
+}
+
+
+// ============================================================
+// STUDENT APP
+// ============================================================
+
+async function openStudentApp() {
+
+    showLoading();
+
+
+    try {
 
         await loadProfile();
 
@@ -2590,27 +1721,664 @@ async function initializeUniUZ() {
         await loadAnnouncements();
 
 
-        console.log(
-            "UniUZ Mini App initialized successfully."
-        );
+        setNav(true);
+
+        bindBottomNavigation();
+
+        openPage("home");
 
 
     } catch (error) {
 
-        console.error(
-            "UniUZ initialization error:",
-            error
-        );
-
-
         showError(
-            T("error")
+            error.message ||
+            T("apiError")
         );
 
 
     } finally {
 
         hideLoading();
+    }
+}
+
+
+// ============================================================
+// HOME
+// ============================================================
+
+function renderHomeScreen() {
+
+    const s =
+        screen();
+
+
+    if (!s) {
+        return;
+    }
+
+
+    const user =
+        cachedProfile?.telegram_user ||
+        {};
+
+
+    const profile =
+        cachedProfile?.profile ||
+        {};
+
+
+    const name =
+        user.first_name ||
+        user.username ||
+        profile.full_name ||
+        "UniUZ";
+
+
+    s.innerHTML = `
+
+        <section class="home-page">
+
+            <div class="page-header">
+
+                <div>
+
+                    <h1>
+                        🎓 UniUZ
+                    </h1>
+
+                    <p>
+                        ${escapeHtml(
+                            T("welcome")
+                        )}
+                    </p>
+
+                </div>
+
+
+                <div class="avatar">
+
+                    ${escapeHtml(
+                        (
+                            name[0] ||
+                            "U"
+                        ).toUpperCase()
+                    )}
+
+                </div>
+
+            </div>
+
+
+            <div class="profile-card">
+
+                <div class="eyebrow">
+                    ${escapeHtml(
+                        T("student")
+                    )}
+                </div>
+
+
+                <h2>
+                    ${escapeHtml(
+                        name
+                    )}
+                </h2>
+
+
+                <p>
+                    ${escapeHtml(
+                        profile.department ||
+                        "—"
+                    )}
+
+                    ·
+
+                    ${escapeHtml(
+                        profile.group_name ||
+                        "—"
+                    )}
+                </p>
+
+            </div>
+
+
+            <div class="next-card">
+
+                <div class="card-label">
+                    ${escapeHtml(
+                        T("schedule")
+                    )}
+                </div>
+
+
+                <div class="next-time">
+                    09:00
+                </div>
+
+
+                <h3>
+                    Расписание будет подключено к базе
+                </h3>
+
+            </div>
+
+
+            <div class="dashboard-grid">
+
+                <button
+                    class="dashboard-card"
+                    data-page="schedule"
+                >
+                    <span>📅</span>
+
+                    <strong>
+                        ${escapeHtml(
+                            T("schedule")
+                        )}
+                    </strong>
+
+                    <small>
+                        ${escapeHtml(
+                            T("today")
+                        )}
+                    </small>
+
+                </button>
+
+
+                <button
+                    class="dashboard-card"
+                    data-page="homework"
+                >
+                    <span>📝</span>
+
+                    <strong>
+                        ${escapeHtml(
+                            T("homework")
+                        )}
+                    </strong>
+
+                    <small>
+                        ${cachedHomework.length}
+                    </small>
+
+                </button>
+
+
+                <button
+                    class="dashboard-card"
+                    data-page="announcements"
+                >
+                    <span>📢</span>
+
+                    <strong>
+                        ${escapeHtml(
+                            T("announcements")
+                        )}
+                    </strong>
+
+                    <small>
+                        ${cachedAnnouncements.length}
+                    </small>
+
+                </button>
+
+
+                <button
+                    class="dashboard-card"
+                    data-page="ai"
+                >
+                    <span>🤖</span>
+
+                    <strong>
+                        ${escapeHtml(
+                            T("ai")
+                        )}
+                    </strong>
+
+                    <small>
+                        7 / day
+                    </small>
+
+                </button>
+
+            </div>
+
+
+            <div class="quick-card">
+
+                <h3>
+                    ${escapeHtml(
+                        T("quick")
+                    )}
+                </h3>
+
+
+                <div class="quick-grid">
+
+                    <button
+                        data-page="schedule"
+                    >
+                        📅
+                        ${escapeHtml(
+                            T("today")
+                        )}
+                    </button>
+
+
+                    <button
+                        data-page="homework"
+                    >
+                        📝
+                        ${escapeHtml(
+                            T("homework")
+                        )}
+                    </button>
+
+
+                    <button
+                        data-page="announcements"
+                    >
+                        📢
+                        ${escapeHtml(
+                            T("announcements")
+                        )}
+                    </button>
+
+
+                    <button
+                        data-page="profile"
+                    >
+                        👤
+                        ${escapeHtml(
+                            T("profile")
+                        )}
+                    </button>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    `;
+
+
+    bindScreenButtons();
+}
+
+
+// ============================================================
+// SIMPLE PAGES
+// ============================================================
+
+function renderSimplePage(page) {
+
+    const s =
+        screen();
+
+
+    if (!s) {
+        return;
+    }
+
+
+    const data = {
+
+        schedule: [
+            "📅",
+            T("schedule"),
+            "Расписание будет подключено к базе"
+        ],
+
+        homework: [
+            "📝",
+            T("homework"),
+            `${cachedHomework.length} заданий`
+        ],
+
+        announcements: [
+            "📢",
+            T("announcements"),
+            `${cachedAnnouncements.length} новых`
+        ],
+
+        ai: [
+            "🤖",
+            T("ai"),
+            "7 запросов/день"
+        ],
+
+        profile: [
+            "👤",
+            T("profile"),
+            cachedProfile?.profile
+                ? `${cachedProfile.profile.department || "—"} · ${cachedProfile.profile.group_name || "—"}`
+                : "—"
+        ]
+
+    };
+
+
+    const item =
+        data[page] ||
+        data.homework;
+
+
+    s.innerHTML = `
+
+        <section class="page">
+
+            <div class="page-title">
+
+                <span>
+                    ${item[0]}
+                </span>
+
+                <h1>
+                    ${escapeHtml(
+                        item[1]
+                    )}
+                </h1>
+
+            </div>
+
+
+            <div class="info-card">
+
+                <h3>
+                    ${escapeHtml(
+                        item[2]
+                    )}
+                </h3>
+
+            </div>
+
+        </section>
+
+    `;
+}
+
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+
+function bindScreenButtons() {
+
+    document
+        .querySelectorAll(
+            "#screen [data-page]"
+        )
+        .forEach(
+            button => {
+
+                button.onclick =
+                    () =>
+                        openPage(
+                            button.dataset.page
+                        );
+
+            }
+        );
+}
+
+
+function bindBottomNavigation() {
+
+    document
+        .querySelectorAll(
+            ".bottom-nav .nav-item"
+        )
+        .forEach(
+            button => {
+
+                button.onclick =
+                    () =>
+                        openPage(
+                            button.dataset.page
+                        );
+
+            }
+        );
+}
+
+
+function openPage(page) {
+
+    document
+        .querySelectorAll(
+            ".nav-item"
+        )
+        .forEach(
+            item =>
+                item.classList.toggle(
+                    "active",
+                    item.dataset.page === page
+                )
+        );
+
+
+    if (
+        page === "home"
+    ) {
+
+        renderHomeScreen();
+
+    } else {
+
+        renderSimplePage(
+            page
+        );
+    }
+}
+
+
+// ============================================================
+// LANGUAGE
+// ============================================================
+
+async function selectLanguage(
+    language
+) {
+
+    if (
+        ![
+            "ru",
+            "en",
+            "ko"
+        ].includes(language)
+    ) {
+
+        return;
+    }
+
+
+    currentLanguage =
+        language;
+
+
+    localStorage.setItem(
+        "uniuz_language",
+        language
+    );
+
+
+    hideLanguageScreen();
+
+
+    try {
+
+        if (
+            !(await checkApi())
+        ) {
+
+            throw new Error(
+                "API недоступен. Проверь Railway."
+            );
+        }
+
+
+        await loadProfile();
+
+
+        showRoleScreen();
+
+
+    } catch (error) {
+
+        showError(
+            error.message ||
+            T("apiError")
+        );
+    }
+}
+
+
+window.selectLanguage =
+    selectLanguage;
+
+
+// ============================================================
+// LANGUAGE BUTTONS
+// ============================================================
+
+function bindLanguageButtons() {
+
+    document
+        .querySelectorAll(
+            ".language-btn"
+        )
+        .forEach(
+            button => {
+
+                button.onclick =
+                    event => {
+
+                        event.preventDefault();
+
+
+                        selectLanguage(
+                            button.dataset.lang
+                        );
+
+                    };
+
+            }
+        );
+}
+
+
+// ============================================================
+// INITIALIZE
+// ============================================================
+
+async function initializeUniUZ() {
+
+    try {
+
+        if (
+            !(await checkApi())
+        ) {
+
+            throw new Error(
+                "API недоступен. Проверь Railway."
+            );
+        }
+
+
+        await loadProfile();
+
+
+        if (isAdmin) {
+
+            showRoleScreen();
+
+            return;
+        }
+
+
+        if (
+            teacherStatus ===
+            "approved"
+        ) {
+
+            currentRole =
+                "teacher";
+
+
+            localStorage.setItem(
+                "uniuz_role",
+                "teacher"
+            );
+
+
+            showTeacherHome();
+
+            return;
+        }
+
+
+        if (
+            teacherStatus ===
+            "pending" &&
+            currentRole ===
+            "teacher"
+        ) {
+
+            showTeacherStatus();
+
+            return;
+        }
+
+
+        if (
+            currentRole ===
+            "student"
+        ) {
+
+            await openStudentApp();
+
+            return;
+        }
+
+
+        if (
+            currentRole ===
+            "teacher"
+        ) {
+
+            await loadTeacherStatus();
+
+
+            if (
+                teacherStatus ===
+                "approved"
+            ) {
+
+                showTeacherHome();
+
+            } else {
+
+                showTeacherStatus();
+
+            }
+
+
+            return;
+        }
+
+
+        showRoleScreen();
+
+
+    } catch (error) {
+
+        showError(
+            error.message ||
+            T("apiError")
+        );
     }
 }
 
@@ -2625,135 +2393,36 @@ async function refreshUniUZ() {
 
         await loadProfile();
 
-        await loadHomework();
 
-        await loadAnnouncements();
+        if (isAdmin) {
 
-
-    } catch (error) {
-
-        console.error(
-            "Refresh error:",
-            error
-        );
-    }
-}
-
-
-// ============================================================
-// PAGE NAVIGATION
-// ============================================================
-
-function openPage(page) {
-
-    try {
-
-        const event =
-            new CustomEvent(
-                "uniuz:openPage",
-                {
-                    detail: {
-                        page
-                    }
-                }
-            );
-
-
-        document.dispatchEvent(
-            event
-        );
-
-    } catch (error) {
-
-        console.warn(
-            "openPage:",
-            error
-        );
-    }
-}
-
-
-// Make available globally
-
-window.openPage =
-    openPage;
-
-
-// ============================================================
-// MAIN START
-// ============================================================
-
-document.addEventListener(
-    "DOMContentLoaded",
-    function() {
-
-        console.log(
-            "Starting UniUZ..."
-        );
-
-
-        setupLanguageButtons();
-
-
-        // ----------------------------------------------------
-        // Existing language
-        // ----------------------------------------------------
-
-        if (!currentLanguage) {
-
-            console.log(
-                "Waiting for language selection..."
-            );
-
+            await openAdminPanel();
 
             return;
         }
 
 
-        hideLanguageScreen();
+        await loadHomework();
 
+        await loadAnnouncements();
 
-        // ----------------------------------------------------
-        // Existing role
-        // ----------------------------------------------------
 
         if (
             currentRole ===
             "student"
         ) {
 
-            showMainApplication();
-
-            initializeUniUZ();
-
-            return;
+            openPage("home");
         }
 
 
-        if (
-            currentRole ===
-            "teacher"
-        ) {
+    } catch (error) {
 
-            // Teacher must be checked
-            // again after approval.
-
-            showRoleScreen();
-
-            handleTeacherRole();
-
-            return;
-        }
-
-
-        // ----------------------------------------------------
-        // Language exists but role doesn't
-        // ----------------------------------------------------
-
-        showRoleScreen();
-
+        showError(
+            error.message
+        );
     }
-);
+}
 
 
 // ============================================================
@@ -2773,59 +2442,36 @@ if (tg) {
             refreshUniUZ
         );
 
-    } catch (error) {
+    } catch (_) {}
 
-        console.warn(
-            "Telegram MainButton error:",
-            error
-        );
-    }
 }
 
 
 // ============================================================
-// TELEGRAM THEME
+// START
 // ============================================================
 
-if (tg) {
+document.addEventListener(
+    "DOMContentLoaded",
+    async () => {
 
-    try {
-
-        tg.onEvent(
-            "themeChanged",
-            function() {
-
-                console.log(
-                    "Telegram theme changed"
-                );
-
-            }
-        );
-
-    } catch (error) {
-
-        console.warn(
-            "Telegram theme listener error:",
-            error
-        );
-    }
-}
+        bindLanguageButtons();
 
 
-// ============================================================
-// DEBUG
-// ============================================================
+        if (
+            !currentLanguage
+        ) {
 
-console.log(
-    "UniUZ app.js loaded",
-    {
-        language:
-            currentLanguage,
+            setNav(false);
 
-        role:
-            currentRole,
+            return;
+        }
 
-        telegram:
-            !!tg
+
+        hideLanguageScreen();
+
+
+        await initializeUniUZ();
+
     }
 );
