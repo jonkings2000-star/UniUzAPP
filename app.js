@@ -580,16 +580,21 @@ languageScreen.style.display =
 
 
 
-await loadProfile();
+try{
 
+    await loadProfile();
 
+}
+catch(e){
 
-showRoleScreen();
-
-
+    console.log(
+        "Новый пользователь"
+    );
 
 }
 
+
+showRoleScreen();
 
 
 
@@ -1971,22 +1976,39 @@ ${text}
 
 async function initializeUniUZ(){
 
+    try{
 
-try{
-
-
-const online =
-await checkApi();
+        const online =
+        await checkApi();
 
 
+        if(!online){
 
-if(!online){
+            throw new Error(
+            "API недоступен"
+            );
+
+        }
 
 
-throw new Error(
-"API недоступен"
-);
+        // НЕ загружаем профиль сразу
+        // ждём выбора языка
 
+
+        return;
+
+
+    }
+
+    catch(error){
+
+        console.error(error);
+
+        showError(
+            error.message
+        );
+
+    }
 
 }
 
