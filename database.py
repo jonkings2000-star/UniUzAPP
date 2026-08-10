@@ -34,7 +34,25 @@ def init_db():
 
     cur = conn.cursor()
 
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS homework (
 
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+        teacher_id INTEGER NOT NULL,
+
+        title TEXT NOT NULL,
+
+        description TEXT,
+
+        group_name TEXT NOT NULL,
+
+        deadline TEXT,
+
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+
+    )
+    """)
 
     # USERS
 
@@ -1711,3 +1729,101 @@ if __name__ == "__main__":
     print(
         "UniUZ Database initialized successfully!"
     )
+    # ==========================================================
+# HOMEWORK SYSTEM
+# ==========================================================
+
+
+def add_homework(
+    teacher_id,
+    title,
+    description,
+    group_name,
+    deadline
+):
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO homework
+        (
+            teacher_id,
+            title,
+            description,
+            group_name,
+            deadline
+        )
+
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            teacher_id,
+            title,
+            description,
+            group_name,
+            deadline
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+
+
+
+
+def get_teacher_homework(
+    teacher_id
+):
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM homework
+        WHERE teacher_id = ?
+        ORDER BY id DESC
+        """,
+        (
+            teacher_id,
+        )
+    )
+
+    data = cur.fetchall()
+
+    conn.close()
+
+    return data
+
+
+
+
+
+def get_group_homework(
+    group_name
+):
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM homework
+        WHERE group_name = ?
+        ORDER BY id DESC
+        """,
+        (
+            group_name,
+        )
+    )
+
+    data = cur.fetchall()
+
+    conn.close()
+
+    return data
