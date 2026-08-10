@@ -579,11 +579,15 @@ async function requestTeacherAccess() {
 
         const data =
             await apiRequest(
-                "/api/teacher/request",
-                {
-                    method: "POST"
-                }
-            );
+    "/api/teacher/request",
+    {
+        method:"POST",
+        body:{
+            telegram_id:
+            tg?.initDataUnsafe?.user?.id
+        }
+    }
+);
 
 
         teacherStatus =
