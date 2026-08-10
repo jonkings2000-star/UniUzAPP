@@ -1,11 +1,17 @@
+// ============================================================
+// UniUZ Mini App
+// ============================================================
+
 const API_URL = "https://uniuz-production.up.railway.app";
 
-const tg = window.Telegram?.WebApp || null;
+const tg = window.Telegram?.WebApp;
 
 if (tg) {
     tg.ready();
     tg.expand();
 }
+
+const initData = tg?.initData || "";
 
 
 // ============================================================
@@ -13,89 +19,78 @@ if (tg) {
 // ============================================================
 
 const translations = {
+
     ru: {
-        welcome: "Добро пожаловать 👋",
+        loading: "Загрузка...",
+        error: "⚠️ Не удалось загрузить данные UniUZ.",
+
+        student: "Студент",
+        university: "Университет",
+        department: "Факультет",
+        group: "Группа",
+        language: "Язык",
+        telegramId: "Telegram ID",
+        notSelected: "Не выбрано",
+
         home: "Главная",
         schedule: "Расписание",
         homework: "Задания",
         ai: "ИИ",
         profile: "Профиль",
-        student: "Студент",
-        nextLesson: "Следующая пара",
-        scheduleSoon: "Расписание будет подключено",
-        noHomework: "Нет заданий",
-        noAnnouncements: "Нет объявлений",
-        announcements: "Объявления",
-        quickActions: "Быстрые действия",
-        today: "Сегодня",
-        deadlines: "Дедлайны",
-        news: "Новости",
-        university: "Университет",
-        department: "Факультет",
-        group: "Группа",
-        notSelected: "Не выбрано",
-        loading: "Загрузка...",
-        apiError: "Не удалось загрузить данные"
+
+        noHomework: "📚 Нет заданий",
+        noAnnouncements: "📢 Нет объявлений"
     },
 
     en: {
-        welcome: "Welcome 👋",
+        loading: "Loading...",
+        error: "⚠️ Failed to load UniUZ data.",
+
+        student: "Student",
+        university: "University",
+        department: "Department",
+        group: "Group",
+        language: "Language",
+        telegramId: "Telegram ID",
+        notSelected: "Not selected",
+
         home: "Home",
         schedule: "Schedule",
         homework: "Homework",
         ai: "AI",
         profile: "Profile",
-        student: "Student",
-        nextLesson: "Next class",
-        scheduleSoon: "Schedule will be connected",
-        noHomework: "No homework",
-        noAnnouncements: "No announcements",
-        announcements: "Announcements",
-        quickActions: "Quick actions",
-        today: "Today",
-        deadlines: "Deadlines",
-        news: "News",
-        university: "University",
-        department: "Department",
-        group: "Group",
-        notSelected: "Not selected",
-        loading: "Loading...",
-        apiError: "Failed to load data"
+
+        noHomework: "📚 No homework",
+        noAnnouncements: "📢 No announcements"
     },
 
     ko: {
-        welcome: "환영합니다 👋",
+        loading: "로딩 중...",
+        error: "⚠️ UniUZ 데이터를 불러오지 못했습니다.",
+
+        student: "학생",
+        university: "대학교",
+        department: "학과",
+        group: "그룹",
+        language: "언어",
+        telegramId: "Telegram ID",
+        notSelected: "선택되지 않음",
+
         home: "홈",
         schedule: "시간표",
         homework: "과제",
         ai: "AI",
         profile: "프로필",
-        student: "학생",
-        nextLesson: "다음 수업",
-        scheduleSoon: "시간표가 연결됩니다",
-        noHomework: "과제가 없습니다",
-        noAnnouncements: "공지가 없습니다",
-        announcements: "공지사항",
-        quickActions: "빠른 실행",
-        today: "오늘",
-        deadlines: "마감일",
-        news: "뉴스",
-        university: "대학교",
-        department: "학과",
-        group: "그룹",
-        notSelected: "선택되지 않음",
-        loading: "로딩 중...",
-        apiError: "데이터를 불러오지 못했습니다"
+
+        noHomework: "📚 과제가 없습니다",
+        noAnnouncements: "📢 공지가 없습니다"
     }
+
 };
 
 
-// ============================================================
-// LANGUAGE STORAGE
-// ============================================================
-
 let currentLanguage =
-    localStorage.getItem("uniuz_language");
+    localStorage.getItem("uniuz_language") || null;
 
 
 // ============================================================
@@ -108,17 +103,170 @@ let announcementsData = [];
 
 
 // ============================================================
-// HELPERS
+// LANGUAGE HELPERS
 // ============================================================
 
-function t(key) {
-    return (
-        translations[currentLanguage]?.[key] ||
-        translations.ru[key] ||
-        key
-    );
+function getLanguage() {
+    return currentLanguage || "ru";
 }
 
+
+function t(key) {
+
+    const lang =
+        translations[getLanguage()] ||
+        translations.ru;
+
+    return lang[key] ?? key;
+}
+
+
+// ============================================================
+// LANGUAGE SCREEN
+// ============================================================
+
+function findLanguageScreen() {
+
+    const selectors = [
+        "#languageScreen",
+        "#language-screen",
+        ".language-screen",
+        "#language-selection",
+        ".language-selection",
+        "#language-container",
+        ".language-container"
+    ];
+
+    for (const selector of selectors) {
+
+        const element =
+            document.querySelector(selector);
+
+        if (element) {
+            return element;
+        }
+    }
+
+    return null;
+}
+
+
+function hideLanguageScreen() {
+
+    const screen =
+        findLanguageScreen();
+
+    if (screen) {
+        screen.style.display = "none";
+    }
+}
+
+
+function showMainApplication() {
+
+    const app =
+        document.querySelector("#app");
+
+    if (app) {
+        app.classList.remove("hidden");
+        app.style.display = "";
+    }
+
+    const main =
+        document.querySelector("main");
+
+    if (main) {
+        main.style.display = "";
+    }
+}
+
+
+async function selectLanguage(language) {
+
+    if (!["ru", "en", "ko"].includes(language)) {
+        return;
+    }
+
+    currentLanguage = language;
+
+    localStorage.setItem(
+        "uniuz_language",
+        language
+    );
+
+    console.log(
+        "UniUZ language:",
+        language
+    );
+
+    hideLanguageScreen();
+    showMainApplication();
+
+    updateNavigationLanguage();
+
+    await initializeUniUZ();
+
+    renderHome();
+}
+
+
+window.selectLanguage = selectLanguage;
+
+
+// ============================================================
+// LANGUAGE BUTTONS
+// ============================================================
+
+document.addEventListener(
+    "click",
+    function(event) {
+
+        const button =
+            event.target.closest("button");
+
+        if (!button) {
+            return;
+        }
+
+        const lang =
+            button.dataset.lang;
+
+        if (lang) {
+            selectLanguage(lang);
+            return;
+        }
+
+        const text =
+            (
+                button.textContent || ""
+            )
+                .trim()
+                .toLowerCase();
+
+        if (text.includes("русский")) {
+            selectLanguage("ru");
+            return;
+        }
+
+        if (text.includes("english")) {
+            selectLanguage("en");
+            return;
+        }
+
+        if (
+            text.includes("한국어") ||
+            text.includes("korean")
+        ) {
+            selectLanguage("ko");
+            return;
+        }
+    }
+);
+
+
+// ============================================================
+// HELPERS
+// ============================================================
 
 function escapeHtml(value) {
 
@@ -138,102 +286,22 @@ function escapeHtml(value) {
 }
 
 
-// ============================================================
-// LANGUAGE
-// ============================================================
+function setText(selector, value) {
 
-function selectLanguage(language) {
+    const element =
+        document.querySelector(selector);
 
-    if (
-        !["ru", "en", "ko"].includes(language)
-    ) {
-        return;
+    if (element) {
+        element.textContent =
+            value ?? "";
     }
-
-    currentLanguage = language;
-
-    localStorage.setItem(
-        "uniuz_language",
-        language
-    );
-
-    console.log(
-        "Selected language:",
-        language
-    );
-
-    const languageScreen =
-        document.getElementById(
-            "languageScreen"
-        );
-
-    const app =
-        document.getElementById(
-            "app"
-        );
-
-
-    // Скрываем выбор языка
-    if (languageScreen) {
-        languageScreen.classList.add("hidden");
-        languageScreen.style.display = "none";
-    }
-
-
-    // ПОКАЗЫВАЕМ ПРИЛОЖЕНИЕ
-    if (app) {
-
-        // Главное исправление
-        app.classList.remove("hidden");
-
-        app.style.display = "flex";
-    }
-
-
-    updateNavigation();
-
-    renderHome();
-
-    initializeApp();
 }
 
 
-window.selectLanguage =
-    selectLanguage;
+function getScreen() {
 
-
-// ============================================================
-// LANGUAGE BUTTONS
-// ============================================================
-
-function setupLanguageButtons() {
-
-    const buttons =
-        document.querySelectorAll(
-            ".language-btn"
-        );
-
-
-    buttons.forEach(button => {
-
-        button.addEventListener(
-            "click",
-            () => {
-
-                const language =
-                    button.dataset.lang;
-
-                selectLanguage(
-                    language
-                );
-            }
-        );
-    });
-
-
-    console.log(
-        "Language buttons:",
-        buttons.length
+    return document.getElementById(
+        "screen"
     );
 }
 
@@ -244,49 +312,79 @@ function setupLanguageButtons() {
 
 async function apiRequest(path) {
 
-    const headers = {
-        "Accept":
-            "application/json"
-    };
-
-
-    if (tg?.initData) {
-
-        headers[
-            "X-Telegram-Init-Data"
-        ] = tg.initData;
-    }
-
-
     const response =
         await fetch(
             `${API_URL}${path}`,
             {
                 method: "GET",
-                headers
+
+                headers: {
+                    "X-Telegram-Init-Data":
+                        initData
+                }
             }
         );
 
+    let data;
 
-    const data =
-        await response.json();
-
+    try {
+        data =
+            await response.json();
+    } catch {
+        throw new Error(
+            "API returned invalid JSON"
+        );
+    }
 
     if (!response.ok) {
 
         throw new Error(
             data.error ||
-            `API error ${response.status}`
+            "API error"
         );
     }
-
 
     return data;
 }
 
 
 // ============================================================
-// LOAD PROFILE
+// API HEALTH
+// ============================================================
+
+async function checkApi() {
+
+    try {
+
+        const response =
+            await fetch(
+                `${API_URL}/api/health`
+            );
+
+        const data =
+            await response.json();
+
+        console.log(
+            "UniUZ API:",
+            data
+        );
+
+        return data.ok === true;
+
+    } catch (error) {
+
+        console.error(
+            "UniUZ API unavailable:",
+            error
+        );
+
+        return false;
+    }
+}
+
+
+// ============================================================
+// PROFILE DATA
 // ============================================================
 
 async function loadProfile() {
@@ -296,41 +394,51 @@ async function loadProfile() {
             "/api/me"
         );
 
-
     console.log(
-        "Profile:",
+        "UniUZ profile:",
         data
     );
 
-
     if (!data.ok) {
-        return;
+        throw new Error(
+            "Profile loading failed"
+        );
     }
-
 
     profileData = data;
 
+    updateUserHeader();
+
+    return data;
+}
+
+
+// ============================================================
+// HEADER
+// ============================================================
+
+function updateUserHeader() {
+
+    if (!profileData) {
+        return;
+    }
 
     const telegramUser =
-        data.telegram_user;
-
+        profileData.telegram_user || {};
 
     const profile =
-        data.profile;
-
+        profileData.profile || {};
 
     const name =
-        telegramUser?.first_name ||
-        telegramUser?.username ||
-        profile?.full_name ||
-        "UniUZ";
-
+        profile.full_name ||
+        telegramUser.first_name ||
+        telegramUser.username ||
+        "Student";
 
     const avatar =
-        document.getElementById(
-            "avatar"
+        document.querySelector(
+            "#avatar"
         );
-
 
     if (avatar) {
 
@@ -340,476 +448,21 @@ async function loadProfile() {
                 "U"
             ).toUpperCase();
     }
-}
 
-
-// ============================================================
-// LOAD HOMEWORK
-// ============================================================
-
-async function loadHomework() {
-
-    try {
-
-        const data =
-            await apiRequest(
-                "/api/homework"
-            );
-
-
-        homeworkData =
-            data.items || [];
-
-
-    } catch (error) {
-
-        console.error(
-            "Homework error:",
-            error
-        );
-
-        homeworkData = [];
-    }
-}
-
-
-// ============================================================
-// LOAD ANNOUNCEMENTS
-// ============================================================
-
-async function loadAnnouncements() {
-
-    try {
-
-        const data =
-            await apiRequest(
-                "/api/announcements"
-            );
-
-
-        announcementsData =
-            data.items || [];
-
-
-    } catch (error) {
-
-        console.error(
-            "Announcements error:",
-            error
-        );
-
-        announcementsData = [];
-    }
-}
-
-
-// ============================================================
-// NAVIGATION
-// ============================================================
-
-function updateNavigation() {
-
-    document
-        .querySelectorAll(
-            ".nav-item"
-        )
-        .forEach(button => {
-
-            const key =
-                button.dataset.page;
-
-            const text =
-                button.querySelector(
-                    "[data-i18n]"
-                );
-
-
-            if (text) {
-
-                text.textContent =
-                    t(key);
-            }
-        });
-
-
-    const welcome =
-        document.getElementById(
-            "welcome"
-        );
-
-
-    if (welcome) {
-
-        welcome.textContent =
-            t("welcome");
-    }
-}
-
-
-// ============================================================
-// NAVIGATION CLICK
-// ============================================================
-
-function setupNavigation() {
-
-    document
-        .querySelectorAll(
-            ".nav-item"
-        )
-        .forEach(button => {
-
-            button.addEventListener(
-                "click",
-                () => {
-
-                    const page =
-                        button.dataset.page;
-
-
-                    document
-                        .querySelectorAll(
-                            ".nav-item"
-                        )
-                        .forEach(item => {
-
-                            item.classList.remove(
-                                "active"
-                            );
-                        });
-
-
-                    button.classList.add(
-                        "active"
-                    );
-
-
-                    openPage(page);
-                }
-            );
-        });
-}
-
-
-// ============================================================
-// OPEN PAGE
-// ============================================================
-
-function openPage(page) {
-
-    if (page === "home") {
-        renderHome();
-    }
-
-    else if (
-        page === "schedule"
-    ) {
-        renderSchedule();
-    }
-
-    else if (
-        page === "homework"
-    ) {
-        renderHomework();
-    }
-
-    else if (
-        page === "ai"
-    ) {
-        renderAI();
-    }
-
-    else if (
-        page === "profile"
-    ) {
-        renderProfile();
-    }
-}
-
-
-// ============================================================
-// HOME
-// ============================================================
-
-function renderHome() {
-
-    const screen =
-        document.getElementById(
-            "screen"
-        );
-
-
-    if (!screen) {
-        return;
-    }
-
-
-    const telegramUser =
-        profileData?.telegram_user;
-
-
-    const profile =
-        profileData?.profile;
-
-
-    const name =
-        telegramUser?.first_name ||
-        telegramUser?.username ||
-        profile?.full_name ||
-        t("student");
-
-
-    screen.innerHTML = `
-
-        <div class="page">
-
-            <div class="welcome-card">
-
-                <div>
-
-                    <div class="eyebrow">
-                        ${escapeHtml(
-                            t("student")
-                        )}
-                    </div>
-
-                    <h1>
-                        ${escapeHtml(
-                            name
-                        )}
-                    </h1>
-
-                    <p>
-                        ${escapeHtml(
-                            t("welcome")
-                        )}
-                    </p>
-
-                </div>
-
-            </div>
-
-
-            <div class="dashboard-grid">
-
-
-                <button
-                    class="dashboard-card"
-                    data-page="schedule"
-                >
-
-                    <span>
-                        📅
-                    </span>
-
-                    <strong>
-                        ${escapeHtml(
-                            t("schedule")
-                        )}
-                    </strong>
-
-                    <small>
-                        ${escapeHtml(
-                            t("today")
-                        )}
-                    </small>
-
-                </button>
-
-
-                <button
-                    class="dashboard-card"
-                    data-page="homework"
-                >
-
-                    <span>
-                        📝
-                    </span>
-
-                    <strong>
-                        ${escapeHtml(
-                            t("homework")
-                        )}
-                    </strong>
-
-                    <small>
-                        ${homeworkData.length}
-                    </small>
-
-                </button>
-
-
-                <button
-                    class="dashboard-card"
-                    data-page="announcements"
-                >
-
-                    <span>
-                        📢
-                    </span>
-
-                    <strong>
-                        ${escapeHtml(
-                            t("announcements")
-                        )}
-                    </strong>
-
-                    <small>
-                        ${announcementsData.length}
-                    </small>
-
-                </button>
-
-
-                <button
-                    class="dashboard-card"
-                    data-page="ai"
-                >
-
-                    <span>
-                        🤖
-                    </span>
-
-                    <strong>
-                        ${escapeHtml(
-                            t("ai")
-                        )}
-                    </strong>
-
-                    <small>
-                        7 / day
-                    </small>
-
-                </button>
-
-            </div>
-
-
-            <div class="info-card">
-
-                <h3>
-                    ${escapeHtml(
-                        t("nextLesson")
-                    )}
-                </h3>
-
-                <p>
-                    ${escapeHtml(
-                        t("scheduleSoon")
-                    )}
-                </p>
-
-            </div>
-
-
-            <div class="quick-card">
-
-                <h3>
-                    ${escapeHtml(
-                        t("quickActions")
-                    )}
-                </h3>
-
-
-                <div class="quick-grid">
-
-                    <button
-                        data-page="schedule"
-                    >
-                        📅
-                        ${escapeHtml(
-                            t("today")
-                        )}
-                    </button>
-
-
-                    <button
-                        data-page="homework"
-                    >
-                        📝
-                        ${escapeHtml(
-                            t("deadlines")
-                        )}
-                    </button>
-
-
-                    <button
-                        data-page="announcements"
-                    >
-                        📢
-                        ${escapeHtml(
-                            t("news")
-                        )}
-                    </button>
-
-
-                    <button
-                        data-page="profile"
-                    >
-                        👤
-                        ${escapeHtml(
-                            t("profile")
-                        )}
-                    </button>
-
-                </div>
-
-            </div>
-
-        </div>
-    `;
-
-
-    setupScreenButtons();
-}
-
-
-// ============================================================
-// SCHEDULE
-// ============================================================
-
-function renderSchedule() {
-
-    const screen =
-        document.getElementById(
-            "screen"
-        );
-
-
-    if (!screen) {
-        return;
-    }
-
-
-    screen.innerHTML = `
-
-        <div class="page">
-
-            <h1>
-                📅
-                ${escapeHtml(
-                    t("schedule")
-                )}
-            </h1>
-
-
-            <div class="info-card">
-
-                <h3>
-                    ${escapeHtml(
-                        t("nextLesson")
-                    )}
-                </h3>
-
-                <p>
-                    ${escapeHtml(
-                        t("scheduleSoon")
-                    )}
-                </p>
-
-            </div>
-
-        </div>
-    `;
+    setText(
+        "#welcome",
+        `${t("student")} • ${name}`
+    );
+
+    setText(
+        "#user-name",
+        name
+    );
+
+    setText(
+        "#profile-name",
+        name
+    );
 }
 
 
@@ -817,99 +470,24 @@ function renderSchedule() {
 // HOMEWORK
 // ============================================================
 
-function renderHomework() {
+async function loadHomework() {
 
-    const screen =
-        document.getElementById(
-            "screen"
+    const data =
+        await apiRequest(
+            "/api/homework"
         );
 
+    console.log(
+        "UniUZ homework:",
+        data
+    );
 
-    if (!screen) {
-        return;
-    }
+    homeworkData =
+        Array.isArray(data.items)
+            ? data.items
+            : [];
 
-
-    let html = "";
-
-
-    if (
-        homeworkData.length === 0
-    ) {
-
-        html = `
-
-            <div class="empty-state">
-
-                ${escapeHtml(
-                    t("noHomework")
-                )}
-
-            </div>
-
-        `;
-
-    } else {
-
-        html =
-            homeworkData
-                .map(item => `
-
-                    <div class="info-card">
-
-                        <h3>
-                            📚
-                            ${escapeHtml(
-                                item.subject_name
-                            )}
-                        </h3>
-
-                        <p>
-                            ${escapeHtml(
-                                item.task_text
-                            )}
-                        </p>
-
-                        <small>
-                            📅
-                            ${escapeHtml(
-                                item.homework_date
-                            )}
-
-                            ${
-                                item.homework_time
-                                ? `
-                                    ⏰
-                                    ${escapeHtml(
-                                        item.homework_time
-                                    )}
-                                `
-                                : ""
-                            }
-                        </small>
-
-                    </div>
-
-                `)
-                .join("");
-    }
-
-
-    screen.innerHTML = `
-
-        <div class="page">
-
-            <h1>
-                📝
-                ${escapeHtml(
-                    t("homework")
-                )}
-            </h1>
-
-            ${html}
-
-        </div>
-    `;
+    return data;
 }
 
 
@@ -917,264 +495,822 @@ function renderHomework() {
 // ANNOUNCEMENTS
 // ============================================================
 
-function renderAnnouncements() {
+async function loadAnnouncements() {
 
-    const screen =
-        document.getElementById(
-            "screen"
+    const data =
+        await apiRequest(
+            "/api/announcements"
         );
 
+    console.log(
+        "UniUZ announcements:",
+        data
+    );
 
-    if (!screen) {
-        return;
-    }
+    announcementsData =
+        Array.isArray(data.items)
+            ? data.items
+            : [];
 
-
-    let html = "";
-
-
-    if (
-        announcementsData.length === 0
-    ) {
-
-        html = `
-
-            <div class="empty-state">
-
-                ${escapeHtml(
-                    t("noAnnouncements")
-                )}
-
-            </div>
-
-        `;
-
-    } else {
-
-        html =
-            announcementsData
-                .map(item => `
-
-                    <div class="info-card">
-
-                        <h3>
-                            📢
-                            ${escapeHtml(
-                                item.title
-                            )}
-                        </h3>
-
-                        <p>
-                            ${escapeHtml(
-                                item.message
-                            )}
-                        </p>
-
-                    </div>
-
-                `)
-                .join("");
-    }
-
-
-    screen.innerHTML = `
-
-        <div class="page">
-
-            <h1>
-                📢
-                ${escapeHtml(
-                    t("announcements")
-                )}
-            </h1>
-
-            ${html}
-
-        </div>
-    `;
+    return data;
 }
 
 
 // ============================================================
-// AI
-// ============================================================
-
-function renderAI() {
-
-    const screen =
-        document.getElementById(
-            "screen"
-        );
-
-
-    if (!screen) {
-        return;
-    }
-
-
-    screen.innerHTML = `
-
-        <div class="page">
-
-            <h1>
-                🤖
-                ${escapeHtml(
-                    t("ai")
-                )}
-            </h1>
-
-
-            <div class="info-card">
-
-                <h3>
-                    UniUZ AI Assistant
-                </h3>
-
-                <p>
-                    ${
-                        currentLanguage === "ko"
-                        ? "학업에 관한 질문을 입력하세요."
-                        : currentLanguage === "en"
-                        ? "Ask your study-related question."
-                        : "Задайте вопрос по учебе."
-                    }
-                </p>
-
-            </div>
-
-        </div>
-    `;
-}
-
-
-// ============================================================
-// PROFILE
+// PROFILE PAGE
 // ============================================================
 
 function renderProfile() {
 
     const screen =
-        document.getElementById(
-            "screen"
-        );
-
+        getScreen();
 
     if (!screen) {
         return;
     }
 
-
     const telegramUser =
-        profileData?.telegram_user;
-
+        profileData?.telegram_user || {};
 
     const profile =
-        profileData?.profile;
-
+        profileData?.profile || {};
 
     const name =
-        telegramUser?.first_name ||
-        telegramUser?.username ||
-        profile?.full_name ||
-        t("student");
+        profile.full_name ||
+        telegramUser.first_name ||
+        telegramUser.username ||
+        "Student";
+
+    const username =
+        profile.username ||
+        telegramUser.username ||
+        "";
+
+    const university =
+        profile.university ||
+        "Ajou University in Tashkent";
+
+    const department =
+        profile.department ||
+        t("notSelected");
+
+    const group =
+        profile.group_name ||
+        t("notSelected");
+
+    const telegramId =
+        telegramUser.id ||
+        "—";
+
+    const languageNames = {
+
+        ru: "🇷🇺 Русский",
+        en: "🇬🇧 English",
+        ko: "🇰🇷 한국어"
+
+    };
+
+    const language =
+        languageNames[
+            getLanguage()
+        ] ||
+        languageNames.ru;
+
+    const avatarLetter =
+        (
+            name.trim()[0] ||
+            "U"
+        ).toUpperCase();
 
 
     screen.innerHTML = `
 
-        <div class="page">
+        <div class="page profile-page">
 
-            <h1>
-                👤
-                ${escapeHtml(
-                    t("profile")
-                )}
-            </h1>
+            <div class="profile-hero">
 
-
-            <div class="profile-card">
-
-                <div class="avatar">
-
+                <div class="profile-avatar">
                     ${escapeHtml(
-                        (
-                            name[0] ||
-                            "U"
-                        ).toUpperCase()
+                        avatarLetter
                     )}
+                </div>
+
+                <h1>
+                    ${escapeHtml(
+                        name
+                    )}
+                </h1>
+
+                ${
+                    username
+                        ? `
+                            <div class="profile-username">
+                                @${escapeHtml(
+                                    username
+                                )}
+                            </div>
+                        `
+                        : ""
+                }
+
+                <div class="profile-role">
+                    🎓 ${escapeHtml(
+                        t("student")
+                    )}
+                </div>
+
+            </div>
+
+
+            <div class="profile-section">
+
+                <div class="profile-section-title">
+                    👤 ${getLanguage() === "ru"
+                        ? "Личная информация"
+                        : getLanguage() === "ko"
+                            ? "개인 정보"
+                            : "Personal information"}
+                </div>
+
+
+                <div class="profile-row">
+
+                    <div class="profile-row-icon">
+                        🏫
+                    </div>
+
+                    <div class="profile-row-content">
+
+                        <small>
+                            ${escapeHtml(
+                                t("university")
+                            )}
+                        </small>
+
+                        <strong>
+                            ${escapeHtml(
+                                university
+                            )}
+                        </strong>
+
+                    </div>
 
                 </div>
 
 
-                <h2>
+                <div class="profile-row">
+
+                    <div class="profile-row-icon">
+                        🎓
+                    </div>
+
+                    <div class="profile-row-content">
+
+                        <small>
+                            ${escapeHtml(
+                                t("department")
+                            )}
+                        </small>
+
+                        <strong>
+                            ${escapeHtml(
+                                department
+                            )}
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <div class="profile-row">
+
+                    <div class="profile-row-icon">
+                        👥
+                    </div>
+
+                    <div class="profile-row-content">
+
+                        <small>
+                            ${escapeHtml(
+                                t("group")
+                            )}
+                        </small>
+
+                        <strong>
+                            ${escapeHtml(
+                                group
+                            )}
+                        </strong>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="profile-section">
+
+                <div class="profile-section-title">
+                    ⚙️ ${
+                        getLanguage() === "ru"
+                            ? "Настройки"
+                            : getLanguage() === "ko"
+                                ? "설정"
+                                : "Settings"
+                    }
+                </div>
+
+
+                <div class="profile-row">
+
+                    <div class="profile-row-icon">
+                        🌐
+                    </div>
+
+                    <div class="profile-row-content">
+
+                        <small>
+                            ${escapeHtml(
+                                t("language")
+                            )}
+                        </small>
+
+                        <strong>
+                            ${escapeHtml(
+                                language
+                            )}
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <div class="profile-row">
+
+                    <div class="profile-row-icon">
+                        🆔
+                    </div>
+
+                    <div class="profile-row-content">
+
+                        <small>
+                            ${escapeHtml(
+                                t("telegramId")
+                            )}
+                        </small>
+
+                        <strong>
+                            ${escapeHtml(
+                                String(
+                                    telegramId
+                                )
+                            )}
+                        </strong>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="profile-status">
+
+                <div class="profile-status-icon">
+                    ✓
+                </div>
+
+                <div>
+
+                    <strong>
+                        UniUZ
+                    </strong>
+
+                    <small>
+                        ${
+                            getLanguage() === "ru"
+                                ? "Профиль синхронизирован с базой"
+                                : getLanguage() === "ko"
+                                    ? "프로필이 데이터베이스와 동기화되었습니다"
+                                    : "Profile synchronized with database"
+                        }
+                    </small>
+
+                </div>
+
+            </div>
+
+        </div>
+    `;
+}
+
+
+// ============================================================
+// HOME PAGE
+// ============================================================
+
+function renderHome() {
+
+    const screen =
+        getScreen();
+
+    if (!screen) {
+        return;
+    }
+
+    const telegramUser =
+        profileData?.telegram_user || {};
+
+    const profile =
+        profileData?.profile || {};
+
+    const name =
+        profile.full_name ||
+        telegramUser.first_name ||
+        telegramUser.username ||
+        "Student";
+
+    const homeworkCount =
+        homeworkData.length;
+
+    const announcementCount =
+        announcementsData.length;
+
+
+    screen.innerHTML = `
+
+        <div class="page home-page">
+
+            <div class="home-header">
+
+                <div class="home-label">
+                    ${escapeHtml(
+                        t("student")
+                    )}
+                </div>
+
+                <h1>
                     ${escapeHtml(
                         name
                     )}
-                </h2>
-
+                </h1>
 
                 <p>
                     ${
-                        profile?.username
-                        ? "@" +
-                          escapeHtml(
-                              profile.username
-                          )
-                        : ""
+                        getLanguage() === "ru"
+                            ? "Добро пожаловать 👋"
+                            : getLanguage() === "ko"
+                                ? "환영합니다 👋"
+                                : "Welcome 👋"
                     }
                 </p>
 
             </div>
 
 
-            <div class="info-card">
+            <div class="home-stats">
 
-                <strong>
-                    ${escapeHtml(
-                        t("university")
-                    )}
-                </strong>
+                <button
+                    class="stat-card"
+                    data-page="schedule"
+                >
+                    <span>📅</span>
+                    <strong>
+                        ${getLanguage() === "ru"
+                            ? "Расписание"
+                            : getLanguage() === "ko"
+                                ? "시간표"
+                                : "Schedule"}
+                    </strong>
+                    <small>
+                        ${
+                            getLanguage() === "ru"
+                                ? "Сегодня"
+                                : getLanguage() === "ko"
+                                    ? "오늘"
+                                    : "Today"
+                        }
+                    </small>
+                </button>
+
+
+                <button
+                    class="stat-card"
+                    data-page="homework"
+                >
+                    <span>📝</span>
+                    <strong>
+                        ${getLanguage() === "ru"
+                            ? "Задания"
+                            : getLanguage() === "ko"
+                                ? "과제"
+                                : "Homework"}
+                    </strong>
+                    <small>
+                        ${homeworkCount}
+                    </small>
+                </button>
+
+
+                <button
+                    class="stat-card"
+                    data-page="announcements"
+                >
+                    <span>📢</span>
+                    <strong>
+                        ${getLanguage() === "ru"
+                            ? "Объявления"
+                            : getLanguage() === "ko"
+                                ? "공지사항"
+                                : "Announcements"}
+                    </strong>
+                    <small>
+                        ${announcementCount}
+                    </small>
+                </button>
+
+            </div>
+
+
+            <div class="home-card">
+
+                <h2>
+                    ${
+                        getLanguage() === "ru"
+                            ? "Следующая пара"
+                            : getLanguage() === "ko"
+                                ? "다음 수업"
+                                : "Next class"
+                    }
+                </h2>
 
                 <p>
-                    ${escapeHtml(
-                        profile?.university ||
-                        "Ajou University in Tashkent"
-                    )}
+                    ${
+                        getLanguage() === "ru"
+                            ? "Расписание будет подключено"
+                            : getLanguage() === "ko"
+                                ? "시간표가 연결됩니다"
+                                : "Schedule will be connected"
+                    }
                 </p>
 
             </div>
 
 
-            <div class="info-card">
+            <div class="home-card">
 
-                <strong>
-                    ${escapeHtml(
-                        t("department")
-                    )}
-                </strong>
+                <h2>
+                    ${
+                        getLanguage() === "ru"
+                            ? "Быстрые действия"
+                            : getLanguage() === "ko"
+                                ? "빠른 실행"
+                                : "Quick actions"
+                    }
+                </h2>
 
-                <p>
-                    ${escapeHtml(
-                        profile?.department ||
-                        t("notSelected")
-                    )}
-                </p>
+                <div class="quick-actions">
+
+                    <button
+                        class="quick-action"
+                        data-page="schedule"
+                    >
+                        📅
+                        ${
+                            getLanguage() === "ru"
+                                ? "Сегодня"
+                                : getLanguage() === "ko"
+                                    ? "오늘"
+                                    : "Today"
+                        }
+                    </button>
+
+                    <button
+                        class="quick-action"
+                        data-page="homework"
+                    >
+                        📝
+                        ${
+                            getLanguage() === "ru"
+                                ? "Дедлайны"
+                                : getLanguage() === "ko"
+                                    ? "마감일"
+                                    : "Deadlines"
+                        }
+                    </button>
+
+                    <button
+                        class="quick-action"
+                        data-page="announcements"
+                    >
+                        📢
+                        ${
+                            getLanguage() === "ru"
+                                ? "Новости"
+                                : getLanguage() === "ko"
+                                    ? "공지"
+                                    : "News"
+                        }
+                    </button>
+
+                    <button
+                        class="quick-action"
+                        data-page="profile"
+                    >
+                        👤
+                        ${
+                            getLanguage() === "ru"
+                                ? "Профиль"
+                                : getLanguage() === "ko"
+                                    ? "프로필"
+                                    : "Profile"
+                        }
+                    </button>
+
+                </div>
 
             </div>
 
+        </div>
+    `;
+}
 
-            <div class="info-card">
 
-                <strong>
-                    ${escapeHtml(
-                        t("group")
+// ============================================================
+// HOMEWORK PAGE
+// ============================================================
+
+function renderHomework() {
+
+    const screen =
+        getScreen();
+
+    if (!screen) {
+        return;
+    }
+
+    if (!homeworkData.length) {
+
+        screen.innerHTML = `
+
+            <div class="page">
+
+                <div class="page-title">
+                    📝 ${escapeHtml(
+                        t("homework")
                     )}
-                </strong>
+                </div>
+
+                <div class="empty-state">
+                    ${escapeHtml(
+                        t("noHomework")
+                    )}
+                </div>
+
+            </div>
+        `;
+
+        return;
+    }
+
+
+    screen.innerHTML = `
+
+        <div class="page">
+
+            <div class="page-title">
+                📝 ${escapeHtml(
+                    t("homework")
+                )}
+            </div>
+
+            <div class="cards-list">
+
+                ${
+                    homeworkData
+                        .map(item => `
+
+                            <div class="data-card">
+
+                                <div class="data-card-title">
+                                    📚 ${escapeHtml(
+                                        item.subject_name ||
+                                        "Subject"
+                                    )}
+                                </div>
+
+                                <div class="data-card-text">
+                                    ${escapeHtml(
+                                        item.task_text ||
+                                        ""
+                                    )}
+                                </div>
+
+                                <div class="data-card-meta">
+                                    📅 ${escapeHtml(
+                                        item.homework_date ||
+                                        ""
+                                    )}
+
+                                    ${
+                                        item.homework_time
+                                            ? `
+                                                ⏰ ${escapeHtml(
+                                                    item.homework_time
+                                                )}
+                                            `
+                                            : ""
+                                    }
+                                </div>
+
+                            </div>
+
+                        `)
+                        .join("")
+                }
+
+            </div>
+
+        </div>
+    `;
+}
+
+
+// ============================================================
+// ANNOUNCEMENTS PAGE
+// ============================================================
+
+function renderAnnouncements() {
+
+    const screen =
+        getScreen();
+
+    if (!screen) {
+        return;
+    }
+
+    if (!announcementsData.length) {
+
+        screen.innerHTML = `
+
+            <div class="page">
+
+                <div class="page-title">
+                    📢 ${
+                        getLanguage() === "ru"
+                            ? "Объявления"
+                            : getLanguage() === "ko"
+                                ? "공지사항"
+                                : "Announcements"
+                    }
+                </div>
+
+                <div class="empty-state">
+                    ${escapeHtml(
+                        t("noAnnouncements")
+                    )}
+                </div>
+
+            </div>
+        `;
+
+        return;
+    }
+
+
+    screen.innerHTML = `
+
+        <div class="page">
+
+            <div class="page-title">
+                📢 ${
+                    getLanguage() === "ru"
+                        ? "Объявления"
+                        : getLanguage() === "ko"
+                            ? "공지사항"
+                            : "Announcements"
+                }
+            </div>
+
+            <div class="cards-list">
+
+                ${
+                    announcementsData
+                        .map(item => `
+
+                            <div class="data-card">
+
+                                <div class="data-card-title">
+                                    📢 ${escapeHtml(
+                                        item.title ||
+                                        "Announcement"
+                                    )}
+                                </div>
+
+                                <div class="data-card-text">
+                                    ${escapeHtml(
+                                        item.message ||
+                                        ""
+                                    )}
+                                </div>
+
+                            </div>
+
+                        `)
+                        .join("")
+                }
+
+            </div>
+
+        </div>
+    `;
+}
+
+
+// ============================================================
+// SCHEDULE PAGE
+// ============================================================
+
+function renderSchedule() {
+
+    const screen =
+        getScreen();
+
+    if (!screen) {
+        return;
+    }
+
+    screen.innerHTML = `
+
+        <div class="page">
+
+            <div class="page-title">
+                📅 ${escapeHtml(
+                    t("schedule")
+                )}
+            </div>
+
+            <div class="empty-state">
+
+                📅
+
+                <br><br>
+
+                ${
+                    getLanguage() === "ru"
+                        ? "Расписание будет подключено"
+                        : getLanguage() === "ko"
+                            ? "시간표가 연결됩니다"
+                            : "Schedule will be connected"
+                }
+
+            </div>
+
+        </div>
+    `;
+}
+
+
+// ============================================================
+// AI PAGE
+// ============================================================
+
+function renderAI() {
+
+    const screen =
+        getScreen();
+
+    if (!screen) {
+        return;
+    }
+
+    screen.innerHTML = `
+
+        <div class="page">
+
+            <div class="page-title">
+                🤖 ${escapeHtml(
+                    t("ai")
+                )}
+            </div>
+
+            <div class="home-card">
+
+                <h2>
+                    UniUZ AI
+                </h2>
 
                 <p>
-                    ${escapeHtml(
-                        profile?.group_name ||
-                        t("notSelected")
-                    )}
+                    ${
+                        getLanguage() === "ru"
+                            ? "ИИ-помощник скоро будет доступен в Mini App."
+                            : getLanguage() === "ko"
+                                ? "AI 도우미가 곧 Mini App에서 제공됩니다."
+                                : "AI assistant will soon be available in the Mini App."
+                    }
                 </p>
 
             </div>
@@ -1185,101 +1321,257 @@ function renderProfile() {
 
 
 // ============================================================
-// SCREEN BUTTONS
+// NAVIGATION
 // ============================================================
 
-function setupScreenButtons() {
+function updateNavigationLanguage() {
 
     document
         .querySelectorAll(
-            "#screen [data-page]"
+            ".nav-item"
         )
         .forEach(button => {
 
-            button.onclick = () => {
+            const page =
+                button.dataset.page;
 
-                openPage(
-                    button.dataset.page
+            const small =
+                button.querySelector(
+                    "small"
                 );
-            };
+
+            if (!small) {
+                return;
+            }
+
+            if (
+                page === "home"
+            ) {
+                small.textContent =
+                    t("home");
+            }
+
+            if (
+                page === "schedule"
+            ) {
+                small.textContent =
+                    t("schedule");
+            }
+
+            if (
+                page === "homework"
+            ) {
+                small.textContent =
+                    t("homework");
+            }
+
+            if (
+                page === "ai"
+            ) {
+                small.textContent =
+                    t("ai");
+            }
+
+            if (
+                page === "profile"
+            ) {
+                small.textContent =
+                    t("profile");
+            }
+
         });
 }
 
 
+async function navigate(page) {
+
+    document
+        .querySelectorAll(
+            ".nav-item"
+        )
+        .forEach(button => {
+
+            button.classList.toggle(
+                "active",
+                button.dataset.page === page
+            );
+
+        });
+
+
+    if (page === "home") {
+
+        renderHome();
+        return;
+    }
+
+
+    if (page === "schedule") {
+
+        renderSchedule();
+        return;
+    }
+
+
+    if (page === "homework") {
+
+        renderHomework();
+        return;
+    }
+
+
+    if (page === "ai") {
+
+        renderAI();
+        return;
+    }
+
+
+    if (page === "profile") {
+
+        renderProfile();
+        return;
+    }
+
+
+    if (page === "announcements") {
+
+        renderAnnouncements();
+        return;
+    }
+}
+
+
 // ============================================================
-// API INITIALIZATION
+// NAV CLICK HANDLER
 // ============================================================
 
-async function initializeApp() {
+document.addEventListener(
+    "click",
+    function(event) {
+
+        const button =
+            event.target.closest(
+                "[data-page]"
+            );
+
+        if (!button) {
+            return;
+        }
+
+        const page =
+            button.dataset.page;
+
+        if (!page) {
+            return;
+        }
+
+        navigate(page);
+    }
+);
+
+
+// ============================================================
+// LOADING
+// ============================================================
+
+function showLoading() {
+
+    const loading =
+        document.querySelector(
+            "#loading"
+        );
+
+    if (loading) {
+        loading.style.display =
+            "flex";
+    }
+}
+
+
+function hideLoading() {
+
+    const loading =
+        document.querySelector(
+            "#loading"
+        );
+
+    if (loading) {
+        loading.style.display =
+            "none";
+    }
+}
+
+
+// ============================================================
+// ERROR
+// ============================================================
+
+function showError(message) {
+
+    console.error(
+        message
+    );
+
+    const errorElement =
+        document.querySelector(
+            "#error"
+        );
+
+    if (errorElement) {
+
+        errorElement.textContent =
+            message;
+
+        errorElement.style.display =
+            "block";
+    }
+}
+
+
+// ============================================================
+// INITIALIZE
+// ============================================================
+
+async function initializeUniUZ() {
+
+    showLoading();
 
     try {
 
-        console.log(
-            "UniUZ API connecting..."
-        );
+        const apiOnline =
+            await checkApi();
 
-
-        // Проверяем API
-
-        const health =
-            await fetch(
-                `${API_URL}/api/health`
-            );
-
-
-        const healthData =
-            await health.json();
-
-
-        console.log(
-            "API:",
-            healthData
-        );
-
-
-        if (
-            !health.ok ||
-            !healthData.ok
-        ) {
+        if (!apiOnline) {
 
             throw new Error(
-                "API unavailable"
+                "UniUZ API is unavailable."
             );
         }
 
 
-        // Профиль
-
-        try {
-
-            await loadProfile();
-
-        } catch (error) {
+        if (!initData) {
 
             console.warn(
-                "Profile:",
-                error
+                "Telegram initData is empty."
             );
         }
 
 
-        // Задания
+        await loadProfile();
 
         await loadHomework();
-
-
-        // Объявления
 
         await loadAnnouncements();
 
 
-        // Обновляем главный экран
+        updateUserHeader();
 
-        renderHome();
+        updateNavigationLanguage();
 
 
         console.log(
-            "UniUZ loaded successfully"
+            "UniUZ Mini App initialized successfully."
         );
 
 
@@ -1290,12 +1582,56 @@ async function initializeApp() {
             error
         );
 
+        showError(
+            t("error")
+        );
 
-        // ВАЖНО:
-        // Даже если API не загрузился,
-        // интерфейс всё равно остаётся.
+    } finally {
 
-        renderHome();
+        hideLoading();
+    }
+}
+
+
+// ============================================================
+// REFRESH
+// ============================================================
+
+async function refreshUniUZ() {
+
+    try {
+
+        await loadProfile();
+
+        await loadHomework();
+
+        await loadAnnouncements();
+
+        updateUserHeader();
+
+        const active =
+            document.querySelector(
+                ".nav-item.active"
+            );
+
+        if (active) {
+
+            navigate(
+                active.dataset.page
+            );
+
+        } else {
+
+            renderHome();
+
+        }
+
+    } catch (error) {
+
+        console.error(
+            "Refresh error:",
+            error
+        );
     }
 }
 
@@ -1306,105 +1642,52 @@ async function initializeApp() {
 
 document.addEventListener(
     "DOMContentLoaded",
-    () => {
+    async function() {
 
-        console.log(
-            "UniUZ DOM loaded"
-        );
+        updateNavigationLanguage();
 
-
-        setupLanguageButtons();
-
-        setupNavigation();
-
-
-        // ====================================================
-        // ЕСЛИ ЯЗЫК УЖЕ ВЫБРАН
-        // ====================================================
 
         if (currentLanguage) {
 
-            const languageScreen =
-                document.getElementById(
-                    "languageScreen"
-                );
+            hideLanguageScreen();
 
-            const app =
-                document.getElementById(
-                    "app"
-                );
+            showMainApplication();
 
-
-            if (languageScreen) {
-
-                languageScreen.classList.add(
-                    "hidden"
-                );
-
-                languageScreen.style.display =
-                    "none";
-            }
-
-
-            if (app) {
-
-                // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ
-                app.classList.remove(
-                    "hidden"
-                );
-
-                app.style.display =
-                    "flex";
-            }
-
-
-            updateNavigation();
-
+            await initializeUniUZ();
 
             renderHome();
 
-
-            initializeApp();
-
-
         } else {
 
-            // =================================================
-            // ПЕРВЫЙ ЗАПУСК
-            // =================================================
-
-            const app =
-                document.getElementById(
-                    "app"
-                );
-
-
-            if (app) {
-
-                app.classList.add(
-                    "hidden"
-                );
-
-                app.style.display =
-                    "none";
-            }
-
-
-            const languageScreen =
-                document.getElementById(
-                    "languageScreen"
-                );
-
-
-            if (languageScreen) {
-
-                languageScreen.classList.remove(
-                    "hidden"
-                );
-
-                languageScreen.style.display =
-                    "flex";
-            }
+            console.log(
+                "Waiting for language selection..."
+            );
         }
     }
 );
+
+
+// ============================================================
+// TELEGRAM MAIN BUTTON
+// ============================================================
+
+if (tg) {
+
+    try {
+
+        tg.MainButton.setText(
+            "Обновить"
+        );
+
+        tg.MainButton.onClick(
+            refreshUniUZ
+        );
+
+    } catch (error) {
+
+        console.warn(
+            "Telegram MainButton unavailable:",
+            error
+        );
+    }
+}
