@@ -9,3 +9,8 @@
 .language-btn{width:100%;border:1px solid #2a354b;border-radius:15px;background:#1a2334;color:#fff;padding:15px 16px;margin:7px 0;display:flex;align-items:center;gap:12px;font-size:16px;font-weight:750;cursor:pointer;transition:.15s}
 .language-btn:hover{background:#222d43;transform:translateY(-1px)}
 .language-btn span{flex:1;text-align:left}
+
+.language-settings{margin-top:14px}
+.language-options{display:grid;gap:8px;margin-top:14px}
+.language-options button{border:1px solid #2a354b;border-radius:12px;background:#1a2334;color:#fff;padding:12px;text-align:left;font-weight:700;cursor:pointer}
+.language-options button.selected{border-color:#6b7cff;background:#24304a}

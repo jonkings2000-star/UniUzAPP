@@ -5,7 +5,7 @@ if (tg) {
   tg.expand();
 }
 
-const LANG_KEY = "uniuz_language";
+const LANG_KEY = "uniuz_language_v2";
 
 const state = {
   user: tg?.initDataUnsafe?.user || null,
@@ -268,8 +268,24 @@ function renderPage(page) {
           <b>${esc(getUserName())}</b>
           <p class="muted">${esc(t("profileInfo"))}</p>
         </div>
+
+        <div class="item language-settings">
+          <b>🌐 ${esc(t("languageTitle"))}</b>
+          <div class="language-options">
+            <button class="${state.lang === "ru" ? "selected" : ""}" data-lang-change="ru">🇷🇺 Русский</button>
+            <button class="${state.lang === "en" ? "selected" : ""}" data-lang-change="en">🇬🇧 English</button>
+            <button class="${state.lang === "ko" ? "selected" : ""}" data-lang-change="ko">🇰🇷 한국어</button>
+          </div>
+        </div>
       </section>
     `;
+
+    document.querySelectorAll("[data-lang-change]").forEach(btn => {
+      btn.onclick = () => {
+        startApp(btn.dataset.langChange);
+        renderPage("profile");
+      };
+    });
 
   } else if (page === "ai") {
     main.innerHTML = `

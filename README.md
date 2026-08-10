@@ -14,3 +14,9 @@ Railway start command:
 `python server.py`
 
 The existing UniUZ bot is not modified by these files.
+
+## Update v2
+The language storage key was versioned so users who opened the previous Mini App will see the language selection screen once after this deployment.
+
+## Update v3
+Added a language switcher in Profile. Users can change between Russian, English, and Korean at any time.
