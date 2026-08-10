@@ -1808,7 +1808,6 @@ function bindScreenButtons(){
 
 async function initializeUniUZ(){
 
-
     try{
 
 
@@ -1823,21 +1822,22 @@ async function initializeUniUZ(){
         }
 
 
-
         await loadProfile();
 
 
+        // Ждём выбора языка
+        // showRoleScreen() вызывается только после selectLanguage()
 
 
-        // НЕ входит автоматически студентом
-
-        showRoleScreen();
-
+        return;
 
 
     }
 
     catch(error){
+
+
+        console.error(error);
 
 
         showError(
@@ -1846,7 +1846,6 @@ async function initializeUniUZ(){
 
 
     }
-
 
 }
 
