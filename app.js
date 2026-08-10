@@ -11,7 +11,7 @@
 // CONFIG
 // =====================================================
 
-const API_URL = "https://uniuz-production.up.railway.app";
+const API_URL = window.location.origin;
 
 const tg = window.Telegram?.WebApp || null;
 
