@@ -1437,15 +1437,46 @@ function openPage(page) {
 
     else if (page === "homework") {
 
-        title =
-            `📝 ${T("homework")}`;
+
+    title =
+        `📝 ${T("homework")}`;
+
+
+    if (cachedHomework.length > 0) {
+
+
+        text = cachedHomework.map(hw => {
+
+
+            return `
+
+📚 ${hw.title}
+
+📝 ${hw.description || "Без описания"}
+
+👥 Группа:
+${hw.group_name}
+
+📅 Сдать до:
+${hw.deadline || "Не указано"}
+
+--------------------
+
+`;
+
+        }).join("\n");
+
+
+    } else {
+
 
         text =
-            cachedHomework.length > 0
-                ? `Загружено заданий: ${cachedHomework.length}`
-                : "Пока нет заданий.";
+        "Пока нет заданий.";
+
 
     }
+
+}
 
 
     else if (page === "announcements") {
