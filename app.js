@@ -841,59 +841,119 @@ async function checkTeacherStatus() {
 // TEACHER HOME
 // =====================================================
 
-function showTeacherHome() {
+function showTeacherHome(){
 
     setNav(false);
 
 
-    const screen =
-        getScreen();
-
-    if (!screen) return;
+    const s = getScreen();
 
 
-    screen.innerHTML = `
+    s.innerHTML = `
 
-        <div class="page">
+    <div class="page">
 
-            <div class="info-card">
+        <div class="page-header">
 
-                <h1>
-                    👨‍🏫 UniUZ
-                </h1>
-
-                <h2>
-                    ${escapeHtml(T("approved"))}
-                </h2>
-
-                <p>
-                    Режим преподавателя активирован.
-                </p>
-
-                <button
-                    type="button"
-                    id="teacherBack"
-                    class="role-button"
-                >
-                    ⬅️ Вернуться
-                </button>
-
-            </div>
+            <h1>
+            👨‍🏫 UniUZ
+            </h1>
 
         </div>
+
+
+        <div class="info-card">
+
+            <h2>
+            ✅ Преподаватель
+            </h2>
+
+
+            <p>
+            Добро пожаловать в кабинет преподавателя.
+            </p>
+
+
+        </div>
+
+
+        <div class="dashboard-grid">
+
+
+            <button class="dashboard-card">
+
+                📅
+                <br>
+
+                Моё расписание
+
+            </button>
+
+
+
+            <button class="dashboard-card">
+
+                📝
+                <br>
+
+                Создать задание
+
+            </button>
+
+
+
+            <button class="dashboard-card">
+
+                📢
+                <br>
+
+                Объявления
+
+            </button>
+
+
+
+            <button class="dashboard-card">
+
+                👥
+                <br>
+
+                Студенты
+
+            </button>
+
+
+        </div>
+
+
+
+        <button
+        class="role-button"
+        id="backProfile"
+        >
+
+        ⬅️ Вернуться
+
+        </button>
+
+
+    </div>
 
     `;
 
 
-    document
-        .getElementById("teacherBack")
-        ?.addEventListener(
-            "click",
-            () => {
 
-                showRoleScreen();
-            }
-        );
+    document
+    .getElementById("backProfile")
+    .onclick = ()=>{
+
+
+        showRoleScreen();
+
+
+    };
+
+
 }
 
 
