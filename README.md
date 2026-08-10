@@ -1,18 +1,15 @@
-# UniUZ Mini App — этап 1
+# UniUZ Mini App — Railway ready
 
-Это первый экран Telegram Mini App для UniUZ.
+## Railway
+1. Push these files to the `uniuz-miniapp` GitHub repository.
+2. Railway will create/deploy the service from GitHub.
+3. In Railway open the Mini App service.
+4. Settings → Deploy → Start Command:
+   `python server.py`
+5. Settings → Networking → Generate Domain.
+6. When Railway asks for the target port, enter the value shown in the Railway `PORT` variable. If you did not create a `PORT` variable, Railway provides one automatically; the server reads it from the environment.
+7. Open the generated `https://....up.railway.app` URL.
 
-Сейчас:
-- Telegram WebApp SDK подключён.
-- Получается Telegram-пользователь из `initDataUnsafe.user` для отображения интерфейса.
-- Есть главная, расписание, задания, объявления, AI и профиль.
-- Интерфейс адаптирован под телефон и Telegram.
-- Данные пока демонстрационные.
+The server listens on `0.0.0.0:$PORT`, as required for Railway public networking.
 
-Следующий этап:
-1. Развернуть Mini App на Railway по HTTPS.
-2. Добавить FastAPI backend.
-3. Проверять `Telegram.WebApp.initData` на сервере.
-4. Подключить существующую SQLite-базу UniUZ.
-5. Подключить реальный AI API.
-6. Добавить кнопку открытия Mini App в Telegram-бот.
+Do not change the existing UniUZ bot service. This Mini App is a separate service.
