@@ -1,11 +1,13 @@
 # ==========================================================
 # UniUZ API
 # Flask Backend
-# Part 1/3
 # ==========================================================
 
 import os
 import json
+
+from urllib.parse import parse_qs
+
 
 from flask import (
     Flask,
@@ -13,27 +15,31 @@ from flask import (
     jsonify
 )
 
+
 from flask_cors import CORS
 
+
 import database
+
 
 
 # ==========================================================
 # APP
 # ==========================================================
 
+
 app = Flask(__name__)
 
 CORS(app)
 
 
-# создаём таблицы
+
 database.init_db()
 
 
 
 # ==========================================================
-# TELEGRAM USER
+# TELEGRAM AUTH
 # ==========================================================
 
 
@@ -43,34 +49,49 @@ def get_telegram_user():
         "X-Telegram-Init-Data"
     )
 
+
     if not init_data:
+
+        print(
+            "NO TELEGRAM INIT DATA"
+        )
+
         return None
+
 
 
     try:
 
-        params = {}
-
-        for item in init_data.split("&"):
-
-            key, value = item.split("=")
-
-            params[key] = value
-
-
-        user_json = params.get("user")
-
-
-        if not user_json:
-            return None
-
-
-        return json.loads(
-            user_json
+        data = parse_qs(
+            init_data
         )
 
 
-    except Exception:
+        user = data.get(
+            "user"
+        )
+
+
+        if not user:
+
+            return None
+
+
+
+        return json.loads(
+            user[0]
+        )
+
+
+
+    except Exception as e:
+
+
+        print(
+            "Telegram parse error:",
+            e
+        )
+
 
         return None
 
@@ -80,7 +101,9 @@ def get_telegram_user():
 
 def require_user():
 
+
     user = get_telegram_user()
+
 
 
     if not user:
@@ -97,13 +120,24 @@ def require_user():
             "username"
         ),
 
+
         full_name=(
 
-            user.get("first_name","")
+            user.get(
+                "first_name",
+                ""
+            )
 
-            + " "
+            +
 
-            + user.get("last_name","")
+            " "
+
+            +
+
+            user.get(
+                "last_name",
+                ""
+            )
 
         ).strip()
 
@@ -127,10 +161,13 @@ def health():
 
     return jsonify({
 
-        "ok": True,
+        "ok":
+        True,
+
 
         "service":
         "UniUZ API",
+
 
         "status":
         "online"
@@ -147,13 +184,15 @@ def health():
 
 
 @app.get("/api/me")
-def get_profile():
+def profile():
 
 
     user = require_user()
 
 
+
     if not user:
+
 
         return jsonify({
 
@@ -164,7 +203,7 @@ def get_profile():
 
 
 
-    profile = database.get_user(
+    user_db = database.get_user(
         user["id"]
     )
 
@@ -179,26 +218,22 @@ def get_profile():
     return jsonify({
 
         "telegram":
-
         user,
 
 
         "profile":
-
-        dict(profile)
-        if profile
+        dict(user_db)
+        if user_db
         else None,
 
 
         "teacher_status":
-
         teacher["status"]
         if teacher
         else None,
 
 
         "is_admin":
-
         database.is_admin(
             user["id"]
         )
@@ -218,6 +253,7 @@ def teacher_request():
 
     if not user:
 
+
         return jsonify({
 
             "error":
@@ -231,19 +267,19 @@ def teacher_request():
 
 
 
-    existing = database.get_teacher(
+    teacher = database.get_teacher(
         telegram_id
     )
 
 
 
-    if existing:
+    if teacher:
 
 
         return jsonify({
 
             "status":
-            existing["status"]
+            teacher["status"]
 
         })
 
@@ -252,6 +288,7 @@ def teacher_request():
     database.add_teacher_request(
 
         telegram_id=telegram_id,
+
 
         full_name=(
 
@@ -273,12 +310,12 @@ def teacher_request():
 
         ).strip(),
 
+
         username=user.get(
             "username"
         )
 
     )
-
 
 
     return jsonify({
@@ -304,7 +341,9 @@ def teacher_status():
     user = require_user()
 
 
+
     if not user:
+
 
         return jsonify({
 
@@ -315,13 +354,17 @@ def teacher_status():
 
 
 
+
     teacher = database.get_teacher(
+
         user["id"]
+
     )
 
 
 
     if not teacher:
+
 
         return jsonify({
 
@@ -344,7 +387,7 @@ def teacher_status():
 
 
 # ==========================================================
-# ADMIN CHECK
+# ADMIN AUTH
 # ==========================================================
 
 
@@ -362,7 +405,9 @@ def require_admin():
 
 
     if not database.is_admin(
+
         user["id"]
+
     ):
 
         return None
@@ -376,18 +421,20 @@ def require_admin():
 
 
 # ==========================================================
-# ADMIN - TEACHER REQUESTS
+# ADMIN TEACHER REQUESTS
 # ==========================================================
 
 
 @app.get("/api/admin/teacher-requests")
-def admin_teacher_requests():
+def admin_requests():
 
 
     admin = require_admin()
 
 
+
     if not admin:
+
 
         return jsonify({
 
@@ -398,26 +445,31 @@ def admin_teacher_requests():
 
 
 
+
     teachers = database.get_pending_teachers()
 
 
 
-    result = []
+    items = []
 
 
 
     for teacher in teachers:
 
-        result.append({
+
+        items.append({
 
             "telegram_id":
             teacher["telegram_id"],
 
+
             "full_name":
             teacher["full_name"],
 
+
             "username":
             teacher["username"],
+
 
             "status":
             teacher["status"]
@@ -429,7 +481,7 @@ def admin_teacher_requests():
     return jsonify({
 
         "items":
-        result
+        items
 
     })
 
@@ -453,7 +505,9 @@ def approve_teacher(
     admin = require_admin()
 
 
+
     if not admin:
+
 
         return jsonify({
 
@@ -464,8 +518,11 @@ def approve_teacher(
 
 
 
+
     database.approve_teacher(
+
         telegram_id
+
     )
 
 
@@ -497,7 +554,9 @@ def reject_teacher(
     admin = require_admin()
 
 
+
     if not admin:
+
 
         return jsonify({
 
@@ -508,8 +567,11 @@ def reject_teacher(
 
 
 
+
     database.reject_teacher(
+
         telegram_id
+
     )
 
 
@@ -521,17 +583,19 @@ def reject_teacher(
 
     })
     # ==========================================================
-# SIMPLE DATA API
+# HOMEWORK
 # ==========================================================
 
 
 @app.get("/api/homework")
 def homework():
 
+
     user = require_user()
 
 
     if not user:
+
 
         return jsonify({
 
@@ -542,13 +606,17 @@ def homework():
 
 
 
+
     profile = database.get_user(
+
         user["id"]
+
     )
 
 
 
     if not profile:
+
 
         return jsonify({
 
@@ -587,13 +655,21 @@ def homework():
 
 
 
+# ==========================================================
+# ANNOUNCEMENTS
+# ==========================================================
+
+
 @app.get("/api/announcements")
 def announcements():
+
 
     user = require_user()
 
 
+
     if not user:
+
 
         return jsonify({
 
@@ -604,13 +680,17 @@ def announcements():
 
 
 
+
     profile = database.get_user(
+
         user["id"]
+
     )
 
 
 
     if not profile:
+
 
         return jsonify({
 
@@ -650,12 +730,13 @@ def announcements():
 
 
 # ==========================================================
-# ERROR HANDLER
+# 404
 # ==========================================================
 
 
 @app.errorhandler(404)
-def not_found(error):
+def page_not_found(error):
+
 
     return jsonify({
 
@@ -669,7 +750,7 @@ def not_found(error):
 
 
 # ==========================================================
-# RUN
+# START
 # ==========================================================
 
 
@@ -678,28 +759,32 @@ if __name__ == "__main__":
 
     port = int(
 
-        os.getenv(
+        os.environ.get(
 
             "PORT",
 
-            "8080"
+            8080
 
         )
 
     )
 
 
-    print("=" * 50)
-
     print(
-        "UniUZ API started"
+        "=============================="
     )
 
     print(
-        f"Port: {port}"
+        "UniUZ API STARTED"
     )
 
-    print("=" * 50)
+    print(
+        f"PORT: {port}"
+    )
+
+    print(
+        "=============================="
+    )
 
 
 
