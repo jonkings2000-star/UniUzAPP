@@ -9,63 +9,44 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
-  <div class="app">
+  <div id="languageScreen" class="language-screen">
+    <div class="language-card">
+      <div class="language-logo">🎓</div>
+      <h1>UniUZ</h1>
+      <p class="language-subtitle">Выберите язык / Choose language / 언어를 선택하세요</p>
+
+      <button class="language-btn" data-lang="ru">
+        🇷🇺 <span>Русский</span>
+      </button>
+      <button class="language-btn" data-lang="en">
+        🇬🇧 <span>English</span>
+      </button>
+      <button class="language-btn" data-lang="ko">
+        🇰🇷 <span>한국어</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="app hidden" id="app">
     <header class="topbar">
       <div>
         <div class="brand">🎓 UniUZ</div>
-        <div class="subtitle" id="welcome">Добро пожаловать</div>
+        <div class="subtitle" id="welcome"></div>
       </div>
       <div class="avatar" id="avatar">U</div>
     </header>
 
-    <main id="screen">
-      <section class="hero-card">
-        <div class="eyebrow">СТУДЕНТ</div>
-        <h1 id="userName">UniUZ</h1>
-        <p id="userGroup">Загрузка профиля...</p>
-      </section>
-
-      <section class="next-card">
-        <div class="section-title">📅 Следующая пара</div>
-        <div class="lesson-time" id="nextTime">09:00</div>
-        <div class="lesson-name" id="nextSubject">Расписание появится после подключения базы</div>
-        <div class="lesson-room" id="nextRoom">🏫 —</div>
-      </section>
-
-      <div class="stats-grid">
-        <button class="stat-card" data-page="schedule">
-          <span>📅</span><b>Расписание</b><small>На сегодня</small>
-        </button>
-        <button class="stat-card" data-page="homework">
-          <span>📝</span><b>Задания</b><small id="homeworkCount">—</small>
-        </button>
-        <button class="stat-card" data-page="announcements">
-          <span>📢</span><b>Объявления</b><small id="announcementCount">—</small>
-        </button>
-        <button class="stat-card ai-card" data-page="ai">
-          <span>🤖</span><b>AI Assistant</b><small>7 запросов/день</small>
-        </button>
-      </div>
-
-      <section class="quick-card">
-        <div class="section-title">⚡ Быстрые действия</div>
-        <div class="quick-actions">
-          <button data-page="schedule">Сегодня</button>
-          <button data-page="homework">Дедлайны</button>
-          <button data-page="announcements">Новости</button>
-          <button data-page="profile">Профиль</button>
-        </div>
-      </section>
-    </main>
+    <main id="screen"></main>
 
     <nav class="bottom-nav">
-      <button class="nav-item active" data-page="home"><span>🏠</span><small>Главная</small></button>
-      <button class="nav-item" data-page="schedule"><span>📅</span><small>Расписание</small></button>
-      <button class="nav-item" data-page="homework"><span>📝</span><small>Задания</small></button>
-      <button class="nav-item" data-page="ai"><span>🤖</span><small>AI</small></button>
-      <button class="nav-item" data-page="profile"><span>👤</span><small>Профиль</small></button>
+      <button class="nav-item active" data-page="home"><span>🏠</span><small data-i18n="home"></small></button>
+      <button class="nav-item" data-page="schedule"><span>📅</span><small data-i18n="schedule"></small></button>
+      <button class="nav-item" data-page="homework"><span>📝</span><small data-i18n="homework"></small></button>
+      <button class="nav-item" data-page="ai"><span>🤖</span><small data-i18n="ai"></small></button>
+      <button class="nav-item" data-page="profile"><span>👤</span><small data-i18n="profile"></small></button>
     </nav>
   </div>
+
   <script src="app.js"></script>
 </body>
 </html>
