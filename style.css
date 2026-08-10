@@ -848,3 +848,444 @@ button:focus {
             0;
     }
 }
+/* =========================================================
+   UniUZ PROFILE
+   ========================================================= */
+
+.profile-page {
+    padding: 16px 14px 90px;
+}
+
+.profile-hero {
+    text-align: center;
+    padding: 24px 18px;
+    margin-bottom: 14px;
+
+    background:
+        linear-gradient(
+            145deg,
+            #172235,
+            #101827
+        );
+
+    border: 1px solid #293850;
+    border-radius: 24px;
+}
+
+.profile-avatar {
+    width: 78px;
+    height: 78px;
+
+    margin: 0 auto 14px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 50%;
+
+    background:
+        linear-gradient(
+            145deg,
+            #344768,
+            #1b273c
+        );
+
+    border: 1px solid #465a7c;
+
+    color: white;
+
+    font-size: 28px;
+    font-weight: 800;
+
+    box-shadow:
+        0 12px 30px
+        rgba(0, 0, 0, 0.28);
+}
+
+.profile-hero h1 {
+    margin: 0;
+
+    color: #ffffff;
+
+    font-size: 25px;
+    font-weight: 800;
+}
+
+.profile-username {
+    margin-top: 5px;
+
+    color: #8797ae;
+
+    font-size: 13px;
+}
+
+.profile-role {
+    display: inline-flex;
+
+    margin-top: 12px;
+
+    padding: 6px 12px;
+
+    border-radius: 999px;
+
+    background: #1d2b42;
+
+    color: #aebeff;
+
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.profile-section {
+    margin-bottom: 12px;
+
+    padding: 8px 16px;
+
+    background: #111827;
+
+    border: 1px solid #26344d;
+
+    border-radius: 20px;
+}
+
+.profile-section-title {
+    padding: 10px 2px;
+
+    color: #8495ad;
+
+    font-size: 12px;
+    font-weight: 700;
+
+    text-transform: uppercase;
+
+    letter-spacing: .4px;
+}
+
+.profile-row {
+    display: flex;
+
+    align-items: center;
+
+    gap: 13px;
+
+    padding: 13px 2px;
+
+    border-top: 1px solid #202c40;
+}
+
+.profile-row-icon {
+    width: 40px;
+    height: 40px;
+
+    flex-shrink: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 12px;
+
+    background: #1a263a;
+
+    font-size: 19px;
+}
+
+.profile-row-content {
+    min-width: 0;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 4px;
+}
+
+.profile-row-content small {
+    color: #75859d;
+
+    font-size: 11px;
+}
+
+.profile-row-content strong {
+    color: #f3f6fa;
+
+    font-size: 14px;
+
+    line-height: 1.35;
+
+    word-break: break-word;
+}
+
+.profile-status {
+    display: flex;
+
+    align-items: center;
+
+    gap: 12px;
+
+    padding: 15px 16px;
+
+    margin-bottom: 15px;
+
+    background: #111827;
+
+    border: 1px solid #26344d;
+
+    border-radius: 20px;
+}
+
+.profile-status-icon {
+    width: 36px;
+    height: 36px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 50%;
+
+    background: #16352a;
+
+    color: #5ee6a4;
+
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.profile-status strong {
+    display: block;
+
+    color: white;
+
+    font-size: 13px;
+
+    margin-bottom: 3px;
+}
+
+.profile-status small {
+    display: block;
+
+    color: #7e8da2;
+
+    font-size: 11px;
+}
+
+
+/* =========================================================
+   COMMON PAGES
+   ========================================================= */
+
+.page {
+    padding: 16px 14px 90px;
+}
+
+.page-title {
+    margin-bottom: 18px;
+
+    color: white;
+
+    font-size: 24px;
+    font-weight: 800;
+}
+
+.empty-state {
+    padding: 35px 20px;
+
+    text-align: center;
+
+    background: #111827;
+
+    border: 1px solid #26344d;
+
+    border-radius: 20px;
+
+    color: #8998ad;
+
+    font-size: 14px;
+}
+
+.cards-list {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 10px;
+}
+
+.data-card {
+    padding: 16px;
+
+    background: #111827;
+
+    border: 1px solid #26344d;
+
+    border-radius: 18px;
+}
+
+.data-card-title {
+    color: white;
+
+    font-size: 15px;
+    font-weight: 750;
+
+    margin-bottom: 8px;
+}
+
+.data-card-text {
+    color: #c4ccda;
+
+    font-size: 13px;
+
+    line-height: 1.5;
+}
+
+.data-card-meta {
+    margin-top: 12px;
+
+    color: #77879e;
+
+    font-size: 11px;
+}
+
+
+/* =========================================================
+   HOME
+   ========================================================= */
+
+.home-page {
+    padding: 16px 14px 90px;
+}
+
+.home-header {
+    margin-bottom: 16px;
+}
+
+.home-label {
+    color: #8294b1;
+
+    font-size: 12px;
+    font-weight: 700;
+
+    text-transform: uppercase;
+}
+
+.home-header h1 {
+    margin: 8px 0 5px;
+
+    color: white;
+
+    font-size: 27px;
+}
+
+.home-header p {
+    margin: 0;
+
+    color: #c5ccda;
+
+    font-size: 14px;
+}
+
+.home-stats {
+    display: grid;
+
+    grid-template-columns:
+        repeat(3, 1fr);
+
+    gap: 8px;
+
+    margin-bottom: 14px;
+}
+
+.stat-card {
+    padding: 13px 8px;
+
+    border: 1px solid #26344d;
+
+    border-radius: 16px;
+
+    background: #111827;
+
+    color: white;
+
+    cursor: pointer;
+}
+
+.stat-card span {
+    display: block;
+
+    font-size: 20px;
+
+    margin-bottom: 6px;
+}
+
+.stat-card strong {
+    display: block;
+
+    font-size: 11px;
+}
+
+.stat-card small {
+    display: block;
+
+    margin-top: 4px;
+
+    color: #8392a8;
+
+    font-size: 10px;
+}
+
+.home-card {
+    padding: 17px;
+
+    margin-bottom: 12px;
+
+    background: #111827;
+
+    border: 1px solid #26344d;
+
+    border-radius: 20px;
+}
+
+.home-card h2 {
+    margin: 0 0 10px;
+
+    color: white;
+
+    font-size: 17px;
+}
+
+.home-card p {
+    margin: 0;
+
+    color: #9aa8ba;
+
+    font-size: 13px;
+}
+
+.quick-actions {
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, 1fr);
+
+    gap: 8px;
+}
+
+.quick-action {
+    padding: 10px;
+
+    border: 1px solid #2b3a54;
+
+    border-radius: 12px;
+
+    background: #172235;
+
+    color: #e8edf5;
+
+    cursor: pointer;
+}
+
+.quick-action:active,
+.stat-card:active {
+    transform: scale(.98);
+}
