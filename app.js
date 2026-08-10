@@ -783,23 +783,11 @@ async function selectLanguage(lang){
 // ROLE SCREEN
 // =====================================
 
-function showRoleScreen(){
-
+function showRoleScreen() {
 
     setNav(false);
 
-
-
-    const s =
-        screen();
-
-
-
-    if(!s)
-        return;
-
-
-
+    const s = document.getElementById("screen");
 
     s.innerHTML = `
 
@@ -819,7 +807,7 @@ function showRoleScreen(){
 
 
             <p>
-                ${T("chooseRole")}
+                ${T("chooseRole") || "Выберите вашу роль"}
             </p>
 
 
@@ -829,7 +817,7 @@ function showRoleScreen(){
                 class="role-button"
             >
 
-                ${T("student")}
+                🎓 Студент
 
             </button>
 
@@ -841,37 +829,9 @@ function showRoleScreen(){
                 class="role-button teacher"
             >
 
-                ${T("teacher")}
+                👨‍🏫 Преподаватель
 
             </button>
-
-
-
-
-            ${
-                isAdmin
-
-                ?
-
-                `
-
-                <button
-                    id="adminBtn"
-                    class="role-button admin"
-                >
-
-                    ${T("admin")}
-
-                </button>
-
-                `
-
-                :
-
-                ""
-
-            }
-
 
 
         </div>
@@ -882,72 +842,58 @@ function showRoleScreen(){
 
 
 
+    const student =
+        document.getElementById(
+            "studentBtn"
+        );
 
 
-    document
-    .getElementById(
-        "studentBtn"
-    )
+    const teacher =
+        document.getElementById(
+            "teacherBtn"
+        );
 
-    ?.addEventListener(
-        "click",
-        () => {
+
+
+    if(student){
+
+        student.onclick = async function(){
+
+            console.log(
+                "Student selected"
+            );
+
 
             currentRole =
                 "student";
 
 
-            openStudentApp();
+            await openStudentApp();
 
-        }
+        };
 
-    );
-
-
+    }
 
 
 
-    document
-    .getElementById(
-        "teacherBtn"
-    )
+    if(teacher){
 
-    ?.addEventListener(
-        "click",
-        () => {
+        teacher.onclick = async function(){
+
+            console.log(
+                "Teacher selected"
+            );
 
 
             currentRole =
                 "teacher";
 
 
-            requestTeacherAccess();
+            await requestTeacherAccess();
 
+        };
 
-
-        }
-
-    );
-
-
-
-
-
-    document
-    .getElementById(
-        "adminBtn"
-    )
-
-    ?.addEventListener(
-        "click",
-        () => {
-
-            openAdminPanel();
-
-        }
-
-    );
-
+    }
 
 
 }
