@@ -908,42 +908,38 @@ function showRoleScreen() {
 
 async function requestTeacherAccess(){
 
-
     try{
 
 
         const data =
-            await apiRequest(
-
-                "/api/teacher/request",
-
-                {
-                    method:
-                        "POST"
+        await apiRequest(
+            "/api/teacher/request",
+            {
+                method:"POST",
+                body:{
+                    telegram_id:
+                    tg?.initDataUnsafe?.user?.id
                 }
-
-            );
-
+            }
+        );
 
 
         teacherStatus =
-            data.status;
-
+        data.status || "pending";
 
 
         showTeacherStatus();
-
 
 
     }
 
     catch(error){
 
+        console.error(error);
 
         showError(
             error.message
         );
-
 
     }
 
