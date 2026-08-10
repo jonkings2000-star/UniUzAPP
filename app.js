@@ -1,271 +1,265 @@
 // ============================================================
 // UniUZ Mini App
+// app.js
 // ============================================================
 
-const API_URL = "https://uniuz-production.up.railway.app";
 
-const tg = window.Telegram?.WebApp;
+// ============================================================
+// CONFIG
+// ============================================================
+
+const API_URL =
+    "https://uniuz-production.up.railway.app";
+
+
+// ============================================================
+// TELEGRAM
+// ============================================================
+
+const tg =
+    window.Telegram?.WebApp || null;
 
 if (tg) {
     tg.ready();
     tg.expand();
 }
 
-const initData = tg?.initData || "";
+const initData =
+    tg?.initData || "";
+
+
+// ============================================================
+// TRANSLATIONS
+// ============================================================
+
+const translations = {
+
+    ru: {
+
+        loading: "Загрузка...",
+
+        error:
+            "⚠️ Не удалось загрузить данные UniUZ.",
+
+        noHomework:
+            "📚 Нет заданий",
+
+        noAnnouncements:
+            "📢 Нет объявлений",
+
+        chooseRole:
+            "Выберите вашу роль",
+
+        student:
+            "Студент",
+
+        teacher:
+            "Преподаватель",
+
+        home:
+            "Главная",
+
+        schedule:
+            "Расписание",
+
+        homework:
+            "Задания",
+
+        ai:
+            "ИИ",
+
+        profile:
+            "Профиль",
+
+        welcome:
+            "Добро пожаловать 👋",
+
+        studentShort:
+            "🎓 Студент",
+
+        teacherShort:
+            "👨‍🏫 Преподаватель",
+
+        apiOffline:
+            "⚠️ API временно недоступен"
+    },
+
+
+    en: {
+
+        loading:
+            "Loading...",
+
+        error:
+            "⚠️ Failed to load UniUZ data.",
+
+        noHomework:
+            "📚 No homework",
+
+        noAnnouncements:
+            "📢 No announcements",
+
+        chooseRole:
+            "Choose your role",
+
+        student:
+            "Student",
+
+        teacher:
+            "Professor",
+
+        home:
+            "Home",
+
+        schedule:
+            "Schedule",
+
+        homework:
+            "Homework",
+
+        ai:
+            "AI",
+
+        profile:
+            "Profile",
+
+        welcome:
+            "Welcome 👋",
+
+        studentShort:
+            "🎓 Student",
+
+        teacherShort:
+            "👨‍🏫 Professor",
+
+        apiOffline:
+            "⚠️ API is temporarily unavailable"
+    },
+
+
+    ko: {
+
+        loading:
+            "로딩 중...",
+
+        error:
+            "⚠️ UniUZ 데이터를 불러오지 못했습니다.",
+
+        noHomework:
+            "📚 과제가 없습니다",
+
+        noAnnouncements:
+            "📢 공지가 없습니다",
+
+        chooseRole:
+            "역할을 선택하세요",
+
+        student:
+            "학생",
+
+        teacher:
+            "교수님",
+
+        home:
+            "홈",
+
+        schedule:
+            "시간표",
+
+        homework:
+            "과제",
+
+        ai:
+            "AI",
+
+        profile:
+            "프로필",
+
+        welcome:
+            "환영합니다 👋",
+
+        studentShort:
+            "🎓 학생",
+
+        teacherShort:
+            "👨‍🏫 교수님",
+
+        apiOffline:
+            "⚠️ API를 사용할 수 없습니다"
+    }
+
+};
+
+
+// ============================================================
+// ROLE TRANSLATIONS
+// ============================================================
+
+const roleTranslations = {
+
+    ru: {
+        subtitle: "Выберите вашу роль",
+        student: "Студент",
+        teacher: "Преподаватель"
+    },
+
+    en: {
+        subtitle: "Choose your role",
+        student: "Student",
+        teacher: "Professor"
+    },
+
+    ko: {
+        subtitle: "역할을 선택하세요",
+        student: "학생",
+        teacher: "교수님"
+    }
+
+};
+
+
+// ============================================================
+// LOCAL STORAGE
+// ============================================================
+
+let currentLanguage =
+    localStorage.getItem(
+        "uniuz_language"
+    ) || null;
+
+
+let currentRole =
+    localStorage.getItem(
+        "uniuz_role"
+    ) || null;
 
 
 // ============================================================
 // LANGUAGE
 // ============================================================
 
-const translations = {
-
-    ru: {
-        loading: "Загрузка...",
-        error: "⚠️ Не удалось загрузить данные UniUZ.",
-
-        student: "Студент",
-        university: "Университет",
-        department: "Факультет",
-        group: "Группа",
-        language: "Язык",
-        telegramId: "Telegram ID",
-        notSelected: "Не выбрано",
-
-        home: "Главная",
-        schedule: "Расписание",
-        homework: "Задания",
-        ai: "ИИ",
-        profile: "Профиль",
-
-        noHomework: "📚 Нет заданий",
-        noAnnouncements: "📢 Нет объявлений"
-    },
-
-    en: {
-        loading: "Loading...",
-        error: "⚠️ Failed to load UniUZ data.",
-
-        student: "Student",
-        university: "University",
-        department: "Department",
-        group: "Group",
-        language: "Language",
-        telegramId: "Telegram ID",
-        notSelected: "Not selected",
-
-        home: "Home",
-        schedule: "Schedule",
-        homework: "Homework",
-        ai: "AI",
-        profile: "Profile",
-
-        noHomework: "📚 No homework",
-        noAnnouncements: "📢 No announcements"
-    },
-
-    ko: {
-        loading: "로딩 중...",
-        error: "⚠️ UniUZ 데이터를 불러오지 못했습니다.",
-
-        student: "학생",
-        university: "대학교",
-        department: "학과",
-        group: "그룹",
-        language: "언어",
-        telegramId: "Telegram ID",
-        notSelected: "선택되지 않음",
-
-        home: "홈",
-        schedule: "시간표",
-        homework: "과제",
-        ai: "AI",
-        profile: "프로필",
-
-        noHomework: "📚 과제가 없습니다",
-        noAnnouncements: "📢 공지가 없습니다"
-    }
-
-};
-
-
-let currentLanguage =
-    localStorage.getItem("uniuz_language") || null;
-
-
-// ============================================================
-// DATA
-// ============================================================
-
-let profileData = null;
-let homeworkData = [];
-let announcementsData = [];
-
-
-// ============================================================
-// LANGUAGE HELPERS
-// ============================================================
-
 function getLanguage() {
-    return currentLanguage || "ru";
-}
 
-
-function t(key) {
-
-    const lang =
-        translations[getLanguage()] ||
-        translations.ru;
-
-    return lang[key] ?? key;
-}
-
-
-// ============================================================
-// LANGUAGE SCREEN
-// ============================================================
-
-function findLanguageScreen() {
-
-    const selectors = [
-        "#languageScreen",
-        "#language-screen",
-        ".language-screen",
-        "#language-selection",
-        ".language-selection",
-        "#language-container",
-        ".language-container"
-    ];
-
-    for (const selector of selectors) {
-
-        const element =
-            document.querySelector(selector);
-
-        if (element) {
-            return element;
-        }
-    }
-
-    return null;
-}
-
-
-function hideLanguageScreen() {
-
-    const screen =
-        findLanguageScreen();
-
-    if (screen) {
-        screen.style.display = "none";
-    }
-}
-
-
-function showMainApplication() {
-
-    const app =
-        document.querySelector("#app");
-
-    if (app) {
-        app.classList.remove("hidden");
-        app.style.display = "";
-    }
-
-    const main =
-        document.querySelector("main");
-
-    if (main) {
-        main.style.display = "";
-    }
-}
-
-
-async function selectLanguage(language) {
-
-    if (!["ru", "en", "ko"].includes(language)) {
-        return;
-    }
-
-    currentLanguage = language;
-
-    localStorage.setItem(
-        "uniuz_language",
-        language
+    return (
+        currentLanguage || "ru"
     );
-
-    console.log(
-        "UniUZ language:",
-        language
-    );
-
-    hideLanguageScreen();
-    showMainApplication();
-
-    updateNavigationLanguage();
-
-    await initializeUniUZ();
-
-    renderHome();
 }
 
 
-window.selectLanguage = selectLanguage;
+// ============================================================
+// ROLE
+// ============================================================
+
+function getRole() {
+
+    return (
+        currentRole || "student"
+    );
+}
 
 
 // ============================================================
-// LANGUAGE BUTTONS
-// ============================================================
-
-document.addEventListener(
-    "click",
-    function(event) {
-
-        const button =
-            event.target.closest("button");
-
-        if (!button) {
-            return;
-        }
-
-        const lang =
-            button.dataset.lang;
-
-        if (lang) {
-            selectLanguage(lang);
-            return;
-        }
-
-        const text =
-            (
-                button.textContent || ""
-            )
-                .trim()
-                .toLowerCase();
-
-        if (text.includes("русский")) {
-            selectLanguage("ru");
-            return;
-        }
-
-        if (text.includes("english")) {
-            selectLanguage("en");
-            return;
-        }
-
-        if (
-            text.includes("한국어") ||
-            text.includes("korean")
-        ) {
-            selectLanguage("ko");
-            return;
-        }
-    }
-);
-
-
-// ============================================================
-// HELPERS
+// HTML ESCAPE
 // ============================================================
 
 function escapeHtml(value) {
@@ -286,31 +280,501 @@ function escapeHtml(value) {
 }
 
 
-function setText(selector, value) {
+// ============================================================
+// SET TEXT
+// ============================================================
+
+function setText(
+    selector,
+    value
+) {
 
     const element =
-        document.querySelector(selector);
+        document.querySelector(
+            selector
+        );
 
     if (element) {
+
         element.textContent =
             value ?? "";
     }
 }
 
 
-function getScreen() {
+// ============================================================
+// LANGUAGE SCREEN
+// ============================================================
+
+function getLanguageScreen() {
 
     return document.getElementById(
-        "screen"
+        "languageScreen"
+    );
+}
+
+
+function getRoleScreen() {
+
+    return document.getElementById(
+        "roleScreen"
+    );
+}
+
+
+function getApp() {
+
+    return document.getElementById(
+        "app"
     );
 }
 
 
 // ============================================================
-// API
+// SHOW LANGUAGE SCREEN
 // ============================================================
 
-async function apiRequest(path) {
+function showLanguageScreen() {
+
+    const languageScreen =
+        getLanguageScreen();
+
+    const roleScreen =
+        getRoleScreen();
+
+    const app =
+        getApp();
+
+
+    if (languageScreen) {
+
+        languageScreen.classList.remove(
+            "hidden"
+        );
+
+        languageScreen.style.display =
+            "flex";
+    }
+
+
+    if (roleScreen) {
+
+        roleScreen.classList.add(
+            "hidden"
+        );
+
+        roleScreen.style.display =
+            "none";
+    }
+
+
+    if (app) {
+
+        app.classList.add(
+            "hidden"
+        );
+
+        app.style.display =
+            "none";
+    }
+}
+
+
+// ============================================================
+// HIDE LANGUAGE SCREEN
+// ============================================================
+
+function hideLanguageScreen() {
+
+    const languageScreen =
+        getLanguageScreen();
+
+    if (languageScreen) {
+
+        languageScreen.classList.add(
+            "hidden"
+        );
+
+        languageScreen.style.display =
+            "none";
+    }
+}
+
+
+// ============================================================
+// SHOW ROLE SCREEN
+// ============================================================
+
+function showRoleScreen() {
+
+    const languageScreen =
+        getLanguageScreen();
+
+    const roleScreen =
+        getRoleScreen();
+
+    const app =
+        getApp();
+
+
+    if (languageScreen) {
+
+        languageScreen.classList.add(
+            "hidden"
+        );
+
+        languageScreen.style.display =
+            "none";
+    }
+
+
+    if (app) {
+
+        app.classList.add(
+            "hidden"
+        );
+
+        app.style.display =
+            "none";
+    }
+
+
+    if (roleScreen) {
+
+        roleScreen.classList.remove(
+            "hidden"
+        );
+
+        roleScreen.style.display =
+            "flex";
+    }
+
+
+    updateRoleLanguage();
+}
+
+
+// ============================================================
+// HIDE ROLE SCREEN
+// ============================================================
+
+function hideRoleScreen() {
+
+    const roleScreen =
+        getRoleScreen();
+
+    if (roleScreen) {
+
+        roleScreen.classList.add(
+            "hidden"
+        );
+
+        roleScreen.style.display =
+            "none";
+    }
+}
+
+
+// ============================================================
+// SHOW MAIN APPLICATION
+// ============================================================
+
+function showMainApplication() {
+
+    const app =
+        getApp();
+
+    if (app) {
+
+        app.classList.remove(
+            "hidden"
+        );
+
+        app.style.display =
+            "";
+    }
+}
+
+
+// ============================================================
+// UPDATE ROLE LANGUAGE
+// ============================================================
+
+function updateRoleLanguage() {
+
+    const lang =
+        getLanguage();
+
+    const data =
+        roleTranslations[lang] ||
+        roleTranslations.ru;
+
+
+    const subtitle =
+        document.getElementById(
+            "roleSubtitle"
+        );
+
+    const student =
+        document.getElementById(
+            "studentRoleText"
+        );
+
+    const teacher =
+        document.getElementById(
+            "teacherRoleText"
+        );
+
+
+    if (subtitle) {
+
+        subtitle.textContent =
+            data.subtitle;
+    }
+
+
+    if (student) {
+
+        student.textContent =
+            data.student;
+    }
+
+
+    if (teacher) {
+
+        teacher.textContent =
+            data.teacher;
+    }
+}
+
+
+// ============================================================
+// UPDATE NAVIGATION
+// ============================================================
+
+function updateNavigationLanguage() {
+
+    const lang =
+        getLanguage();
+
+    const t =
+        translations[lang] ||
+        translations.ru;
+
+
+    const items = {
+
+        home: t.home,
+
+        schedule: t.schedule,
+
+        homework: t.homework,
+
+        ai: t.ai,
+
+        profile: t.profile
+
+    };
+
+
+    document
+        .querySelectorAll(
+            "[data-i18n]"
+        )
+        .forEach(element => {
+
+            const key =
+                element.dataset.i18n;
+
+            if (
+                items[key] !== undefined
+            ) {
+
+                element.textContent =
+                    items[key];
+            }
+
+        });
+
+
+    const welcome =
+        document.getElementById(
+            "welcome"
+        );
+
+    if (welcome) {
+
+        welcome.textContent =
+            t.welcome;
+    }
+}
+
+
+// ============================================================
+// SELECT LANGUAGE
+// ============================================================
+
+async function selectLanguage(
+    language
+) {
+
+    if (
+        !["ru", "en", "ko"]
+            .includes(language)
+    ) {
+        return;
+    }
+
+
+    currentLanguage =
+        language;
+
+
+    localStorage.setItem(
+        "uniuz_language",
+        language
+    );
+
+
+    console.log(
+        "UniUZ language:",
+        currentLanguage
+    );
+
+
+    // После выбора языка
+    // НЕ запускаем приложение.
+    // Показываем выбор роли.
+
+    showRoleScreen();
+}
+
+
+window.selectLanguage =
+    selectLanguage;
+
+
+// ============================================================
+// SELECT ROLE
+// ============================================================
+
+async function selectRole(
+    role
+) {
+
+    if (
+        !["student", "teacher"]
+            .includes(role)
+    ) {
+        return;
+    }
+
+
+    currentRole =
+        role;
+
+
+    localStorage.setItem(
+        "uniuz_role",
+        role
+    );
+
+
+    console.log(
+        "UniUZ role:",
+        currentRole
+    );
+
+
+    hideRoleScreen();
+
+    showMainApplication();
+
+    updateNavigationLanguage();
+
+
+    await initializeUniUZ();
+
+
+    renderHome();
+}
+
+
+window.selectRole =
+    selectRole;
+
+
+// ============================================================
+// LANGUAGE BUTTONS
+// ============================================================
+
+document.addEventListener(
+    "click",
+    function(event) {
+
+        const button =
+            event.target.closest(
+                ".language-btn"
+            );
+
+
+        if (!button) {
+            return;
+        }
+
+
+        const language =
+            button.dataset.lang;
+
+
+        if (language) {
+
+            selectLanguage(
+                language
+            );
+        }
+    }
+);
+
+
+// ============================================================
+// ROLE BUTTONS
+// ============================================================
+
+document.addEventListener(
+    "click",
+    function(event) {
+
+        const button =
+            event.target.closest(
+                ".role-btn"
+            );
+
+
+        if (!button) {
+            return;
+        }
+
+
+        const role =
+            button.dataset.role;
+
+
+        if (role) {
+
+            selectRole(role);
+        }
+    }
+);
+
+
+// ============================================================
+// API REQUEST
+// ============================================================
+
+async function apiRequest(
+    path
+) {
 
     const response =
         await fetch(
@@ -325,24 +789,31 @@ async function apiRequest(path) {
             }
         );
 
-    let data;
+
+    let data = null;
+
 
     try {
+
         data =
             await response.json();
+
     } catch {
+
         throw new Error(
-            "API returned invalid JSON"
+            `API returned ${response.status}`
         );
     }
+
 
     if (!response.ok) {
 
         throw new Error(
-            data.error ||
+            data?.error ||
             "API error"
         );
     }
+
 
     return data;
 }
@@ -361,15 +832,21 @@ async function checkApi() {
                 `${API_URL}/api/health`
             );
 
+
         const data =
             await response.json();
+
 
         console.log(
             "UniUZ API:",
             data
         );
 
-        return data.ok === true;
+
+        return (
+            data &&
+            data.ok === true
+        );
 
     } catch (error) {
 
@@ -378,13 +855,14 @@ async function checkApi() {
             error
         );
 
+
         return false;
     }
 }
 
 
 // ============================================================
-// PROFILE DATA
+// PROFILE
 // ============================================================
 
 async function loadProfile() {
@@ -394,75 +872,165 @@ async function loadProfile() {
             "/api/me"
         );
 
+
     console.log(
         "UniUZ profile:",
         data
     );
 
+
     if (!data.ok) {
+
         throw new Error(
             "Profile loading failed"
         );
     }
 
-    profileData = data;
-
-    updateUserHeader();
-
-    return data;
-}
-
-
-// ============================================================
-// HEADER
-// ============================================================
-
-function updateUserHeader() {
-
-    if (!profileData) {
-        return;
-    }
 
     const telegramUser =
-        profileData.telegram_user || {};
+        data.telegram_user;
+
 
     const profile =
-        profileData.profile || {};
+        data.profile;
 
-    const name =
-        profile.full_name ||
-        telegramUser.first_name ||
-        telegramUser.username ||
-        "Student";
 
-    const avatar =
-        document.querySelector(
-            "#avatar"
+    // Telegram name
+
+    if (telegramUser) {
+
+        const name =
+            telegramUser.first_name ||
+            telegramUser.username ||
+            "Student";
+
+
+        setText(
+            "#user-name",
+            name
         );
 
-    if (avatar) {
 
-        avatar.textContent =
-            (
-                name[0] ||
-                "U"
-            ).toUpperCase();
+        const avatar =
+            document.querySelector(
+                "#user-avatar"
+            );
+
+
+        if (avatar) {
+
+            avatar.textContent =
+                (
+                    name[0] ||
+                    "U"
+                ).toUpperCase();
+        }
+
+
+        // Header avatar
+
+        const headerAvatar =
+            document.querySelector(
+                "#avatar"
+            );
+
+
+        if (headerAvatar) {
+
+            headerAvatar.textContent =
+                (
+                    name[0] ||
+                    "U"
+                ).toUpperCase();
+        }
     }
 
-    setText(
-        "#welcome",
-        `${t("student")} • ${name}`
-    );
 
-    setText(
-        "#user-name",
-        name
-    );
+    // Profile data
 
-    setText(
-        "#profile-name",
-        name
-    );
+    if (profile) {
+
+        setText(
+            "#profile-name",
+            profile.full_name ||
+            "UniUZ"
+        );
+
+
+        setText(
+            "#profile-username",
+            profile.username
+                ? `@${profile.username}`
+                : ""
+        );
+
+
+        setText(
+            "#profile-university",
+            profile.university ||
+            "Ajou University in Tashkent"
+        );
+
+
+        setText(
+            "#profile-department",
+            profile.department ||
+            "Not selected"
+        );
+
+
+        setText(
+            "#profile-group",
+            profile.group_name ||
+            "Not selected"
+        );
+
+
+        setText(
+            "#department",
+            profile.department ||
+            "—"
+        );
+
+
+        setText(
+            "#group",
+            profile.group_name ||
+            "—"
+        );
+
+    } else {
+
+        setText(
+            "#profile-name",
+            telegramUser?.first_name ||
+            "Student"
+        );
+
+
+        setText(
+            "#profile-university",
+            "Ajou University in Tashkent"
+        );
+
+
+        setText(
+            "#profile-department",
+            "Not selected"
+        );
+
+
+        setText(
+            "#profile-group",
+            "Not selected"
+        );
+    }
+
+
+    return {
+        telegramUser,
+        profile
+    };
 }
 
 
@@ -477,17 +1045,120 @@ async function loadHomework() {
             "/api/homework"
         );
 
+
     console.log(
         "UniUZ homework:",
         data
     );
 
-    homeworkData =
-        Array.isArray(data.items)
-            ? data.items
-            : [];
 
-    return data;
+    const container =
+        document.querySelector(
+            "#homework-list"
+        );
+
+
+    if (!container) {
+
+        return;
+    }
+
+
+    container.innerHTML =
+        "";
+
+
+    if (
+        !data.items ||
+        data.items.length === 0
+    ) {
+
+        const text =
+            translations[
+                getLanguage()
+            ].noHomework;
+
+
+        container.innerHTML = `
+            <div class="empty-state">
+                ${text}
+            </div>
+        `;
+
+
+        setText(
+            "#homework-count",
+            "0"
+        );
+
+
+        return;
+    }
+
+
+    setText(
+        "#homework-count",
+        String(
+            data.items.length
+        )
+    );
+
+
+    data.items.forEach(
+        item => {
+
+            const card =
+                document.createElement(
+                    "div"
+                );
+
+
+            card.className =
+                "homework-card";
+
+
+            card.innerHTML = `
+
+                <div class="homework-title">
+
+                    📚 ${escapeHtml(
+                        item.subject_name
+                    )}
+
+                </div>
+
+
+                <div class="homework-task">
+
+                    ${escapeHtml(
+                        item.task_text
+                    )}
+
+                </div>
+
+
+                <div class="homework-date">
+
+                    📅 ${escapeHtml(
+                        item.homework_date
+                    )}
+
+                    &nbsp;
+
+                    ⏰ ${escapeHtml(
+                        item.homework_time
+                    )}
+
+                </div>
+
+            `;
+
+
+            container.appendChild(
+                card
+            );
+        }
+    );
 }
 
 
@@ -502,539 +1173,316 @@ async function loadAnnouncements() {
             "/api/announcements"
         );
 
+
     console.log(
         "UniUZ announcements:",
         data
     );
 
-    announcementsData =
-        Array.isArray(data.items)
-            ? data.items
-            : [];
 
-    return data;
-}
+    const container =
+        document.querySelector(
+            "#announcement-list"
+        );
 
 
-// ============================================================
-// PROFILE PAGE
-// ============================================================
+    if (!container) {
 
-function renderProfile() {
-
-    const screen =
-        getScreen();
-
-    if (!screen) {
         return;
     }
 
-    const telegramUser =
-        profileData?.telegram_user || {};
 
-    const profile =
-        profileData?.profile || {};
-
-    const name =
-        profile.full_name ||
-        telegramUser.first_name ||
-        telegramUser.username ||
-        "Student";
-
-    const username =
-        profile.username ||
-        telegramUser.username ||
+    container.innerHTML =
         "";
 
-    const university =
-        profile.university ||
-        "Ajou University in Tashkent";
 
-    const department =
-        profile.department ||
-        t("notSelected");
+    if (
+        !data.items ||
+        data.items.length === 0
+    ) {
 
-    const group =
-        profile.group_name ||
-        t("notSelected");
-
-    const telegramId =
-        telegramUser.id ||
-        "—";
-
-    const languageNames = {
-
-        ru: "🇷🇺 Русский",
-        en: "🇬🇧 English",
-        ko: "🇰🇷 한국어"
-
-    };
-
-    const language =
-        languageNames[
-            getLanguage()
-        ] ||
-        languageNames.ru;
-
-    const avatarLetter =
-        (
-            name.trim()[0] ||
-            "U"
-        ).toUpperCase();
+        const text =
+            translations[
+                getLanguage()
+            ].noAnnouncements;
 
 
-    screen.innerHTML = `
+        container.innerHTML = `
+            <div class="empty-state">
+                ${text}
+            </div>
+        `;
 
-        <div class="page profile-page">
 
-            <div class="profile-hero">
+        setText(
+            "#announcement-count",
+            "0"
+        );
 
-                <div class="profile-avatar">
+
+        return;
+    }
+
+
+    setText(
+        "#announcement-count",
+        String(
+            data.items.length
+        )
+    );
+
+
+    data.items.forEach(
+        item => {
+
+            const card =
+                document.createElement(
+                    "div"
+                );
+
+
+            card.className =
+                "announcement-card";
+
+
+            card.innerHTML = `
+
+                <div class="announcement-title">
+
+                    📢 ${escapeHtml(
+                        item.title
+                    )}
+
+                </div>
+
+
+                <div class="announcement-message">
+
                     ${escapeHtml(
-                        avatarLetter
+                        item.message
                     )}
-                </div>
-
-                <h1>
-                    ${escapeHtml(
-                        name
-                    )}
-                </h1>
-
-                ${
-                    username
-                        ? `
-                            <div class="profile-username">
-                                @${escapeHtml(
-                                    username
-                                )}
-                            </div>
-                        `
-                        : ""
-                }
-
-                <div class="profile-role">
-                    🎓 ${escapeHtml(
-                        t("student")
-                    )}
-                </div>
-
-            </div>
-
-
-            <div class="profile-section">
-
-                <div class="profile-section-title">
-                    👤 ${getLanguage() === "ru"
-                        ? "Личная информация"
-                        : getLanguage() === "ko"
-                            ? "개인 정보"
-                            : "Personal information"}
-                </div>
-
-
-                <div class="profile-row">
-
-                    <div class="profile-row-icon">
-                        🏫
-                    </div>
-
-                    <div class="profile-row-content">
-
-                        <small>
-                            ${escapeHtml(
-                                t("university")
-                            )}
-                        </small>
-
-                        <strong>
-                            ${escapeHtml(
-                                university
-                            )}
-                        </strong>
-
-                    </div>
 
                 </div>
 
-
-                <div class="profile-row">
-
-                    <div class="profile-row-icon">
-                        🎓
-                    </div>
-
-                    <div class="profile-row-content">
-
-                        <small>
-                            ${escapeHtml(
-                                t("department")
-                            )}
-                        </small>
-
-                        <strong>
-                            ${escapeHtml(
-                                department
-                            )}
-                        </strong>
-
-                    </div>
-
-                </div>
+            `;
 
 
-                <div class="profile-row">
-
-                    <div class="profile-row-icon">
-                        👥
-                    </div>
-
-                    <div class="profile-row-content">
-
-                        <small>
-                            ${escapeHtml(
-                                t("group")
-                            )}
-                        </small>
-
-                        <strong>
-                            ${escapeHtml(
-                                group
-                            )}
-                        </strong>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-
-            <div class="profile-section">
-
-                <div class="profile-section-title">
-                    ⚙️ ${
-                        getLanguage() === "ru"
-                            ? "Настройки"
-                            : getLanguage() === "ko"
-                                ? "설정"
-                                : "Settings"
-                    }
-                </div>
-
-
-                <div class="profile-row">
-
-                    <div class="profile-row-icon">
-                        🌐
-                    </div>
-
-                    <div class="profile-row-content">
-
-                        <small>
-                            ${escapeHtml(
-                                t("language")
-                            )}
-                        </small>
-
-                        <strong>
-                            ${escapeHtml(
-                                language
-                            )}
-                        </strong>
-
-                    </div>
-
-                </div>
-
-
-                <div class="profile-row">
-
-                    <div class="profile-row-icon">
-                        🆔
-                    </div>
-
-                    <div class="profile-row-content">
-
-                        <small>
-                            ${escapeHtml(
-                                t("telegramId")
-                            )}
-                        </small>
-
-                        <strong>
-                            ${escapeHtml(
-                                String(
-                                    telegramId
-                                )
-                            )}
-                        </strong>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-
-            <div class="profile-status">
-
-                <div class="profile-status-icon">
-                    ✓
-                </div>
-
-                <div>
-
-                    <strong>
-                        UniUZ
-                    </strong>
-
-                    <small>
-                        ${
-                            getLanguage() === "ru"
-                                ? "Профиль синхронизирован с базой"
-                                : getLanguage() === "ko"
-                                    ? "프로필이 데이터베이스와 동기화되었습니다"
-                                    : "Profile synchronized with database"
-                        }
-                    </small>
-
-                </div>
-
-            </div>
-
-        </div>
-    `;
+            container.appendChild(
+                card
+            );
+        }
+    );
 }
 
 
 // ============================================================
-// HOME PAGE
+// HOME
 // ============================================================
 
 function renderHome() {
 
     const screen =
-        getScreen();
+        document.getElementById(
+            "screen"
+        );
+
+
+    if (!screen) {
+
+        return;
+    }
+
+
+    const lang =
+        getLanguage();
+
+
+    const t =
+        translations[lang] ||
+        translations.ru;
+
+
+    const role =
+        getRole();
+
+
+    const roleText =
+        role === "teacher"
+            ? t.teacherShort
+            : t.studentShort;
+
+
+    screen.innerHTML = `
+
+        <section class="home-screen">
+
+            <div class="home-role">
+
+                ${roleText}
+
+            </div>
+
+
+            <h1>
+
+                UniUZ
+
+            </h1>
+
+
+            <p>
+
+                ${t.welcome}
+
+            </p>
+
+
+            <div class="quick-actions">
+
+                <button
+                    class="quick-action"
+                    data-page="schedule"
+                >
+
+                    📅
+                    ${t.schedule}
+
+                </button>
+
+
+                <button
+                    class="quick-action"
+                    data-page="homework"
+                >
+
+                    📝
+                    ${t.homework}
+
+                </button>
+
+
+                <button
+                    class="quick-action"
+                    data-page="ai"
+                >
+
+                    🤖
+                    ${t.ai}
+
+                </button>
+
+
+                <button
+                    class="quick-action"
+                    data-page="profile"
+                >
+
+                    👤
+                    ${t.profile}
+
+                </button>
+
+            </div>
+
+
+            <div class="home-info">
+
+                <h2>
+
+                    ${role === "teacher"
+                        ? t.teacherShort
+                        : t.studentShort}
+
+                </h2>
+
+
+                <p>
+
+                    ${
+                        role === "teacher"
+                            ? (
+                                lang === "ru"
+                                    ? "Панель преподавателя будет доступна здесь."
+                                    : lang === "en"
+                                        ? "The teacher dashboard will be available here."
+                                        : "교수님 대시보드가 여기에 표시됩니다."
+                              )
+                            : (
+                                lang === "ru"
+                                    ? "Ваш университетский помощник."
+                                    : lang === "en"
+                                        ? "Your university assistant."
+                                        : "나만의 대학 도우미입니다."
+                              )
+                    }
+
+                </p>
+
+            </div>
+
+        </section>
+
+    `;
+
+
+    attachPageButtons();
+}
+
+
+// ============================================================
+// SCHEDULE
+// ============================================================
+
+function renderSchedule() {
+
+    const screen =
+        document.getElementById(
+            "screen"
+        );
+
 
     if (!screen) {
         return;
     }
 
-    const telegramUser =
-        profileData?.telegram_user || {};
 
-    const profile =
-        profileData?.profile || {};
+    const lang =
+        getLanguage();
 
-    const name =
-        profile.full_name ||
-        telegramUser.first_name ||
-        telegramUser.username ||
-        "Student";
 
-    const homeworkCount =
-        homeworkData.length;
+    const title =
+        lang === "ru"
+            ? "📅 Расписание"
+            : lang === "en"
+                ? "📅 Schedule"
+                : "📅 시간표";
 
-    const announcementCount =
-        announcementsData.length;
+
+    const message =
+        lang === "ru"
+            ? "Расписание будет подключено после получения реальных данных."
+            : lang === "en"
+                ? "The schedule will be connected after real data is received."
+                : "실제 데이터를 받은 후 시간표가 연결됩니다.";
 
 
     screen.innerHTML = `
 
-        <div class="page home-page">
+        <section class="page-screen">
 
-            <div class="home-header">
+            <h1>
+                ${title}
+            </h1>
 
-                <div class="home-label">
-                    ${escapeHtml(
-                        t("student")
-                    )}
-                </div>
 
-                <h1>
-                    ${escapeHtml(
-                        name
-                    )}
-                </h1>
+            <div class="empty-state">
 
-                <p>
-                    ${
-                        getLanguage() === "ru"
-                            ? "Добро пожаловать 👋"
-                            : getLanguage() === "ko"
-                                ? "환영합니다 👋"
-                                : "Welcome 👋"
-                    }
-                </p>
+                ${message}
 
             </div>
 
+        </section>
 
-            <div class="home-stats">
-
-                <button
-                    class="stat-card"
-                    data-page="schedule"
-                >
-                    <span>📅</span>
-                    <strong>
-                        ${getLanguage() === "ru"
-                            ? "Расписание"
-                            : getLanguage() === "ko"
-                                ? "시간표"
-                                : "Schedule"}
-                    </strong>
-                    <small>
-                        ${
-                            getLanguage() === "ru"
-                                ? "Сегодня"
-                                : getLanguage() === "ko"
-                                    ? "오늘"
-                                    : "Today"
-                        }
-                    </small>
-                </button>
-
-
-                <button
-                    class="stat-card"
-                    data-page="homework"
-                >
-                    <span>📝</span>
-                    <strong>
-                        ${getLanguage() === "ru"
-                            ? "Задания"
-                            : getLanguage() === "ko"
-                                ? "과제"
-                                : "Homework"}
-                    </strong>
-                    <small>
-                        ${homeworkCount}
-                    </small>
-                </button>
-
-
-                <button
-                    class="stat-card"
-                    data-page="announcements"
-                >
-                    <span>📢</span>
-                    <strong>
-                        ${getLanguage() === "ru"
-                            ? "Объявления"
-                            : getLanguage() === "ko"
-                                ? "공지사항"
-                                : "Announcements"}
-                    </strong>
-                    <small>
-                        ${announcementCount}
-                    </small>
-                </button>
-
-            </div>
-
-
-            <div class="home-card">
-
-                <h2>
-                    ${
-                        getLanguage() === "ru"
-                            ? "Следующая пара"
-                            : getLanguage() === "ko"
-                                ? "다음 수업"
-                                : "Next class"
-                    }
-                </h2>
-
-                <p>
-                    ${
-                        getLanguage() === "ru"
-                            ? "Расписание будет подключено"
-                            : getLanguage() === "ko"
-                                ? "시간표가 연결됩니다"
-                                : "Schedule will be connected"
-                    }
-                </p>
-
-            </div>
-
-
-            <div class="home-card">
-
-                <h2>
-                    ${
-                        getLanguage() === "ru"
-                            ? "Быстрые действия"
-                            : getLanguage() === "ko"
-                                ? "빠른 실행"
-                                : "Quick actions"
-                    }
-                </h2>
-
-                <div class="quick-actions">
-
-                    <button
-                        class="quick-action"
-                        data-page="schedule"
-                    >
-                        📅
-                        ${
-                            getLanguage() === "ru"
-                                ? "Сегодня"
-                                : getLanguage() === "ko"
-                                    ? "오늘"
-                                    : "Today"
-                        }
-                    </button>
-
-                    <button
-                        class="quick-action"
-                        data-page="homework"
-                    >
-                        📝
-                        ${
-                            getLanguage() === "ru"
-                                ? "Дедлайны"
-                                : getLanguage() === "ko"
-                                    ? "마감일"
-                                    : "Deadlines"
-                        }
-                    </button>
-
-                    <button
-                        class="quick-action"
-                        data-page="announcements"
-                    >
-                        📢
-                        ${
-                            getLanguage() === "ru"
-                                ? "Новости"
-                                : getLanguage() === "ko"
-                                    ? "공지"
-                                    : "News"
-                        }
-                    </button>
-
-                    <button
-                        class="quick-action"
-                        data-page="profile"
-                    >
-                        👤
-                        ${
-                            getLanguage() === "ru"
-                                ? "Профиль"
-                                : getLanguage() === "ko"
-                                    ? "프로필"
-                                    : "Profile"
-                        }
-                    </button>
-
-                </div>
-
-            </div>
-
-        </div>
     `;
 }
 
@@ -1043,234 +1491,58 @@ function renderHome() {
 // HOMEWORK PAGE
 // ============================================================
 
-function renderHomework() {
+function renderHomeworkPage() {
 
     const screen =
-        getScreen();
+        document.getElementById(
+            "screen"
+        );
+
 
     if (!screen) {
         return;
     }
 
-    if (!homeworkData.length) {
 
-        screen.innerHTML = `
+    const lang =
+        getLanguage();
 
-            <div class="page">
 
-                <div class="page-title">
-                    📝 ${escapeHtml(
-                        t("homework")
-                    )}
-                </div>
-
-                <div class="empty-state">
-                    ${escapeHtml(
-                        t("noHomework")
-                    )}
-                </div>
-
-            </div>
-        `;
-
-        return;
-    }
+    const title =
+        lang === "ru"
+            ? "📝 Задания"
+            : lang === "en"
+                ? "📝 Homework"
+                : "📝 과제";
 
 
     screen.innerHTML = `
 
-        <div class="page">
+        <section class="page-screen">
 
-            <div class="page-title">
-                📝 ${escapeHtml(
-                    t("homework")
-                )}
-            </div>
+            <h1>
+                ${title}
+            </h1>
 
-            <div class="cards-list">
 
-                ${
-                    homeworkData
-                        .map(item => `
+            <div
+                id="homework-list"
+                class="homework-list"
+            ></div>
 
-                            <div class="data-card">
+        </section>
 
-                                <div class="data-card-title">
-                                    📚 ${escapeHtml(
-                                        item.subject_name ||
-                                        "Subject"
-                                    )}
-                                </div>
-
-                                <div class="data-card-text">
-                                    ${escapeHtml(
-                                        item.task_text ||
-                                        ""
-                                    )}
-                                </div>
-
-                                <div class="data-card-meta">
-                                    📅 ${escapeHtml(
-                                        item.homework_date ||
-                                        ""
-                                    )}
-
-                                    ${
-                                        item.homework_time
-                                            ? `
-                                                ⏰ ${escapeHtml(
-                                                    item.homework_time
-                                                )}
-                                            `
-                                            : ""
-                                    }
-                                </div>
-
-                            </div>
-
-                        `)
-                        .join("")
-                }
-
-            </div>
-
-        </div>
     `;
-}
 
 
-// ============================================================
-// ANNOUNCEMENTS PAGE
-// ============================================================
+    loadHomework()
+        .catch(error => {
 
-function renderAnnouncements() {
-
-    const screen =
-        getScreen();
-
-    if (!screen) {
-        return;
-    }
-
-    if (!announcementsData.length) {
-
-        screen.innerHTML = `
-
-            <div class="page">
-
-                <div class="page-title">
-                    📢 ${
-                        getLanguage() === "ru"
-                            ? "Объявления"
-                            : getLanguage() === "ko"
-                                ? "공지사항"
-                                : "Announcements"
-                    }
-                </div>
-
-                <div class="empty-state">
-                    ${escapeHtml(
-                        t("noAnnouncements")
-                    )}
-                </div>
-
-            </div>
-        `;
-
-        return;
-    }
-
-
-    screen.innerHTML = `
-
-        <div class="page">
-
-            <div class="page-title">
-                📢 ${
-                    getLanguage() === "ru"
-                        ? "Объявления"
-                        : getLanguage() === "ko"
-                            ? "공지사항"
-                            : "Announcements"
-                }
-            </div>
-
-            <div class="cards-list">
-
-                ${
-                    announcementsData
-                        .map(item => `
-
-                            <div class="data-card">
-
-                                <div class="data-card-title">
-                                    📢 ${escapeHtml(
-                                        item.title ||
-                                        "Announcement"
-                                    )}
-                                </div>
-
-                                <div class="data-card-text">
-                                    ${escapeHtml(
-                                        item.message ||
-                                        ""
-                                    )}
-                                </div>
-
-                            </div>
-
-                        `)
-                        .join("")
-                }
-
-            </div>
-
-        </div>
-    `;
-}
-
-
-// ============================================================
-// SCHEDULE PAGE
-// ============================================================
-
-function renderSchedule() {
-
-    const screen =
-        getScreen();
-
-    if (!screen) {
-        return;
-    }
-
-    screen.innerHTML = `
-
-        <div class="page">
-
-            <div class="page-title">
-                📅 ${escapeHtml(
-                    t("schedule")
-                )}
-            </div>
-
-            <div class="empty-state">
-
-                📅
-
-                <br><br>
-
-                ${
-                    getLanguage() === "ru"
-                        ? "Расписание будет подключено"
-                        : getLanguage() === "ko"
-                            ? "시간표가 연결됩니다"
-                            : "Schedule will be connected"
-                }
-
-            </div>
-
-        </div>
-    `;
+            console.error(
+                "Homework page error:",
+                error
+            );
+        });
 }
 
 
@@ -1281,109 +1553,453 @@ function renderSchedule() {
 function renderAI() {
 
     const screen =
-        getScreen();
+        document.getElementById(
+            "screen"
+        );
+
 
     if (!screen) {
         return;
     }
 
+
+    const lang =
+        getLanguage();
+
+
+    const title =
+        lang === "ru"
+            ? "🤖 UniUZ AI"
+            : lang === "en"
+                ? "🤖 UniUZ AI"
+                : "🤖 UniUZ AI";
+
+
+    const message =
+        lang === "ru"
+            ? "AI-помощник скоро будет доступен в Mini App."
+            : lang === "en"
+                ? "The AI assistant will soon be available in the Mini App."
+                : "Mini App에서 AI 도우미를 곧 사용할 수 있습니다.";
+
+
     screen.innerHTML = `
 
-        <div class="page">
+        <section class="page-screen">
 
-            <div class="page-title">
-                🤖 ${escapeHtml(
-                    t("ai")
-                )}
-            </div>
+            <h1>
+                ${title}
+            </h1>
 
-            <div class="home-card">
 
-                <h2>
-                    UniUZ AI
-                </h2>
+            <div class="empty-state">
 
-                <p>
-                    ${
-                        getLanguage() === "ru"
-                            ? "ИИ-помощник скоро будет доступен в Mini App."
-                            : getLanguage() === "ko"
-                                ? "AI 도우미가 곧 Mini App에서 제공됩니다."
-                                : "AI assistant will soon be available in the Mini App."
-                    }
-                </p>
+                ${message}
 
             </div>
 
-        </div>
+        </section>
+
     `;
 }
 
 
 // ============================================================
-// NAVIGATION
+// PROFILE PAGE
 // ============================================================
 
-function updateNavigationLanguage() {
+function renderProfile() {
 
-    document
-        .querySelectorAll(
-            ".nav-item"
-        )
-        .forEach(button => {
+    const screen =
+        document.getElementById(
+            "screen"
+        );
 
-            const page =
-                button.dataset.page;
 
-            const small =
-                button.querySelector(
-                    "small"
+    if (!screen) {
+        return;
+    }
+
+
+    const lang =
+        getLanguage();
+
+
+    const role =
+        getRole();
+
+
+    const t =
+        translations[lang] ||
+        translations.ru;
+
+
+    const roleText =
+        role === "teacher"
+            ? t.teacherShort
+            : t.studentShort;
+
+
+    screen.innerHTML = `
+
+        <section class="profile-screen">
+
+            <div class="profile-header">
+
+                <div
+                    class="profile-avatar"
+                    id="user-avatar"
+                >
+                    U
+                </div>
+
+
+                <h1
+                    id="profile-name"
+                >
+                    UniUZ
+                </h1>
+
+
+                <div
+                    id="profile-username"
+                    class="profile-username"
+                ></div>
+
+
+                <div class="profile-role">
+
+                    ${roleText}
+
+                </div>
+
+            </div>
+
+
+            <div class="profile-card">
+
+                <h3>
+                    👤 ${lang === "ru"
+                        ? "Личная информация"
+                        : lang === "en"
+                            ? "Personal information"
+                            : "개인 정보"}
+                </h3>
+
+
+                <div class="profile-row">
+
+                    <span>
+                        🏫
+                    </span>
+
+                    <div>
+
+                        <small>
+                            ${lang === "ru"
+                                ? "Университет"
+                                : lang === "en"
+                                    ? "University"
+                                    : "대학교"}
+                        </small>
+
+                        <strong
+                            id="profile-university"
+                        >
+                            Ajou University in Tashkent
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <div class="profile-row">
+
+                    <span>
+                        🎓
+                    </span>
+
+                    <div>
+
+                        <small>
+                            ${lang === "ru"
+                                ? "Факультет"
+                                : lang === "en"
+                                    ? "Faculty"
+                                    : "학부"}
+                        </small>
+
+                        <strong
+                            id="profile-department"
+                        >
+                            —
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <div class="profile-row">
+
+                    <span>
+                        👥
+                    </span>
+
+                    <div>
+
+                        <small>
+                            ${lang === "ru"
+                                ? "Группа"
+                                : lang === "en"
+                                    ? "Group"
+                                    : "그룹"}
+                        </small>
+
+                        <strong
+                            id="profile-group"
+                        >
+                            —
+                        </strong>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="profile-card">
+
+                <h3>
+                    ⚙️
+                    ${lang === "ru"
+                        ? "Настройки"
+                        : lang === "en"
+                            ? "Settings"
+                            : "설정"}
+                </h3>
+
+
+                <div class="profile-row">
+
+                    <span>
+                        🌐
+                    </span>
+
+                    <div>
+
+                        <small>
+                            ${lang === "ru"
+                                ? "Язык"
+                                : lang === "en"
+                                    ? "Language"
+                                    : "언어"}
+                        </small>
+
+                        <strong>
+
+                            ${
+                                lang === "ru"
+                                    ? "Русский"
+                                    : lang === "en"
+                                        ? "English"
+                                        : "한국어"
+                            }
+
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <div class="profile-row">
+
+                    <span>
+                        🎭
+                    </span>
+
+                    <div>
+
+                        <small>
+                            ${lang === "ru"
+                                ? "Роль"
+                                : lang === "en"
+                                    ? "Role"
+                                    : "역할"}
+                        </small>
+
+                        <strong>
+
+                            ${roleText}
+
+                        </strong>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <button
+                class="change-role-btn"
+                id="changeRoleButton"
+            >
+
+                🔄
+                ${
+                    lang === "ru"
+                        ? "Сменить роль"
+                        : lang === "en"
+                            ? "Change role"
+                            : "역할 변경"
+                }
+
+            </button>
+
+
+            <button
+                class="change-language-btn"
+                id="changeLanguageButton"
+            >
+
+                🌐
+                ${
+                    lang === "ru"
+                        ? "Сменить язык"
+                        : lang === "en"
+                            ? "Change language"
+                            : "언어 변경"
+                }
+
+            </button>
+
+        </section>
+
+    `;
+
+
+    loadProfile()
+        .catch(error => {
+
+            console.error(
+                "Profile page error:",
+                error
+            );
+        });
+
+
+    const changeRole =
+        document.getElementById(
+            "changeRoleButton"
+        );
+
+
+    if (changeRole) {
+
+        changeRole.addEventListener(
+            "click",
+            function() {
+
+                currentRole =
+                    null;
+
+                localStorage.removeItem(
+                    "uniuz_role"
                 );
 
-            if (!small) {
-                return;
+                showRoleScreen();
             }
+        );
+    }
 
-            if (
-                page === "home"
-            ) {
-                small.textContent =
-                    t("home");
+
+    const changeLanguage =
+        document.getElementById(
+            "changeLanguageButton"
+        );
+
+
+    if (changeLanguage) {
+
+        changeLanguage.addEventListener(
+            "click",
+            function() {
+
+                currentLanguage =
+                    null;
+
+                currentRole =
+                    null;
+
+
+                localStorage.removeItem(
+                    "uniuz_language"
+                );
+
+                localStorage.removeItem(
+                    "uniuz_role"
+                );
+
+
+                showLanguageScreen();
             }
-
-            if (
-                page === "schedule"
-            ) {
-                small.textContent =
-                    t("schedule");
-            }
-
-            if (
-                page === "homework"
-            ) {
-                small.textContent =
-                    t("homework");
-            }
-
-            if (
-                page === "ai"
-            ) {
-                small.textContent =
-                    t("ai");
-            }
-
-            if (
-                page === "profile"
-            ) {
-                small.textContent =
-                    t("profile");
-            }
-
-        });
+        );
+    }
 }
 
 
-async function navigate(page) {
+// ============================================================
+// PAGE NAVIGATION
+// ============================================================
+
+function openPage(page) {
+
+    switch (page) {
+
+        case "home":
+
+            renderHome();
+
+            break;
+
+
+        case "schedule":
+
+            renderSchedule();
+
+            break;
+
+
+        case "homework":
+
+            renderHomeworkPage();
+
+            break;
+
+
+        case "ai":
+
+            renderAI();
+
+            break;
+
+
+        case "profile":
+
+            renderProfile();
+
+            break;
+
+
+        default:
+
+            renderHome();
+    }
+
 
     document
         .querySelectorAll(
@@ -1393,57 +2009,50 @@ async function navigate(page) {
 
             button.classList.toggle(
                 "active",
-                button.dataset.page === page
+                button.dataset.page ===
+                page
             );
-
         });
-
-
-    if (page === "home") {
-
-        renderHome();
-        return;
-    }
-
-
-    if (page === "schedule") {
-
-        renderSchedule();
-        return;
-    }
-
-
-    if (page === "homework") {
-
-        renderHomework();
-        return;
-    }
-
-
-    if (page === "ai") {
-
-        renderAI();
-        return;
-    }
-
-
-    if (page === "profile") {
-
-        renderProfile();
-        return;
-    }
-
-
-    if (page === "announcements") {
-
-        renderAnnouncements();
-        return;
-    }
 }
 
 
 // ============================================================
-// NAV CLICK HANDLER
+// NAVIGATION BUTTONS
+// ============================================================
+
+function attachPageButtons() {
+
+    document
+        .querySelectorAll(
+            "[data-page]"
+        )
+        .forEach(button => {
+
+            if (
+                button.dataset.page &&
+                button.classList.contains(
+                    "nav-item"
+                )
+            ) {
+                return;
+            }
+
+
+            button.addEventListener(
+                "click",
+                function() {
+
+                    openPage(
+                        this.dataset.page
+                    );
+                }
+            );
+        });
+}
+
+
+// ============================================================
+// NAVIGATION CLICK
 // ============================================================
 
 document.addEventListener(
@@ -1452,21 +2061,23 @@ document.addEventListener(
 
         const button =
             event.target.closest(
-                "[data-page]"
+                ".nav-item"
             );
+
 
         if (!button) {
             return;
         }
 
+
         const page =
             button.dataset.page;
 
-        if (!page) {
-            return;
-        }
 
-        navigate(page);
+        if (page) {
+
+            openPage(page);
+        }
     }
 );
 
@@ -1478,11 +2089,13 @@ document.addEventListener(
 function showLoading() {
 
     const loading =
-        document.querySelector(
-            "#loading"
+        document.getElementById(
+            "loading"
         );
 
+
     if (loading) {
+
         loading.style.display =
             "flex";
     }
@@ -1492,11 +2105,13 @@ function showLoading() {
 function hideLoading() {
 
     const loading =
-        document.querySelector(
-            "#loading"
+        document.getElementById(
+            "loading"
         );
 
+
     if (loading) {
+
         loading.style.display =
             "none";
     }
@@ -1507,21 +2122,26 @@ function hideLoading() {
 // ERROR
 // ============================================================
 
-function showError(message) {
+function showError(
+    message
+) {
 
     console.error(
         message
     );
 
+
     const errorElement =
-        document.querySelector(
-            "#error"
+        document.getElementById(
+            "error"
         );
+
 
     if (errorElement) {
 
         errorElement.textContent =
             message;
+
 
         errorElement.style.display =
             "block";
@@ -1537,16 +2157,22 @@ async function initializeUniUZ() {
 
     showLoading();
 
+
     try {
 
         const apiOnline =
             await checkApi();
 
+
         if (!apiOnline) {
 
-            throw new Error(
-                "UniUZ API is unavailable."
+            console.warn(
+                "UniUZ API is offline."
             );
+
+            // Не блокируем приложение.
+            // Главная страница всё равно откроется.
+            return;
         }
 
 
@@ -1558,16 +2184,43 @@ async function initializeUniUZ() {
         }
 
 
-        await loadProfile();
+        try {
 
-        await loadHomework();
+            await loadProfile();
 
-        await loadAnnouncements();
+        } catch (error) {
+
+            console.warn(
+                "Profile loading failed:",
+                error
+            );
+        }
 
 
-        updateUserHeader();
+        try {
 
-        updateNavigationLanguage();
+            await loadHomework();
+
+        } catch (error) {
+
+            console.warn(
+                "Homework loading failed:",
+                error
+            );
+        }
+
+
+        try {
+
+            await loadAnnouncements();
+
+        } catch (error) {
+
+            console.warn(
+                "Announcements loading failed:",
+                error
+            );
+        }
 
 
         console.log(
@@ -1582,9 +2235,13 @@ async function initializeUniUZ() {
             error
         );
 
+
         showError(
-            t("error")
+            translations[
+                getLanguage()
+            ].error
         );
+
 
     } finally {
 
@@ -1607,24 +2264,10 @@ async function refreshUniUZ() {
 
         await loadAnnouncements();
 
-        updateUserHeader();
 
-        const active =
-            document.querySelector(
-                ".nav-item.active"
-            );
-
-        if (active) {
-
-            navigate(
-                active.dataset.page
-            );
-
-        } else {
-
-            renderHome();
-
-        }
+        console.log(
+            "UniUZ refreshed."
+        );
 
     } catch (error) {
 
@@ -1637,32 +2280,92 @@ async function refreshUniUZ() {
 
 
 // ============================================================
-// START
+// DOM READY
 // ============================================================
 
 document.addEventListener(
     "DOMContentLoaded",
     async function() {
 
+        console.log(
+            "Starting UniUZ..."
+        );
+
+
         updateNavigationLanguage();
 
 
-        if (currentLanguage) {
+        // ====================================================
+        // LANGUAGE + ROLE ALREADY SELECTED
+        // ====================================================
+
+        if (
+            currentLanguage &&
+            currentRole
+        ) {
+
+            console.log(
+                "Language:",
+                currentLanguage
+            );
+
+            console.log(
+                "Role:",
+                currentRole
+            );
+
 
             hideLanguageScreen();
 
+            hideRoleScreen();
+
             showMainApplication();
+
+            updateNavigationLanguage();
+
 
             await initializeUniUZ();
 
+
             renderHome();
 
-        } else {
+
+            return;
+        }
+
+
+        // ====================================================
+        // LANGUAGE SELECTED
+        // ROLE NOT SELECTED
+        // ====================================================
+
+        if (
+            currentLanguage &&
+            !currentRole
+        ) {
 
             console.log(
-                "Waiting for language selection..."
+                "Language selected, waiting for role..."
             );
+
+
+            showRoleScreen();
+
+
+            return;
         }
+
+
+        // ====================================================
+        // NOTHING SELECTED
+        // ====================================================
+
+        console.log(
+            "Waiting for language selection..."
+        );
+
+
+        showLanguageScreen();
     }
 );
 
@@ -1679,6 +2382,7 @@ if (tg) {
             "Обновить"
         );
 
+
         tg.MainButton.onClick(
             refreshUniUZ
         );
@@ -1691,3 +2395,50 @@ if (tg) {
         );
     }
 }
+
+
+// ============================================================
+// DEBUG HELPERS
+// ============================================================
+
+window.UniUZ = {
+
+    getLanguage:
+        getLanguage,
+
+    getRole:
+        getRole,
+
+    selectLanguage:
+        selectLanguage,
+
+    selectRole:
+        selectRole,
+
+    openPage:
+        openPage,
+
+    refresh:
+        refreshUniUZ,
+
+    resetSelection:
+        function() {
+
+            localStorage.removeItem(
+                "uniuz_language"
+            );
+
+            localStorage.removeItem(
+                "uniuz_role"
+            );
+
+            currentLanguage =
+                null;
+
+            currentRole =
+                null;
+
+            showLanguageScreen();
+        }
+
+};
