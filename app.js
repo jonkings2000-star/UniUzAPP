@@ -6,12 +6,56 @@ if (tg) {
 }
 
 const LANG_KEY = "uniuz_language_v2";
+const API_BASE = "https://uniuz-production.up.railway.app";
 
 const state = {
   user: tg?.initDataUnsafe?.user || null,
   page: "home",
-  lang: localStorage.getItem(LANG_KEY) || null
+  lang: localStorage.getItem(LANG_KEY) || null,
+  profile: null,
+  homework: [],
+  announcements: [],
+  scheduleAvailable: false,
+  apiError: null
 };
+
+
+async function apiGet(path) {
+  if (!tg?.initData) {
+    throw new Error("Mini App must be opened from Telegram.");
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      "X-Telegram-Init-Data": tg.initData
+    }
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || data.ok === false) {
+    throw new Error(data.error || `API error ${response.status}`);
+  }
+
+  return data;
+}
+
+async function loadRealData() {
+  try {
+    const data = await apiGet("/api/home");
+
+    state.profile = data.profile || null;
+    state.homework = Array.isArray(data.homework) ? data.homework : [];
+    state.announcements = Array.isArray(data.announcements)
+      ? data.announcements
+      : [];
+    state.scheduleAvailable = Boolean(data.schedule_available);
+    state.apiError = null;
+  } catch (error) {
+    console.error("UniUZ API error:", error);
+    state.apiError = error.message;
+  }
+}
 
 const demo = {
   homework: [
@@ -33,9 +77,9 @@ const T = {
     schedule: "Расписание",
     scheduleToday: "На сегодня",
     homework: "Задания",
-    homeworkCount: "2 задания",
+    homeworkCount: "0 заданий",
     announcements: "Объявления",
-    announcementsCount: "2 новых",
+    announcementsCount: "0 новых",
     ai: "AI Assistant",
     aiLimit: "7 запросов/день",
     quick: "Быстрые действия",
@@ -64,9 +108,9 @@ const T = {
     schedule: "Schedule",
     scheduleToday: "Today",
     homework: "Homework",
-    homeworkCount: "2 tasks",
+    homeworkCount: "0 tasks",
     announcements: "Announcements",
-    announcementsCount: "2 new",
+    announcementsCount: "0 new",
     ai: "AI Assistant",
     aiLimit: "7 requests/day",
     quick: "Quick actions",
@@ -95,9 +139,9 @@ const T = {
     schedule: "시간표",
     scheduleToday: "오늘",
     homework: "과제",
-    homeworkCount: "과제 2개",
+    homeworkCount: "과제 0개",
     announcements: "공지사항",
-    announcementsCount: "새 공지 2개",
+    announcementsCount: "새 공지 0개",
     ai: "AI 도우미",
     aiLimit: "하루 7회",
     quick: "빠른 메뉴",
@@ -135,7 +179,7 @@ function showLanguageScreen() {
   document.getElementById("app").classList.add("hidden");
 }
 
-function startApp(lang) {
+async function startApp(lang) {
   state.lang = lang;
   localStorage.setItem(LANG_KEY, lang);
 
@@ -144,6 +188,7 @@ function startApp(lang) {
 
   document.documentElement.lang = lang === "ko" ? "ko" : lang;
   applyStaticTranslations();
+  await loadRealData();
   renderPage("home");
 }
 
@@ -170,9 +215,46 @@ function renderHome() {
   document.getElementById("userName").textContent = name || "UniUZ";
   document.getElementById("welcome").textContent = t("welcome");
   document.getElementById("avatar").textContent = (name || "U").charAt(0).toUpperCase();
-  document.getElementById("userGroup").textContent = t("profileLoading");
+  document.getElementById("userGroup").textContent = state.profile ? [state.profile.department, state.profile.group_name].filter(Boolean).join(" • ") || t("profileLoading") : t("profileLoading");
   document.getElementById("homeworkCount").textContent = t("homeworkCount");
-  document.getElementById("announcementCount").textContent = t("announcementsCount");
+  document.getElementById("announcementCount").textContent = state.announcements.length + (state.lang === "ru" ? " новых" : state.lang === "ko" ? "개" : " new");
+  document.getElementById("homeworkCount").textContent = state.homework.length + (state.lang === "ru" ? " заданий" : state.lang === "ko" ? "개" : " tasks");
+}
+
+
+async function loadScheduleImage() {
+  const container = document.getElementById("scheduleContent");
+  if (!container) return;
+
+  try {
+    if (!tg?.initData) throw new Error("Telegram authorization missing");
+
+    const response = await fetch(`${API_BASE}/api/schedule/image`, {
+      headers: {
+        "X-Telegram-Init-Data": tg.initData
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error("Schedule image unavailable");
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+
+    container.innerHTML = `
+      <img class="schedule-image" src="${url}" alt="UniUZ schedule">
+    `;
+  } catch (error) {
+    console.error(error);
+    container.innerHTML = `
+      <p class="muted">${esc(
+        state.lang === "ru" ? "Не удалось загрузить расписание." :
+        state.lang === "ko" ? "시간표를 불러오지 못했습니다." :
+        "Could not load the schedule."
+      )}</p>
+    `;
+  }
 }
 
 function renderPage(page) {
@@ -229,22 +311,38 @@ function renderPage(page) {
       <section class="page">
         <button class="back" data-page="home">${esc(t("back"))}</button>
         <h2>📅 ${esc(t("schedule"))}</h2>
-        <div class="item"><b>${esc(t("today"))}</b><p class="muted">${esc(t("scheduleInfo"))}</p></div>
+        <div id="scheduleContent" class="item">
+          <p class="muted">${esc(
+            state.scheduleAvailable
+              ? (state.lang === "ru" ? "Загрузка расписания..." :
+                 state.lang === "ko" ? "시간표를 불러오는 중..." :
+                 "Loading schedule...")
+              : t("scheduleInfo")
+          )}</p>
+        </div>
       </section>
     `;
+
+    if (state.scheduleAvailable) {
+      loadScheduleImage();
+    }
 
   } else if (page === "homework") {
     main.innerHTML = `
       <section class="page">
         <button class="back" data-page="home">${esc(t("back"))}</button>
         <h2>📝 ${esc(t("homeworkTitle"))}</h2>
-        ${demo.homework.map(x => `
+        ${state.homework.length ? state.homework.map(x => `
           <div class="item">
-            <b>📚 ${esc(x[0])}</b>
-            <p>${esc(x[1])}</p>
-            <span class="muted">⏰ ${esc(x[2])}</span>
+            <b>📚 ${esc(x.subject_name)}</b>
+            <p>${esc(x.task_text)}</p>
+            <span class="muted">📅 ${esc(x.homework_date)} · ⏰ ${esc(x.homework_time)}</span>
           </div>
-        `).join("")}
+        `).join("") : `<div class="item"><p class="muted">${esc(
+          state.lang === "ru" ? "Заданий пока нет." :
+          state.lang === "ko" ? "등록된 과제가 없습니다." :
+          "No homework yet."
+        )}</p></div>`}
       </section>
     `;
 
@@ -253,9 +351,17 @@ function renderPage(page) {
       <section class="page">
         <button class="back" data-page="home">${esc(t("back"))}</button>
         <h2>📢 ${esc(t("announcementsTitle"))}</h2>
-        ${demo.announcements.map(x => `
-          <div class="item"><b>${esc(x[0])}</b><p>${esc(x[1])}</p></div>
-        `).join("")}
+        ${state.announcements.length ? state.announcements.map(x => `
+          <div class="item">
+            <b>📢 ${esc(x.title)}</b>
+            <p>${esc(x.message)}</p>
+            <span class="muted">${esc(x.created_at || "")}</span>
+          </div>
+        `).join("") : `<div class="item"><p class="muted">${esc(
+          state.lang === "ru" ? "Объявлений пока нет." :
+          state.lang === "ko" ? "등록된 공지사항이 없습니다." :
+          "No announcements yet."
+        )}</p></div>`}
       </section>
     `;
 
@@ -265,8 +371,18 @@ function renderPage(page) {
         <button class="back" data-page="home">${esc(t("back"))}</button>
         <h2>👤 ${esc(t("profileTitle"))}</h2>
         <div class="item">
-          <b>${esc(getUserName())}</b>
-          <p class="muted">${esc(t("profileInfo"))}</p>
+          <b>${esc(
+            state.profile?.full_name || getUserName()
+          )}</b>
+          <p class="muted">${
+            state.profile
+              ? esc([
+                  state.profile.university,
+                  state.profile.department,
+                  state.profile.group_name
+                ].filter(Boolean).join(" • ") || t("profileInfo"))
+              : esc(t("profileInfo"))
+          }</p>
         </div>
 
         <div class="item language-settings">
@@ -282,8 +398,7 @@ function renderPage(page) {
 
     document.querySelectorAll("[data-lang-change]").forEach(btn => {
       btn.onclick = () => {
-        startApp(btn.dataset.langChange);
-        renderPage("profile");
+        startApp(btn.dataset.langChange).then(() => renderPage("profile"));
       };
     });
 
@@ -322,7 +437,7 @@ document.querySelectorAll(".language-btn").forEach(btn => {
 });
 
 if (state.lang) {
-  startApp(state.lang);
+  startApp(state.lang).catch(console.error);
 } else {
   showLanguageScreen();
 }
