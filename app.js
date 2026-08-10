@@ -1,41 +1,45 @@
-const API_URL = "https://uniuz-production.up.railway.app";
+// =====================================
+// UniUZ Mini App
+// app.js
+// Part 1/4
+// =====================================
 
-const tg = window.Telegram?.WebApp || null;
+
+const API_URL =
+    "https://uniuz-production.up.railway.app";
 
 
-if (tg) {
 
-    try {
+const tg =
+    window.Telegram?.WebApp || null;
+
+
+
+if(tg){
+
+    try{
 
         tg.ready();
 
         tg.expand();
 
-    } catch (_) {}
+    }
+
+    catch(e){}
 
 }
+
 
 
 const initData =
     tg?.initData || "";
 
 
+
+
 // =====================================
-// RESET LOGIN
+// STATE
 // =====================================
-// Не сохраняем выбор роли.
-// Каждый вход начинается заново:
-// язык → роль
-
-
-localStorage.removeItem(
-    "uniuz_role"
-);
-
-
-localStorage.removeItem(
-    "uniuz_language"
-);
 
 
 let currentLanguage = null;
@@ -45,7 +49,9 @@ let currentRole = null;
 
 let teacherStatus = null;
 
+
 let isAdmin = false;
+
 
 
 let cachedProfile = null;
@@ -56,651 +62,492 @@ let cachedAnnouncements = [];
 
 
 
+
 // =====================================
 // TRANSLATIONS
 // =====================================
 
+
 const translations = {
 
 
-    ru: {
+ru:{
 
-        chooseRole:
-            "Выберите вашу роль",
 
-        roleSub:
-            "Как вы будете использовать UniUZ?",
+chooseLanguage:
+"Выберите язык",
 
-        student:
-            "🎓 Студент",
 
-        teacher:
-            "👨‍🏫 Преподаватель",
+chooseRole:
+"Выберите вашу роль",
 
-        admin:
-            "🔐 Панель администратора",
 
+student:
+"🎓 Студент",
 
-        pending:
-            "⏳ Заявка отправлена",
 
-        pendingText:
-            "Ваша заявка отправлена администратору. Дождитесь одобрения.",
+teacher:
+"👨‍🏫 Преподаватель",
 
 
-        sendRequest:
-            "📨 Отправить заявку",
+admin:
+"🔐 Администратор",
 
-        check:
-            "🔄 Проверить статус",
 
+pending:
+"⏳ Заявка отправлена",
 
-        approved:
-            "✅ Вы одобрены как преподаватель",
 
+pendingText:
+"Ожидайте одобрения администратора",
 
-        rejected:
-            "❌ Заявка отклонена",
 
+approved:
+"✅ Вы одобрены",
 
-        retry:
-            "📨 Подать заявку снова",
 
+rejected:
+"❌ Заявка отклонена",
 
-        back:
-            "⬅️ Назад к выбору роли",
 
+check:
+"🔄 Проверить статус",
 
-        approve:
-            "✅ Одобрить",
 
+schedule:
+"📅 Расписание",
 
-        reject:
-            "❌ Отклонить",
 
+homework:
+"📝 Задания",
 
-        refresh:
-            "🔄 Обновить",
 
+announcements:
+"📢 Объявления",
 
-        noRequests:
-            "📭 Новых заявок нет",
 
+ai:
+"🤖 ИИ",
 
-        adminTitle:
-            "Заявки преподавателей",
 
+profile:
+"👤 Профиль",
 
-        welcome:
-            "Добро пожаловать 👋",
 
+welcome:
+"Добро пожаловать"
 
-        schedule:
-            "Расписание",
 
+},
 
-        homework:
-            "Задания",
 
 
-        announcements:
-            "Объявления",
+en:{
 
 
-        ai:
-            "ИИ",
+chooseLanguage:
+"Choose language",
 
 
-        profile:
-            "Профиль",
+chooseRole:
+"Choose your role",
 
 
-        today:
-            "Сегодня",
+student:
+"🎓 Student",
 
 
-        quick:
-            "Быстрые действия",
+teacher:
+"👨‍🏫 Teacher",
 
 
-        apiError:
-            "⚠️ API недоступен"
+admin:
+"🔐 Admin",
 
-    },
 
+pending:
+"⏳ Pending",
 
-    en: {
 
-        chooseRole:
-            "Choose your role",
+pendingText:
+"Waiting for administrator approval",
 
-        roleSub:
-            "How will you use UniUZ?",
 
-        student:
-            "🎓 Student",
+approved:
+"✅ Approved",
 
-        teacher:
-            "👨‍🏫 Professor",
 
-        admin:
-            "🔐 Administrator panel",
+rejected:
+"❌ Rejected",
 
 
-        pending:
-            "⏳ Request submitted",
+check:
+"🔄 Check status",
 
 
-        pendingText:
-            "Your request was sent to administrator.",
+schedule:
+"📅 Schedule",
 
 
-        sendRequest:
-            "📨 Send request",
+homework:
+"📝 Homework",
 
 
-        check:
-            "🔄 Check status",
+announcements:
+"📢 Announcements",
 
 
-        approved:
-            "✅ Approved as professor",
+ai:
+"🤖 AI",
 
 
-        rejected:
-            "❌ Request rejected",
+profile:
+"👤 Profile",
 
 
-        retry:
-            "📨 Submit again",
+welcome:
+"Welcome"
 
 
-        back:
-            "⬅️ Back",
+},
 
 
-        approve:
-            "✅ Approve",
 
+ko:{
 
-        reject:
-            "❌ Reject",
 
+chooseLanguage:
+"언어 선택",
 
-        refresh:
-            "🔄 Refresh",
 
+chooseRole:
+"역할 선택",
 
-        noRequests:
-            "📭 No requests",
 
+student:
+"🎓 학생",
 
-        adminTitle:
-            "Teacher requests",
 
+teacher:
+"👨‍🏫 교수",
 
-        welcome:
-            "Welcome 👋",
 
+admin:
+"🔐 관리자",
 
-        schedule:
-            "Schedule",
 
+pending:
+"⏳ 승인 대기",
 
-        homework:
-            "Homework",
 
+pendingText:
+"관리자 승인을 기다리고 있습니다",
 
-        announcements:
-            "Announcements",
 
+approved:
+"✅ 승인 완료",
 
-        ai:
-            "AI",
 
+rejected:
+"❌ 거절됨",
 
-        profile:
-            "Profile",
 
+check:
+"🔄 상태 확인",
 
-        today:
-            "Today",
 
+schedule:
+"📅 시간표",
 
-        quick:
-            "Quick actions",
 
+homework:
+"📝 과제",
 
-        apiError:
-            "⚠️ API unavailable"
 
-    },
+announcements:
+"📢 공지",
 
 
-    ko: {
+ai:
+"🤖 AI",
 
-        chooseRole:
-            "역할을 선택하세요",
 
-        roleSub:
-            "UniUZ 사용 방법을 선택하세요",
+profile:
+"👤 프로필",
 
 
-        student:
-            "🎓 학생",
+welcome:
+"환영합니다"
 
 
-        teacher:
-            "👨‍🏫 교수님",
+}
 
-
-        admin:
-            "🔐 관리자",
-
-
-        pending:
-            "⏳ 신청 완료",
-
-
-        pendingText:
-            "관리자의 승인을 기다리고 있습니다.",
-
-
-        sendRequest:
-            "📨 신청 보내기",
-
-
-        check:
-            "🔄 상태 확인",
-
-
-        approved:
-            "✅ 교수님 승인 완료",
-
-
-        rejected:
-            "❌ 신청 거절",
-
-
-        retry:
-            "📨 다시 신청",
-
-
-        back:
-            "⬅️ 돌아가기",
-
-
-        approve:
-            "✅ 승인",
-
-
-        reject:
-            "❌ 거절",
-
-
-        refresh:
-            "🔄 새로고침",
-
-
-        noRequests:
-            "📭 신청 없음",
-
-
-        adminTitle:
-            "교수 신청",
-
-
-        welcome:
-            "환영합니다 👋",
-
-
-        schedule:
-            "시간표",
-
-
-        homework:
-            "과제",
-
-
-        announcements:
-            "공지사항",
-
-
-        ai:
-            "AI",
-
-
-        profile:
-            "프로필",
-
-
-        today:
-            "오늘",
-
-
-        quick:
-            "빠른 메뉴",
-
-
-        apiError:
-            "⚠️ API 오류"
-
-    }
 
 };
 
 
 
-function T(key) {
 
-    return (
 
-        translations[currentLanguage]
-        ||
+function T(key){
 
-        translations.ru
 
-    )[key] || key;
+return (
+
+translations[currentLanguage]
+||
+translations.ru
+
+)[key] || key;
+
 
 }
 
 
 
-function escapeHtml(value) {
 
-    return String(value ?? "")
+function getScreen(){
 
-        .replaceAll("&", "&amp;")
 
-        .replaceAll("<", "&lt;")
+return document.getElementById(
+"screen"
+);
 
-        .replaceAll(">", "&gt;")
-
-        .replaceAll('"', "&quot;")
-
-        .replaceAll("'", "&#039;");
 
 }
 
 
 
-function screen() {
+function setNav(show){
 
-    return document.querySelector(
-        "#screen"
-    );
+
+const nav =
+document.querySelector(
+".bottom-nav"
+);
+
+
+
+if(nav){
+
+nav.style.display =
+show ? "flex" : "none";
+
+}
+
 
 }
 
 
 
-function setNav(show) {
-
-    const nav =
-        document.querySelector(
-            ".bottom-nav"
-        );
 
 
-    if (nav) {
-
-        nav.style.display =
-            show ? "" : "none";
-
-    }
-
-}
 // =====================================
-// API REQUEST
+// API
 // =====================================
+
 
 async function apiRequest(
-    path,
-    options = {}
-) {
-
-    const headers = {
-
-        "X-Telegram-Init-Data":
-            initData,
-
-        ...(options.headers || {})
-
-    };
+path,
+options={}
+){
 
 
-    if (
-        options.body !== undefined
-    ) {
-
-        headers[
-            "Content-Type"
-        ] =
-            "application/json";
-
-    }
+const headers={
 
 
-    const response =
-        await fetch(
+"X-Telegram-Init-Data":
+initData
 
-            API_URL + path,
 
-            {
-
-                method:
-                    options.method || "GET",
-
-                headers,
-
-                body:
-                    options.body !== undefined
-
-                        ?
-
-                    JSON.stringify(
-                        options.body
-                    )
-
-                        :
-
-                    undefined
-
-            }
-
-        );
+};
 
 
 
-    let data = {};
+if(options.body){
 
 
-    try {
-
-        data =
-            await response.json();
-
-    }
-
-    catch (_) {}
-
-
-
-    if (
-        !response.ok
-    ) {
-
-        throw new Error(
-            data.error ||
-            `API error ${response.status}`
-        );
-
-    }
-
-
-
-    return data;
+headers[
+"Content-Type"
+]=
+"application/json";
 
 }
 
 
 
-// =====================================
-// CHECK API
-// =====================================
+
+const response =
+await fetch(
+
+API_URL + path,
+
+{
+
+method:
+options.method || "GET",
+
+headers,
+
+body:
+options.body
+
+?
+
+JSON.stringify(
+options.body
+)
+
+:
+
+undefined
+
+}
+
+);
+
+
+
+
+let data={};
+
+
+
+try{
+
+data =
+await response.json();
+
+}
+
+catch(e){}
+
+
+
+
+if(!response.ok){
+
+throw new Error(
+data.error ||
+"API Error"
+);
+
+}
+
+
+
+return data;
+
+
+}
+
+
+
+
+
 
 async function checkApi(){
 
-    try {
+
+try{
 
 
-        const res =
-            await fetch(
-                API_URL +
-                "/api/health"
-            );
+const res =
+await fetch(
+API_URL + "/api/health"
+);
 
 
-        const data =
-            await res.json();
+const data =
+await res.json();
 
 
 
-        return data.ok === true;
+return data.ok === true;
 
 
-    }
 
-    catch(e){
+}
 
-
-        console.error(e);
+catch(e){
 
 
-        return false;
+return false;
 
-    }
 
 }
 
 
-
-
+}
 // =====================================
 // LOAD PROFILE
 // =====================================
 
+
 async function loadProfile(){
 
-    const data =
-        await apiRequest(
-            "/api/me"
-        );
 
-
-    if(
-        !data.ok
-    ){
-
-        throw new Error(
-            "Profile error"
-        );
-
-    }
+const data =
+await apiRequest(
+"/api/me"
+);
 
 
 
-    cachedProfile =
-        data;
+cachedProfile =
+data;
 
 
 
-    isAdmin =
-        data.is_admin === true;
+isAdmin =
+data.is_admin === true;
 
 
 
-    teacherStatus =
-        data.teacher_status || null;
+teacherStatus =
+data.teacher_status || null;
 
 
 
-    return data;
+return data;
+
 
 }
 
 
 
 
-// =====================================
-// LOAD HOMEWORK
-// =====================================
-
-async function loadHomework(){
-
-    const data =
-        await apiRequest(
-            "/api/homework"
-        );
-
-
-    cachedHomework =
-        data.items || [];
-
-}
-
-
 
 
 // =====================================
-// LOAD ANNOUNCEMENTS
+// LANGUAGE
 // =====================================
 
-async function loadAnnouncements(){
-
-    const data =
-        await apiRequest(
-            "/api/announcements"
-        );
-
-
-    cachedAnnouncements =
-        data.items || [];
-
-}
-
-
-
-
-// =====================================
-// LANGUAGE BUTTONS
-// =====================================
 
 function bindLanguageButtons(){
 
-    document
-    .querySelectorAll(
-        ".language-btn"
-    )
 
-    .forEach(
-        btn => {
+document
+.querySelectorAll(
+".language-btn"
+)
 
-
-            btn.onclick =
-            () => {
+.forEach(btn=>{
 
 
-                selectLanguage(
-                    btn.dataset.lang
-                );
+btn.onclick = ()=>{
 
 
-            };
+selectLanguage(
+btn.dataset.lang
+);
 
 
-        }
-    );
+};
+
+
+
+});
 
 
 }
@@ -708,71 +555,41 @@ function bindLanguageButtons(){
 
 
 
-
-// =====================================
-// SELECT LANGUAGE
-// =====================================
 
 async function selectLanguage(lang){
 
 
-    currentLanguage =
-        lang;
+currentLanguage =
+lang;
 
 
 
-    // сохраняем только пока открыто
-
-    localStorage.setItem(
-        "uniuz_language",
-        lang
-    );
+const languageScreen =
+document.getElementById(
+"languageScreen"
+);
 
 
 
-    const language =
-        document.getElementById(
-            "languageScreen"
-        );
+if(languageScreen){
+
+languageScreen.style.display =
+"none";
+
+}
 
 
 
-    if(language){
-
-        language.style.display =
-            "none";
-
-    }
+await loadProfile();
 
 
 
+showRoleScreen();
 
-    try{
-
-
-        await loadProfile();
-
-
-
-        showRoleScreen();
-
-
-
-    }
-
-
-    catch(error){
-
-
-        showError(
-            error.message
-        );
-
-
-    }
 
 
 }
+
 
 
 
@@ -783,120 +600,190 @@ async function selectLanguage(lang){
 // ROLE SCREEN
 // =====================================
 
-function showRoleScreen() {
 
-    setNav(false);
-
-    const s = document.getElementById("screen");
-
-    s.innerHTML = `
-
-    <div class="role-container">
-
-        <div class="role-card">
+function showRoleScreen(){
 
 
-            <div class="role-logo">
-                🎓
-            </div>
-
-
-            <h1>
-                UniUZ
-            </h1>
-
-
-            <p>
-                ${T("chooseRole") || "Выберите вашу роль"}
-            </p>
+setNav(false);
 
 
 
-            <button
-                id="studentBtn"
-                class="role-button"
-            >
-
-                🎓 Студент
-
-            </button>
+const s =
+getScreen();
 
 
 
-
-            <button
-                id="teacherBtn"
-                class="role-button teacher"
-            >
-
-                👨‍🏫 Преподаватель
-
-            </button>
+s.innerHTML = `
 
 
-        </div>
+<div class="role-container">
 
-    </div>
 
-    `;
+<div class="role-card">
 
 
 
-    const student =
-        document.getElementById(
-            "studentBtn"
-        );
+<div class="role-logo">
 
+🎓
 
-    const teacher =
-        document.getElementById(
-            "teacherBtn"
-        );
+</div>
 
 
 
-    if(student){
+<h1>
 
-        student.onclick = async function(){
+UniUZ
 
-            console.log(
-                "Student selected"
-            );
-
-
-            currentRole =
-                "student";
-
-
-            await openStudentApp();
-
-        };
-
-    }
+</h1>
 
 
 
-    if(teacher){
+<p>
 
-        teacher.onclick = async function(){
+${T("chooseRole")}
 
-            console.log(
-                "Teacher selected"
-            );
+</p>
 
 
-            currentRole =
-                "teacher";
+
+<button
+
+class="role-button"
+
+id="studentBtn"
+
+>
+
+${T("student")}
+
+</button>
 
 
-            await requestTeacherAccess();
 
-        };
+<button
 
-    }
+class="role-button teacher"
+
+id="teacherBtn"
+
+>
+
+${T("teacher")}
+
+</button>
+
+
+
+${
+isAdmin
+
+?
+
+`
+
+<button
+
+class="role-button admin"
+
+id="adminBtn"
+
+>
+
+${T("admin")}
+
+</button>
+
+`
+
+:
+
+""
+
+}
+
+
+
+</div>
+
+
+</div>
+
+
+`;
+
+
+
+
+
+document
+.getElementById(
+"studentBtn"
+)
+
+.onclick =
+()=>{
+
+
+currentRole =
+"student";
+
+
+openStudentApp();
+
+
+
+};
+
+
+
+
+
+document
+.getElementById(
+"teacherBtn"
+)
+
+.onclick =
+()=>{
+
+
+currentRole =
+"teacher";
+
+
+requestTeacherAccess();
+
+
+
+};
+
+
+
+
+
+document
+.getElementById(
+"adminBtn"
+)
+
+?.addEventListener(
+"click",
+()=>{
+
+
+openAdminPanel();
 
 
 }
+
+);
+
+
+
+}
+
+
 
 
 
@@ -906,42 +793,71 @@ function showRoleScreen() {
 // TEACHER REQUEST
 // =====================================
 
+
 async function requestTeacherAccess(){
 
-    try{
 
 
-        const data =
-        await apiRequest(
-            "/api/teacher/request",
-            {
-                method:"POST",
-                body:{
-                    telegram_id:
-                    tg?.initDataUnsafe?.user?.id
-                }
-            }
-        );
+try{
 
 
-        teacherStatus =
-        data.status || "pending";
+const data =
+await apiRequest(
+
+"/api/teacher/request",
+
+{
+
+method:"POST",
+
+body:{
 
 
-        showTeacherStatus();
+telegram_id:
+
+tg
+?.initDataUnsafe
+?.user
+?.id
 
 
-    }
+}
 
-    catch(error){
 
-        console.error(error);
+}
 
-        showError(
-            error.message
-        );
+);
 
-    }
+
+
+
+teacherStatus =
+data.status ||
+"pending";
+
+
+
+showTeacherStatus();
+
+
+
+}
+
+catch(error){
+
+
+
+console.error(error);
+
+
+alert(
+error.message
+);
+
+
+}
+
+
 
 }
 
@@ -950,136 +866,122 @@ async function requestTeacherAccess(){
 
 
 
+
 // =====================================
-// TEACHER STATUS SCREEN
+// TEACHER STATUS
 // =====================================
+
 
 function showTeacherStatus(){
 
 
-    const s =
-        screen();
+const s =
+getScreen();
 
 
 
-    s.innerHTML = `
+s.innerHTML = `
 
 
-    <div class="role-container">
+<div class="role-container">
 
 
-        <div class="role-card">
+<div class="role-card">
 
 
-            <h1>
+<div class="role-logo">
 
-            ${
-                teacherStatus === "approved"
+⏳
 
-                ?
-
-                T("approved")
-
-                :
-
-                teacherStatus === "rejected"
-
-                ?
-
-                T("rejected")
-
-                :
-
-                T("pending")
-
-            }
-
-            </h1>
+</div>
 
 
 
-            <p>
+<h1>
 
-            ${
-                teacherStatus === "pending"
+${T("pending")}
 
-                ?
-
-                T("pendingText")
-
-                :
-
-                ""
-
-            }
-
-            </p>
+</h1>
 
 
 
+<p>
 
-            <button
-                class="role-button"
-                id="checkTeacher"
-            >
+${T("pendingText")}
 
-                ${T("check")}
-
-            </button>
+</p>
 
 
 
-        </div>
+<button
 
+class="role-button"
 
-    </div>
+id="checkTeacher"
 
+>
 
-    `;
+${T("check")}
 
-
-
-    document
-    .getElementById(
-        "checkTeacher"
-    )
-
-    ?.addEventListener(
-        "click",
-        async()=>{
-
-
-            const data =
-                await apiRequest(
-                    "/api/teacher/status"
-                );
-
-
-            teacherStatus =
-                data.status;
+</button>
 
 
 
-            if(
-                teacherStatus ===
-                "approved"
-            ){
-
-                showTeacherHome();
-
-            }
-
-            else{
-
-                showTeacherStatus();
-
-            }
+</div>
 
 
-        }
+</div>
 
-    );
 
+`;
+
+
+
+
+document
+.getElementById(
+"checkTeacher"
+)
+
+.onclick =
+async()=>{
+
+
+
+const data =
+await apiRequest(
+"/api/teacher/status"
+);
+
+
+
+teacherStatus =
+data.status;
+
+
+
+if(
+teacherStatus ===
+"approved"
+){
+
+
+showTeacherHome();
+
+
+}
+
+else{
+
+
+showTeacherStatus();
+
+
+}
+
+
+
+};
 
 
 }
@@ -1087,44 +989,53 @@ function showTeacherStatus(){
 // STUDENT APP
 // =====================================
 
+
 async function openStudentApp(){
 
 
-    try{
+try{
 
 
-        await loadHomework();
+await loadHomework();
 
-        await loadAnnouncements();
-
-
-
-        setNav(true);
+await loadAnnouncements();
 
 
 
-        bindBottomNavigation();
+setNav(true);
 
 
 
-        openPage(
-            "home"
-        );
+bindBottomNavigation();
 
 
-    }
 
-    catch(error){
-
-
-        showError(
-            error.message
-        );
+openPage(
+"home"
+);
 
 
-    }
 
 }
+
+catch(error){
+
+
+console.error(error);
+
+
+alert(
+error.message
+);
+
+
+}
+
+
+}
+
+
+
 
 
 
@@ -1133,104 +1044,111 @@ async function openStudentApp(){
 // TEACHER HOME
 // =====================================
 
+
 function showTeacherHome(){
 
 
-    setNav(false);
+setNav(false);
 
 
 
-    const s =
-        screen();
+const s =
+getScreen();
 
 
 
-    s.innerHTML = `
+s.innerHTML = `
 
 
-    <section class="page">
+<div class="page">
 
 
-        <div class="page-header">
+<div class="page-header">
 
 
-            <h1>
-                👨‍🏫 UniUZ
-            </h1>
+<h1>
+
+👨‍🏫 UniUZ
+
+</h1>
 
 
-            <p>
-                Панель преподавателя
-            </p>
-
-
-        </div>
+</div>
 
 
 
-        <div class="info-card">
+<div class="info-card">
 
 
-            <h2>
-                ✅ Преподаватель
-            </h2>
+<h2>
 
+${T("approved")}
 
-            <p>
-                Ваш аккаунт подтвержден.
-            </p>
-
-
-        </div>
+</h2>
 
 
 
-    </section>
+<p>
+
+Режим преподавателя активирован.
+
+</p>
 
 
-    `;
+
+</div>
+
+
+
+</div>
+
+
+`;
+
 
 
 }
+
+
+
 
 
 
 
 
 // =====================================
-// ADMIN PANEL
+// LOAD DATA
 // =====================================
 
-async function openAdminPanel(){
+
+async function loadHomework(){
 
 
-    try{
+try{
 
 
-        const data =
-            await apiRequest(
-                "/api/admin/teacher-requests"
-            );
-
-
-
-        renderAdminPanel(
-            data.items || []
-        );
+const data =
+await apiRequest(
+"/api/homework"
+);
 
 
 
-    }
-
-    catch(error){
-
-
-        showError(
-            error.message
-        );
+cachedHomework =
+data.items || [];
 
 
-    }
+
+}
+
+catch(e){
+
+
+cachedHomework=[];
+
+
+}
+
 
 
 }
@@ -1238,225 +1156,33 @@ async function openAdminPanel(){
 
 
 
+async function loadAnnouncements(){
 
 
-function renderAdminPanel(items){
+try{
 
 
+const data =
+await apiRequest(
+"/api/announcements"
+);
 
-    const s =
-        screen();
 
 
+cachedAnnouncements =
+data.items || [];
 
-    if(!s)
-        return;
-
-
-
-    let html = "";
-
-
-
-    if(
-        items.length === 0
-    ){
-
-
-        html = `
-
-        <div class="info-card">
-
-            <h3>
-                ${T("noRequests")}
-            </h3>
-
-        </div>
-
-        `;
-
-
-    }
-
-
-    else{
-
-
-        html =
-        items.map(
-            teacher => `
-
-
-            <div class="info-card">
-
-
-                <h3>
-                    👨‍🏫
-                    ${escapeHtml(
-                        teacher.full_name
-                    )}
-                </h3>
-
-
-
-                <p>
-
-                    ID:
-                    ${teacher.telegram_id}
-
-                </p>
-
-
-
-                <button
-                    class="approve-btn"
-                    data-id="${teacher.telegram_id}"
-                >
-
-                    ${T("approve")}
-
-                </button>
-
-
-
-
-                <button
-                    class="reject-btn"
-                    data-id="${teacher.telegram_id}"
-                >
-
-                    ${T("reject")}
-
-                </button>
-
-
-
-            </div>
-
-
-            `
-        ).join("");
-
-    }
-
-
-
-    s.innerHTML = `
-
-
-    <section class="page">
-
-
-        <h1>
-            🔐 Admin
-        </h1>
-
-
-
-        ${html}
-
-
-
-        <button
-            id="adminBack"
-            class="role-button"
-        >
-
-            ${T("back")}
-
-        </button>
-
-
-    </section>
-
-
-    `;
-
-
-
-    document
-    .querySelectorAll(
-        ".approve-btn"
-    )
-
-    .forEach(
-        btn=>{
-
-
-            btn.onclick =
-            ()=>changeTeacher(
-                btn.dataset.id,
-                "approve"
-            );
-
-
-        }
-
-    );
-
-
-
-
-    document
-    .querySelectorAll(
-        ".reject-btn"
-    )
-
-    .forEach(
-        btn=>{
-
-
-            btn.onclick =
-            ()=>changeTeacher(
-                btn.dataset.id,
-                "reject"
-            );
-
-
-        }
-
-    );
-
-
-
-
-    document
-    .getElementById(
-        "adminBack"
-    )
-
-    ?.addEventListener(
-        "click",
-        showRoleScreen
-    );
 
 
 }
 
+catch(e){
 
 
+cachedAnnouncements=[];
 
 
-
-async function changeTeacher(
-    id,
-    action
-){
-
-
-    await apiRequest(
-
-        `/api/admin/teacher/${id}/${action}`,
-
-        {
-            method:
-                "POST"
-        }
-
-    );
-
-
-    openAdminPanel();
+}
 
 
 }
@@ -1471,130 +1197,183 @@ async function changeTeacher(
 // HOME PAGE
 // =====================================
 
-function renderHomeScreen(){
 
+function renderHome(){
 
-    const s =
-        screen();
 
+const s =
+getScreen();
 
 
-    s.innerHTML = `
 
+s.innerHTML = `
 
-    <section class="home-page">
 
+<div class="home-page">
 
-        <div class="page-header">
 
+<div class="page-header">
 
-            <h1>
-                🎓 UniUZ
-            </h1>
 
+<div>
 
-            <div class="avatar">
-                👤
-            </div>
 
+<h1>
 
-        </div>
+🎓 UniUZ
 
+</h1>
 
 
+<p>
 
-        <div class="profile-card">
+${T("welcome")}
 
+</p>
 
-            <h2>
 
-            ${
-                cachedProfile
-                ?.telegram_user
-                ?.first_name
-                ||
-                "Студент"
+</div>
 
-            }
 
-            </h2>
 
+<div class="avatar">
 
+👤
 
-            <p>
-                Добро пожаловать в UniUZ
-            </p>
+</div>
 
 
-        </div>
 
+</div>
 
 
 
 
-        <div class="dashboard-grid">
 
+<div class="profile-card">
 
-            <button
-                class="dashboard-card"
-                data-page="schedule"
-            >
 
-                📅
-                Расписание
+<h2>
 
-            </button>
+${
+cachedProfile
+?.telegram_user
+?.first_name
+||
+"Студент"
 
+}
 
+</h2>
 
-            <button
-                class="dashboard-card"
-                data-page="homework"
-            >
 
-                📝
-                Задания
+<p>
 
-            </button>
+UniUZ Assistant
 
+</p>
 
 
-            <button
-                class="dashboard-card"
-                data-page="announcements"
-            >
+</div>
 
-                📢
-                Объявления
 
-            </button>
 
 
 
-            <button
-                class="dashboard-card"
-                data-page="ai"
-            >
+<div class="dashboard-grid">
 
-                🤖
-                ИИ
 
-            </button>
 
+<button
 
+class="dashboard-card"
 
-        </div>
+data-page="schedule"
 
+>
 
+📅
 
-    </section>
+<br>
 
+${T("schedule")}
 
-    `;
+</button>
 
 
 
-    bindScreenButtons();
+
+<button
+
+class="dashboard-card"
+
+data-page="homework"
+
+>
+
+📝
+
+<br>
+
+${T("homework")}
+
+</button>
+
+
+
+
+
+<button
+
+class="dashboard-card"
+
+data-page="announcements"
+
+>
+
+📢
+
+<br>
+
+${T("announcements")}
+
+</button>
+
+
+
+
+
+<button
+
+class="dashboard-card"
+
+data-page="ai"
+
+>
+
+🤖
+
+<br>
+
+${T("ai")}
+
+</button>
+
+
+
+</div>
+
+
+
+</div>
+
+
+`;
+
+
+
+bindScreenButtons();
+
 
 
 }
@@ -1604,79 +1383,241 @@ function renderHomeScreen(){
 
 
 
+
 // =====================================
-// SIMPLE PAGES
+// PAGES
 // =====================================
+
 
 function openPage(page){
 
 
+document
+.querySelectorAll(
+".nav-item"
+)
 
-    document
-    .querySelectorAll(
-        ".nav-item"
-    )
-
-    .forEach(
-        item=>{
-
-            item.classList.toggle(
-                "active",
-                item.dataset.page === page
-            );
+.forEach(item=>{
 
 
-        }
-    );
+item.classList.toggle(
+
+"active",
+
+item.dataset.page === page
+
+);
 
 
 
-    if(
-        page === "home"
-    ){
-
-        renderHomeScreen();
-
-        return;
-
-    }
+});
 
 
 
 
-    const s =
-        screen();
+
+if(page==="home"){
+
+
+renderHome();
+
+return;
+
+
+}
 
 
 
-    s.innerHTML = `
+const s =
+getScreen();
 
 
-    <section class="page">
 
 
-        <div class="info-card">
+let content = "";
 
 
-            <h2>
-                ${
-                    page
-                }
-            </h2>
 
 
-            <p>
-                Раздел будет подключен после получения данных.
-            </p>
+if(page==="homework"){
 
 
-        </div>
+content = `
 
 
-    </section>
+<div class="info-card">
 
 
-    `;
+<h2>
+
+📝 ${T("homework")}
+
+</h2>
+
+
+
+<p>
+
+${
+cachedHomework.length
+
+?
+
+"Задания загружены"
+
+:
+
+"Нет заданий"
+
+}
+
+</p>
+
+
+</div>
+
+
+`;
+
+
+}
+
+
+
+else if(page==="announcements"){
+
+
+content = `
+
+
+<div class="info-card">
+
+
+<h2>
+
+📢 ${T("announcements")}
+
+</h2>
+
+
+
+<p>
+
+${
+cachedAnnouncements.length
+
+?
+
+"Есть объявления"
+
+:
+
+"Нет объявлений"
+
+}
+
+</p>
+
+
+</div>
+
+
+`;
+
+
+}
+
+
+
+else{
+
+
+content = `
+
+
+<div class="info-card">
+
+
+<h2>
+
+${page}
+
+</h2>
+
+
+
+<p>
+
+Раздел будет подключён после получения данных.
+
+</p>
+
+
+</div>
+
+
+`;
+
+
+}
+
+
+
+s.innerHTML = `
+
+
+<div class="page">
+
+
+${content}
+
+
+</div>
+
+
+`;
+
+
+
+}
+// =====================================
+// ADMIN PANEL
+// =====================================
+
+
+async function openAdminPanel(){
+
+
+try{
+
+
+const data =
+await apiRequest(
+"/api/admin/teacher-requests"
+);
+
+
+
+renderAdminPanel(
+data.items || []
+);
+
+
+
+}
+
+catch(error){
+
+
+console.error(error);
+
+
+alert(
+error.message
+);
+
+
+}
 
 
 
@@ -1684,29 +1625,243 @@ function openPage(page){
 
 
 
+
+function renderAdminPanel(items){
+
+
+const s =
+getScreen();
+
+
+
+let html = "";
+
+
+
+if(items.length===0){
+
+
+html = `
+
+
+<div class="info-card">
+
+
+<h3>
+
+📭 Нет заявок
+
+</h3>
+
+
+</div>
+
+
+`;
+
+
+
+}
+
+else{
+
+
+html =
+items.map(item=>`
+
+
+<div class="info-card">
+
+
+<h3>
+
+👨‍🏫
+${item.full_name || "Без имени"}
+
+</h3>
+
+
+
+<p>
+
+ID:
+${item.telegram_id}
+
+</p>
+
+
+
+<button
+
+class="role-button"
+
+onclick="approveTeacher('${item.telegram_id}')"
+
+>
+
+✅ Одобрить
+
+</button>
+
+
+
+<button
+
+class="role-button teacher"
+
+onclick="rejectTeacher('${item.telegram_id}')"
+
+>
+
+❌ Отклонить
+
+</button>
+
+
+
+</div>
+
+
+
+`).join("");
+
+
+
+}
+
+
+
+
+s.innerHTML = `
+
+
+<div class="page">
+
+
+<h1>
+
+🔐 Администратор
+
+</h1>
+
+
+
+${html}
+
+
+
+<button
+
+class="role-button"
+
+onclick="showRoleScreen()"
+
+>
+
+⬅️ Назад
+
+</button>
+
+
+
+</div>
+
+
+`;
+
+
+
+}
+
+
+
+
+
+async function approveTeacher(id){
+
+
+await apiRequest(
+
+`/api/admin/teacher/${id}/approve`,
+
+{
+
+method:"POST"
+
+}
+
+);
+
+
+
+openAdminPanel();
+
+
+
+}
+
+
+
+
+async function rejectTeacher(id){
+
+
+await apiRequest(
+
+`/api/admin/teacher/${id}/reject`,
+
+{
+
+method:"POST"
+
+}
+
+);
+
+
+
+openAdminPanel();
+
+
+
+}
+
+
+
+
+
+
+// =====================================
+// NAVIGATION
+// =====================================
 
 
 function bindBottomNavigation(){
 
 
-    document
-    .querySelectorAll(
-        ".nav-item"
-    )
+document
+.querySelectorAll(
+".nav-item"
+)
 
-    .forEach(
-        btn=>{
-
-
-            btn.onclick =
-            ()=>openPage(
-                btn.dataset.page
-            );
+.forEach(btn=>{
 
 
-        }
+btn.onclick =
+()=>{
 
-    );
+
+openPage(
+btn.dataset.page
+);
+
+
+};
+
+
+
+});
+
 
 
 }
@@ -1717,24 +1872,28 @@ function bindBottomNavigation(){
 function bindScreenButtons(){
 
 
-    document
-    .querySelectorAll(
-        "[data-page]"
-    )
+document
+.querySelectorAll(
+"[data-page]"
+)
 
-    .forEach(
-        btn=>{
-
-
-            btn.onclick =
-            ()=>openPage(
-                btn.dataset.page
-            );
+.forEach(btn=>{
 
 
-        }
+btn.onclick =
+()=>{
 
-    );
+
+openPage(
+btn.dataset.page
+);
+
+
+};
+
+
+
+});
 
 
 }
@@ -1744,50 +1903,122 @@ function bindScreenButtons(){
 
 
 
+
 // =====================================
-// START APP
+// ERROR
 // =====================================
+
+
+function showError(text){
+
+
+const s =
+getScreen();
+
+
+
+if(!s)
+return;
+
+
+
+s.innerHTML = `
+
+
+<div class="page">
+
+
+<div class="info-card">
+
+
+<h2>
+
+⚠️ Ошибка
+
+</h2>
+
+
+<p>
+
+${text}
+
+</p>
+
+
+</div>
+
+
+</div>
+
+
+`;
+
+
+
+}
+
+
+
+
+
+
+
+
+// =====================================
+// START
+// =====================================
+
 
 async function initializeUniUZ(){
 
-    try{
+
+try{
 
 
-        if(
-            !(await checkApi())
-        ){
-
-            throw new Error(
-                "API недоступен"
-            );
-
-        }
+const online =
+await checkApi();
 
 
-        await loadProfile();
+
+if(!online){
 
 
-        // Ждём выбора языка
-        // showRoleScreen() вызывается только после selectLanguage()
+throw new Error(
+"API недоступен"
+);
 
 
-        return;
+}
 
 
-    }
 
-    catch(error){
-
-
-        console.error(error);
+await loadProfile();
 
 
-        showError(
-            error.message
-        );
+
+/*
+НЕ показываем роль сразу.
+
+Ждём выбора языка.
+*/
 
 
-    }
+
+
+}
+
+catch(error){
+
+
+showError(
+error.message
+);
+
+
+
+}
+
+
 
 }
 
@@ -1796,9 +2027,7 @@ async function initializeUniUZ(){
 
 
 
-// =====================================
-// LANGUAGE INIT
-// =====================================
+
 
 document
 .addEventListener(
@@ -1806,11 +2035,10 @@ document
 ()=>{
 
 
-    bindLanguageButtons();
+bindLanguageButtons();
 
 
-
-    initializeUniUZ();
+initializeUniUZ();
 
 
 
