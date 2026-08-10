@@ -710,7 +710,121 @@ def not_found(error):
 # ==========================================================
 # START
 # ==========================================================
+# ==========================================================
+# TEACHER HOMEWORK CREATE
+# ==========================================================
 
+
+@app.post("/api/teacher/homework/create")
+def create_homework():
+
+    user = require_user()
+
+
+    if not user:
+
+        return jsonify({
+            "error": "Unauthorized"
+        }),401
+
+
+
+    teacher = database.get_teacher(
+        user["id"]
+    )
+
+
+    if not teacher or teacher["status"] != "approved":
+
+        return jsonify({
+            "error": "Only approved teachers allowed"
+        }),403
+
+
+
+    data = request.json
+
+
+
+    title = data.get("title")
+    description = data.get("description")
+    group_name = data.get("group_name")
+    deadline = data.get("deadline")
+
+
+
+    if not title or not group_name:
+
+        return jsonify({
+            "error": "Title and group required"
+        }),400
+
+
+
+    database.add_homework(
+
+        teacher_id=user["id"],
+
+        title=title,
+
+        description=description,
+
+        group_name=group_name,
+
+        deadline=deadline
+
+    )
+
+
+    return jsonify({
+
+        "ok": True,
+
+        "message":
+        "Homework created"
+
+    })
+
+
+
+
+
+# ==========================================================
+# TEACHER HOMEWORK LIST
+# ==========================================================
+
+
+@app.get("/api/teacher/homework")
+def teacher_homework():
+
+    user = require_user()
+
+
+    if not user:
+
+        return jsonify({
+            "error": "Unauthorized"
+        }),401
+
+
+
+    items = database.get_teacher_homework(
+
+        user["id"]
+
+    )
+
+
+    return jsonify({
+
+        "items":
+
+        [
+            dict(item)
+            for item in items
+        ]
+
+    })
 
 if __name__ == "__main__":
 
