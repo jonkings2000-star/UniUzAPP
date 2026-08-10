@@ -891,14 +891,17 @@ function showTeacherHome(){
 
 
 
-            <button class="dashboard-card">
+            <button 
+class="dashboard-card"
+id="createHomeworkBtn"
+>
 
-                📝
-                <br>
+📝
+<br>
 
-                Создать задание
+Создать задание
 
-            </button>
+</button>
 
 
 
