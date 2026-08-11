@@ -128,3 +128,68 @@ body{
         font-size:28px;
     }
 }
+
+
+/* UniUZ FIX v7 - preserve navigation and Telegram buttons */
+
+html, body {
+    margin: 0;
+    padding: 0;
+}
+
+button,
+.btn {
+    appearance: none;
+    -webkit-appearance: none;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+#app {
+    padding-bottom: 75px;
+}
+
+nav,
+.bottom-nav,
+.navbar,
+.tabbar {
+    background:#101f35;
+    border-top:1px solid #294b78;
+}
+
+.bottom-nav button,
+.nav-item,
+nav button {
+    background:transparent;
+    border:none;
+    color:#a8bddc;
+    padding:8px;
+}
+
+.bottom-nav .active,
+.nav-item.active {
+    color:white;
+}
+
+.ai-card {
+    margin-top:18px;
+}
+
+.grid .btn {
+    min-height:54px;
+}
+
+.list-item {
+    color:white;
+}
+
+@media(max-width:600px){
+    .grid {
+        gap:10px;
+    }
+
+    .btn {
+        font-size:14px;
+        padding:14px 8px;
+    }
+}
