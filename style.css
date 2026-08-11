@@ -232,3 +232,61 @@ margin:14px 0;
 .schedule-info small{display:block;color:#91a6c5;margin-top:4px}
 .schedule-room{background:#132e50;border:1px solid #28517e;color:#a9c5e8;border-radius:9px;padding:6px 8px;font-size:10px}
 .schedule-empty{text-align:center;color:#8da3c1;padding:30px 10px}
+
+
+/* UniUZ v8 compatibility fixes */
+
+body{
+    overflow-x:hidden;
+}
+
+.wrap{
+    position:relative;
+}
+
+.nav{
+    display:grid !important;
+    grid-template-columns:repeat(4,1fr) !important;
+}
+
+.nav button{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    background:transparent !important;
+    color:#9db0ca !important;
+    font-size:12px;
+    border:0 !important;
+}
+
+.nav button.active{
+    color:#ffffff !important;
+}
+
+.hero-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+.dashboard-card{
+    background:linear-gradient(145deg,#101f34,#0b1a31);
+    border:1px solid #29486f;
+    border-radius:22px;
+}
+
+.ai-card .btn.primary{
+    background:linear-gradient(135deg,#4b77ff,#7655ff);
+    color:white;
+    border:0;
+}
+
+.grid .btn{
+    min-height:58px;
+}
+
+/* prevent browser default buttons */
+button{
+    font-family:Inter,Arial,sans-serif;
+}
