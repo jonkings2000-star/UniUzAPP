@@ -234,59 +234,126 @@ margin:14px 0;
 .schedule-empty{text-align:center;color:#8da3c1;padding:30px 10px}
 
 
-/* UniUZ v8 compatibility fixes */
+/* ===== UniUZ Mockup Style Override ===== */
 
 body{
-    overflow-x:hidden;
+ background:#050f20 !important;
 }
 
 .wrap{
-    position:relative;
+ max-width:100%;
+ padding:18px 16px 95px;
 }
 
-.nav{
-    display:grid !important;
-    grid-template-columns:repeat(4,1fr) !important;
+/* logo/header */
+.brand{
+ margin:10px 0 25px;
 }
 
-.nav button{
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    background:transparent !important;
-    color:#9db0ca !important;
-    font-size:12px;
-    border:0 !important;
+.logo{
+ width:78px;
+ height:78px;
+ border-radius:26px;
+ background:#19345c;
+ font-size:40px;
 }
 
-.nav button.active{
-    color:#ffffff !important;
+.brand h1{
+ font-size:38px;
+ letter-spacing:.5px;
 }
 
-.hero-row{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
+/* main student card */
+.hero{
+ background:linear-gradient(145deg,#101f3b,#0a172c);
+ border:1px solid #284d7d;
+ border-radius:26px;
+ padding:26px;
 }
 
-.dashboard-card{
-    background:linear-gradient(145deg,#101f34,#0b1a31);
-    border:1px solid #29486f;
-    border-radius:22px;
+.hero h1{
+ font-size:34px;
+}
+
+.profile-badge{
+ background:#132c50;
+ border:1px solid #315d91;
+ color:#b8cae7;
+}
+
+/* schedule/homework cards */
+.today-card,
+.dashboard-card,
+.card{
+ background:linear-gradient(145deg,#102541,#09182d);
+ border:1px solid #294f82;
+ border-radius:24px;
+ box-shadow:0 12px 35px rgba(0,0,0,.25);
+}
+
+.section-title{
+ font-size:22px;
+}
+
+.lesson,
+.list-item{
+ background:#102744;
+ border:1px solid #294f82;
+ border-radius:18px;
+ padding:16px;
+}
+
+/* AI block like mockup */
+.ai-card{
+ background:linear-gradient(135deg,#3920b5,#3449df);
+ border-radius:28px;
+ padding:22px;
+}
+
+.ai-title{
+ font-size:27px;
 }
 
 .ai-card .btn.primary{
-    background:linear-gradient(135deg,#4b77ff,#7655ff);
-    color:white;
-    border:0;
+ background:linear-gradient(90deg,#527cff,#8255ff);
+ border-radius:16px;
+ height:52px;
 }
 
-.grid .btn{
-    min-height:58px;
+/* quick buttons */
+.quick-grid-v2,
+.grid{
+ gap:14px;
 }
 
-/* prevent browser default buttons */
-button{
-    font-family:Inter,Arial,sans-serif;
+.quick-v2,
+.btn{
+ background:#132b4b;
+ border:1px solid #38669d;
+ border-radius:18px;
+ min-height:60px;
+ font-size:16px;
+}
+
+/* bottom nav */
+.nav{
+ background:#101d31;
+ border-top:1px solid #28466e;
+ padding:12px 8px;
+}
+
+.nav button{
+ color:#91a9ca;
+ font-size:12px;
+}
+
+.nav button.active{
+ color:white;
+}
+
+/* mobile spacing */
+@media(max-width:600px){
+ .hero h1{
+  font-size:30px;
+ }
 }
