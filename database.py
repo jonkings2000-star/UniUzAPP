@@ -33,28 +33,7 @@ def init_db():
     conn = get_connection()
 
     cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS homework (
-
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-        teacher_id INTEGER NOT NULL,
-
-        title TEXT NOT NULL,
-
-        description TEXT,
-
-        group_name TEXT NOT NULL,
-
-        deadline TEXT,
-
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
-
-    )
-    """)
-
-    # USERS
+# USERS
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users(
@@ -201,6 +180,37 @@ def init_db():
 
 
     # HOMEWORK
+    # ----------------------------------------------------------
+    # Безопасная миграция старой Mini App-схемы homework.
+    # ----------------------------------------------------------
+
+    cur.execute("""
+        SELECT name
+        FROM sqlite_master
+        WHERE type='table' AND name='homework'
+    """)
+    homework_exists = cur.fetchone() is not None
+
+    if homework_exists:
+        cur.execute("PRAGMA table_info(homework)")
+        homework_columns = {row[1] for row in cur.fetchall()}
+
+        required_homework_columns = {
+            "teacher_id",
+            "department",
+            "group_name",
+            "subject_name",
+            "task_text",
+            "homework_date",
+            "homework_time",
+            "file_id",
+            "file_type",
+            "created_at"
+        }
+
+        if not required_homework_columns.issubset(homework_columns):
+            cur.execute("DROP TABLE IF EXISTS homework_legacy")
+            cur.execute("ALTER TABLE homework RENAME TO homework_legacy")
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS homework(
@@ -231,6 +241,45 @@ def init_db():
     """)
 
 
+
+
+    # Переносим старые задания, если таблица была устаревшей.
+    cur.execute("""
+        SELECT name
+        FROM sqlite_master
+        WHERE type='table' AND name='homework_legacy'
+    """)
+    legacy_exists = cur.fetchone() is not None
+
+    if legacy_exists:
+        cur.execute("""
+            INSERT INTO homework(
+                teacher_id,
+                department,
+                group_name,
+                subject_name,
+                task_text,
+                homework_date,
+                homework_time,
+                file_id,
+                file_type,
+                created_at
+            )
+            SELECT
+                h.teacher_id,
+                COALESCE(u.department, ''),
+                h.group_name,
+                COALESCE(h.title, 'Задание'),
+                COALESCE(h.description, ''),
+                COALESCE(h.deadline, ''),
+                '',
+                NULL,
+                NULL,
+                COALESCE(h.created_at, datetime('now'))
+            FROM homework_legacy h
+            LEFT JOIN users u ON u.id = h.teacher_id
+        """)
+        cur.execute("DROP TABLE homework_legacy")
 
     # ANNOUNCEMENTS
 
@@ -1210,90 +1259,90 @@ def get_teacher_subjects(
 
 def add_homework(
     teacher_id,
-    department,
-    group_name,
-    subject_name,
-    task_text,
-    homework_date,
-    homework_time,
+    department=None,
+    group_name=None,
+    subject_name=None,
+    task_text=None,
+    homework_date=None,
+    homework_time=None,
     file_id=None,
-    file_type=None
+    file_type=None,
+    title=None,
+    description=None,
+    deadline=None
 ):
+    """
+    Основная функция создания задания.
 
-    conn=get_connection()
+    Поддерживает старый вызов бота:
+        add_homework(teacher_id, department, group_name,
+                     subject_name, task_text, homework_date,
+                     homework_time, file_id, file_type)
 
-    cur=conn.cursor()
+    И вызов Mini App:
+        teacher_id, title, description, group_name, deadline
+        (через именованные аргументы).
+    """
 
+    if title is not None or description is not None or deadline is not None:
+        subject_name = title or subject_name or "Задание"
+        task_text = description or task_text or ""
+        homework_date = deadline or homework_date or ""
+        homework_time = homework_time or ""
 
-    now=datetime.now().strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
+        if not department:
+            conn = get_connection()
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT department FROM users WHERE id=?",
+                (teacher_id,)
+            )
+            row = cur.fetchone()
+            conn.close()
+            department = row["department"] if row and row["department"] else ""
 
+    department = department or ""
+    group_name = group_name or ""
+    subject_name = subject_name or "Задание"
+    task_text = task_text or ""
+    homework_date = homework_date or ""
+    homework_time = homework_time or ""
 
+    conn = get_connection()
+    cur = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     cur.execute("""
     INSERT INTO homework(
-
         teacher_id,
-
         department,
-
         group_name,
-
         subject_name,
-
         task_text,
-
         homework_date,
-
         homework_time,
-
         file_id,
-
         file_type,
-
         created_at
-
     )
-
     VALUES(?,?,?,?,?,?,?,?,?,?)
-
-    """,(
+    """, (
         teacher_id,
-
         department,
-
         group_name,
-
         subject_name,
-
         task_text,
-
         homework_date,
-
         homework_time,
-
         file_id,
-
         file_type,
-
         now
     ))
 
-
-
-    homework_id=cur.lastrowid
-
-
+    homework_id = cur.lastrowid
     conn.commit()
-
     conn.close()
-
-
     return homework_id
-
-
-
 
 
 def get_homework(
@@ -1365,35 +1414,35 @@ def get_student_homework(
     group_name
 ):
 
-    conn=get_connection()
+    conn = get_connection()
+    cur = conn.cursor()
 
-    cur=conn.cursor()
+    if department:
+        cur.execute("""
+        SELECT *
+        FROM homework
+        WHERE department=?
+        AND group_name=?
+        ORDER BY id DESC
+        """, (
+            department,
+            group_name
+        ))
+    else:
+        cur.execute("""
+        SELECT *
+        FROM homework
+        WHERE group_name=?
+        ORDER BY id DESC
+        """, (
+            group_name,
+        ))
 
-
-    cur.execute("""
-    SELECT *
-
-    FROM homework
-
-    WHERE department=?
-
-    AND group_name=?
-
-    ORDER BY id DESC
-
-    """,(
-        department,
-        group_name
-    ))
-
-
-    rows=cur.fetchall()
-
-
+    rows = cur.fetchall()
     conn.close()
-
-
     return rows
+
+
 # ==========================================================
 # DELETE HOMEWORK
 # ==========================================================
@@ -1729,101 +1778,3 @@ if __name__ == "__main__":
     print(
         "UniUZ Database initialized successfully!"
     )
-    # ==========================================================
-# HOMEWORK SYSTEM
-# ==========================================================
-
-
-def add_homework(
-    teacher_id,
-    title,
-    description,
-    group_name,
-    deadline
-):
-
-    conn = get_connection()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        INSERT INTO homework
-        (
-            teacher_id,
-            title,
-            description,
-            group_name,
-            deadline
-        )
-
-        VALUES (?, ?, ?, ?, ?)
-        """,
-        (
-            teacher_id,
-            title,
-            description,
-            group_name,
-            deadline
-        )
-    )
-
-    conn.commit()
-    conn.close()
-
-
-
-
-
-def get_teacher_homework(
-    teacher_id
-):
-
-    conn = get_connection()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM homework
-        WHERE teacher_id = ?
-        ORDER BY id DESC
-        """,
-        (
-            teacher_id,
-        )
-    )
-
-    data = cur.fetchall()
-
-    conn.close()
-
-    return data
-
-
-
-
-
-def get_group_homework(
-    group_name
-):
-
-    conn = get_connection()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM homework
-        WHERE group_name = ?
-        ORDER BY id DESC
-        """,
-        (
-            group_name,
-        )
-    )
-
-    data = cur.fetchall()
-
-    conn.close()
-
-    return data
