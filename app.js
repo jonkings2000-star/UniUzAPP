@@ -169,6 +169,7 @@ layout(`
 <div class="ai-card">
  <div class="ai-title">🤖 UniUZ AI</div>
  <p>Ваш персональный помощник</p>
+ <div id="aiCounter">Загрузка...</div>
  <button class="btn primary" onclick="showAI()">
  Спросить ИИ →
  </button>
@@ -229,6 +230,32 @@ async function showAdmin(){
  }catch(e){toast(e.message)}
 }
 async function grant(id,enabled){try{await api("/admin/unlimited",{method:"POST",body:{telegram_id:id,enabled}});showAdmin()}catch(e){toast(e.message)}}
+
+
+async function loadAIUsage(){
+    try{
+        return await api("/ai/usage");
+    }catch(e){
+        return {used:0,limit:10,unlimited:false};
+    }
+}
+
+async function showNotifications(){
+    try{
+        const d = await api("/notifications");
+        layout(`${brand()}
+        <div class="card">
+            <h2>🔔 Уведомления</h2>
+            ${
+              d.items.length
+              ? d.items.map(x=>`<div class="list-item">${x.icon} ${esc(x.text)}</div>`).join("")
+              : `<div class="empty">Нет уведомлений</div>`
+            }
+        </div>`);
+    }catch(e){
+        toast(e.message);
+    }
+}
 
 start();
 

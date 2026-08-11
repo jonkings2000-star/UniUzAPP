@@ -250,3 +250,38 @@ def nf(e):
 @app.errorhandler(500)
 def se(e):
     return jsonify(error="Internal server error"), 500
+
+
+@app.get("/api/ai/usage")
+def ai_usage():
+    u = user_required()
+    if not u:
+        return jsonify(error="Unauthorized"), 401
+    return jsonify(
+        used=int(u["ai_used_count"] or 0),
+        limit=None if u["unlimited_ai"] else 10,
+        unlimited=bool(u["unlimited_ai"])
+    )
+
+
+@app.get("/api/notifications")
+def notifications():
+    u = user_required()
+    if not u:
+        return jsonify(error="Unauthorized"), 401
+
+    items = []
+
+    for x in database.get_homework(int(u["telegram_id"]))[:5]:
+        items.append({
+            "icon":"📝",
+            "text": f"{x['title']} • {x['due_at']}"
+        })
+
+    for x in database.get_schedule(int(u["telegram_id"]))[:3]:
+        items.append({
+            "icon":"🗓",
+            "text": f"{x['subject']} • {x['start_time']}"
+        })
+
+    return jsonify(items=items)
