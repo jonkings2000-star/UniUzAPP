@@ -11,7 +11,7 @@
 // CONFIG
 // =====================================================
 
-const API_URL = window.location.origin;
+const API_URL = "https://uniuz-production.up.railway.app";
 
 const tg = window.Telegram?.WebApp || null;
 
@@ -89,6 +89,16 @@ const translations = {
         ai: "ИИ",
         profile: "Профиль",
 
+        chooseDepartment: "Выберите факультет",
+        chooseGroup: "Выберите группу",
+        saveProfile: "Сохранить профиль",
+        department: "Факультет",
+        group: "Группа",
+        profileSaved: "Профиль сохранён ✅",
+        profileRequired: "Сначала выберите факультет и группу.",
+        noGroups: "Для этого факультета группы не найдены.",
+        loading: "Загрузка...",
+
         today: "Сегодня",
         quick: "Быстрые действия",
 
@@ -133,6 +143,16 @@ const translations = {
         ai: "AI",
         profile: "Profile",
 
+        chooseDepartment: "Choose faculty",
+        chooseGroup: "Choose group",
+        saveProfile: "Save profile",
+        department: "Faculty",
+        group: "Group",
+        profileSaved: "Profile saved ✅",
+        profileRequired: "Choose your faculty and group first.",
+        noGroups: "No groups found for this faculty.",
+        loading: "Loading...",
+
         today: "Today",
         quick: "Quick actions",
 
@@ -176,6 +196,16 @@ const translations = {
         announcements: "공지",
         ai: "AI",
         profile: "프로필",
+
+        chooseDepartment: "학부를 선택하세요",
+        chooseGroup: "그룹을 선택하세요",
+        saveProfile: "프로필 저장",
+        department: "학부",
+        group: "그룹",
+        profileSaved: "프로필이 저장되었습니다 ✅",
+        profileRequired: "먼저 학부와 그룹을 선택하세요.",
+        noGroups: "선택한 학부의 그룹이 없습니다.",
+        loading: "로딩 중...",
 
         today: "오늘",
         quick: "빠른 작업",
@@ -535,8 +565,34 @@ function showRoleScreen() {
             async () => {
 
                 currentRole = "student";
+                localStorage.setItem(
+                    "uniuz_role",
+                    "student"
+                );
 
-                await openStudentApp();
+                try {
+                    await loadProfile();
+
+                    const profile =
+                        cachedProfile?.profile;
+
+                    if (
+                        !profile?.department ||
+                        !profile?.group_name
+                    ) {
+                        await showStudentProfileSetup();
+                        return;
+                    }
+
+                    await openStudentApp();
+
+                } catch (error) {
+
+                    showError(
+                        error.message ||
+                        "Не удалось открыть профиль студента."
+                    );
+                }
             }
         );
     }
@@ -1185,22 +1241,287 @@ showTeacherHome();
 
 
 // =====================================================
+// STUDENT PROFILE SETUP
+// =====================================================
+
+async function showStudentProfileSetup() {
+
+    setNav(false);
+
+    const s = getScreen();
+    if (!s) return;
+
+    s.innerHTML = `
+        <section class="page" style="padding:18px 16px">
+
+            <div class="page-header">
+                <div>
+                    <h1>🎓 UniUZ</h1>
+                    <p>${escapeHtml(T("profileRequired"))}</p>
+                </div>
+            </div>
+
+            <div class="info-card">
+
+                <h2>${escapeHtml(T("chooseDepartment"))}</h2>
+
+                <select
+                    id="studentDepartment"
+                    class="input"
+                    style="width:100%;box-sizing:border-box;margin-top:12px"
+                >
+                    <option value="">${escapeHtml(T("chooseDepartment"))}</option>
+                </select>
+
+                <div id="groupBlock" style="display:none;margin-top:18px">
+                    <h2>${escapeHtml(T("chooseGroup"))}</h2>
+
+                    <select
+                        id="studentGroup"
+                        class="input"
+                        style="width:100%;box-sizing:border-box;margin-top:12px"
+                        disabled
+                    >
+                        <option value="">${escapeHtml(T("chooseGroup"))}</option>
+                    </select>
+                </div>
+
+                <button
+                    type="button"
+                    id="saveStudentProfile"
+                    class="role-button"
+                    style="margin-top:18px"
+                    disabled
+                >
+                    ${escapeHtml(T("saveProfile"))}
+                </button>
+
+                <button
+                    type="button"
+                    id="studentProfileBack"
+                    class="role-button teacher"
+                    style="margin-top:10px"
+                >
+                    ${escapeHtml(T("back"))}
+                </button>
+
+                <p
+                    id="profileSetupMessage"
+                    style="margin-top:12px;opacity:.75"
+                ></p>
+
+            </div>
+        </section>
+    `;
+
+    const departmentSelect =
+        document.getElementById("studentDepartment");
+    const groupSelect =
+        document.getElementById("studentGroup");
+    const groupBlock =
+        document.getElementById("groupBlock");
+    const saveButton =
+        document.getElementById("saveStudentProfile");
+    const message =
+        document.getElementById("profileSetupMessage");
+
+    try {
+
+        message.textContent = T("loading");
+
+        const data =
+            await apiRequest("/api/departments");
+
+        const departments =
+            Array.isArray(data.items)
+                ? data.items
+                : [];
+
+        departmentSelect.innerHTML = `
+            <option value="">${escapeHtml(T("chooseDepartment"))}</option>
+            ${departments.map(department => `
+                <option value="${escapeHtml(department)}">
+                    ${escapeHtml(department)}
+                </option>
+            `).join("")}
+        `;
+
+        message.textContent = "";
+
+        if (!departments.length) {
+            message.textContent = T("noGroups");
+        }
+
+    } catch (error) {
+
+        message.textContent = error.message;
+        return;
+    }
+
+    departmentSelect.addEventListener(
+        "change",
+        async () => {
+
+            const department =
+                departmentSelect.value;
+
+            groupSelect.innerHTML = `
+                <option value="">${escapeHtml(T("loading"))}</option>
+            `;
+
+            groupSelect.disabled = true;
+            saveButton.disabled = true;
+            groupBlock.style.display =
+                department ? "block" : "none";
+
+            if (!department) {
+                return;
+            }
+
+            try {
+
+                const data =
+                    await apiRequest(
+                        `/api/groups?department=${encodeURIComponent(department)}`
+                    );
+
+                const groups =
+                    Array.isArray(data.items)
+                        ? data.items
+                        : [];
+
+                groupSelect.innerHTML = `
+                    <option value="">${escapeHtml(T("chooseGroup"))}</option>
+                    ${groups.map(group => `
+                        <option value="${escapeHtml(group)}">
+                            ${escapeHtml(group)}
+                        </option>
+                    `).join("")}
+                `;
+
+                groupSelect.disabled =
+                    groups.length === 0;
+
+                if (!groups.length) {
+                    message.textContent = T("noGroups");
+                } else {
+                    message.textContent = "";
+                }
+
+            } catch (error) {
+
+                groupSelect.innerHTML = `
+                    <option value="">${escapeHtml(T("chooseGroup"))}</option>
+                `;
+                groupSelect.disabled = true;
+                message.textContent = error.message;
+            }
+        }
+    );
+
+    groupSelect.addEventListener(
+        "change",
+        () => {
+            saveButton.disabled =
+                !groupSelect.value;
+        }
+    );
+
+    saveButton.addEventListener(
+        "click",
+        async () => {
+
+            const department =
+                departmentSelect.value;
+
+            const group_name =
+                groupSelect.value;
+
+            if (!department || !group_name) {
+                message.textContent =
+                    T("profileRequired");
+                return;
+            }
+
+            saveButton.disabled = true;
+            message.textContent = T("loading");
+
+            try {
+
+                const data =
+                    await apiRequest(
+                        "/api/profile",
+                        {
+                            method: "POST",
+                            body: {
+                                university:
+                                    "Ajou University in Tashkent",
+                                department,
+                                group_name,
+                                role: "student"
+                            }
+                        }
+                    );
+
+                if (!data.ok) {
+                    throw new Error(
+                        data.error ||
+                        "Не удалось сохранить профиль"
+                    );
+                }
+
+                await loadProfile();
+
+                message.textContent =
+                    T("profileSaved");
+
+                await openStudentApp();
+
+            } catch (error) {
+
+                saveButton.disabled = false;
+                message.textContent =
+                    error.message;
+            }
+        }
+    );
+
+    document
+        .getElementById("studentProfileBack")
+        ?.addEventListener(
+            "click",
+            showRoleScreen
+        );
+}
+
+
+// =====================================================
 // STUDENT APP
 // =====================================================
 
 async function openStudentApp() {
 
-    setNav(true);
+    await loadProfile();
 
+    const profile =
+        cachedProfile?.profile;
+
+    if (
+        !profile?.department ||
+        !profile?.group_name
+    ) {
+        await showStudentProfileSetup();
+        return;
+    }
+
+    setNav(true);
 
     await Promise.all([
         loadHomework(),
         loadAnnouncements()
     ]);
 
-
     bindBottomNavigation();
-
 
     openPage("home");
 }
@@ -1382,6 +1703,95 @@ function renderHomeScreen() {
 
 
 // =====================================================
+// HOMEWORK PAGE
+// =====================================================
+
+function renderHomeworkPage() {
+
+    const screen = getScreen();
+    if (!screen) return;
+
+    const profile = cachedProfile?.profile;
+    const groupName = profile?.group_name || "";
+
+    const cards = cachedHomework.length
+        ? cachedHomework.map(item => `
+            <div class="info-card" style="margin-top:14px">
+                <h2>
+                    📝 ${escapeHtml(
+                        item.subject_name ||
+                        item.title ||
+                        "Задание"
+                    )}
+                </h2>
+
+                <p>
+                    ${escapeHtml(
+                        item.task_text ||
+                        item.description ||
+                        ""
+                    )}
+                </p>
+
+                <p>
+                    👥 ${escapeHtml(
+                        item.group_name || groupName || "—"
+                    )}
+                </p>
+
+                <p>
+                    📅 ${escapeHtml(
+                        item.homework_date ||
+                        item.deadline ||
+                        "Не указано"
+                    )}
+                </p>
+
+                ${item.homework_time ? `
+                    <p>⏰ ${escapeHtml(item.homework_time)}</p>
+                ` : ""}
+            </div>
+        `).join("")
+        : `
+            <div class="info-card" style="margin-top:14px">
+                <h3>📭 Пока нет заданий</h3>
+                <p>
+                    ${escapeHtml(
+                        groupName
+                            ? `Для группы ${groupName} пока нет опубликованных заданий.`
+                            : T("profileRequired")
+                    )}
+                </p>
+            </div>
+        `;
+
+    screen.innerHTML = `
+        <section class="page">
+
+            <div class="page-title">
+                <span>📝</span>
+                <h1>${escapeHtml(T("homework"))}</h1>
+            </div>
+
+            ${profile?.department || profile?.group_name ? `
+                <div class="info-card">
+                    <p>
+                        🏛 ${escapeHtml(profile?.department || "—")}
+                    </p>
+                    <p>
+                        👥 ${escapeHtml(profile?.group_name || "—")}
+                    </p>
+                </div>
+            ` : ""}
+
+            ${cards}
+
+        </section>
+    `;
+}
+
+
+// =====================================================
 // PAGES
 // =====================================================
 
@@ -1437,46 +1847,9 @@ function openPage(page) {
 
     else if (page === "homework") {
 
-
-    title =
-        `📝 ${T("homework")}`;
-
-
-    if (cachedHomework.length > 0) {
-
-
-        text = cachedHomework.map(hw => {
-
-
-            return `
-
-📚 ${hw.title}
-
-📝 ${hw.description || "Без описания"}
-
-👥 Группа:
-${hw.group_name}
-
-📅 Сдать до:
-${hw.deadline || "Не указано"}
-
---------------------
-
-`;
-
-        }).join("\n");
-
-
-    } else {
-
-
-        text =
-        "Пока нет заданий.";
-
-
+        renderHomeworkPage();
+        return;
     }
-
-}
 
 
     else if (page === "announcements") {
@@ -1586,6 +1959,19 @@ function renderProfilePage() {
                     )}
                 </p>
 
+                ${currentRole === "student" ? `
+                    <p>🏛 ${escapeHtml(cachedProfile?.profile?.department || "—")}</p>
+                    <p>👥 ${escapeHtml(cachedProfile?.profile?.group_name || "—")}</p>
+
+                    <button
+                        type="button"
+                        id="editStudentProfile"
+                        class="role-button"
+                    >
+                        ✏️ ${escapeHtml(T("department"))} / ${escapeHtml(T("group"))}
+                    </button>
+                ` : ""}
+
             </div>
 
 
@@ -1632,6 +2018,14 @@ function renderProfilePage() {
         </section>
 
     `;
+
+
+    document
+        .getElementById("editStudentProfile")
+        ?.addEventListener(
+            "click",
+            () => showStudentProfileSetup()
+        );
 
 
     document
