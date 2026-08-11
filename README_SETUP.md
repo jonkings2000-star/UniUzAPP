@@ -1,41 +1,33 @@
-# UniUZ — unified Mini App
+# UniUZ — Simple Student Version
 
-## Files
-- `index.html` — Mini App shell
-- `style.css` — unified design
-- `app.js` — student / teacher / admin UI and translations
-- `web_api.py` — Flask API
-- `database.py` — SQLite database and migrations
-- `bot.py` — Telegram bot + Flask API server
-- `server.py` — optional Flask-only server
-- `requirements.txt` — Python dependencies
-- `Procfile` — Railway start command
+## Structure
+- Student only. Teacher panel is removed.
+- Start: Russian / English.
+- Setup: University → Faculty → Group → First + Last name.
+- AI: 10 successful requests per day for normal users.
+- Admin can grant unlimited AI per user.
+- Schedule: upload JPG/PNG/PDF; AI extracts classes.
+- Homework: personal tasks with due date and optional file.
+- Reminders: Telegram messages for classes and homework deadlines.
+- Admin: statistics, users, unlimited AI, add administrators.
 
-## Railway environment variables
-
+## Railway variables
 Required:
 - `BOT_TOKEN`
 - `ADMIN_ID`
-
-Optional AI:
 - `OPENAI_API_KEY`
-- `OPENAI_MODEL` (default: `gpt-4o-mini`)
+- `WEB_APP_URL` (the public Railway URL, e.g. `https://uniuz-production.up.railway.app`)
+
+Optional:
+- `OPENAI_MODEL=gpt-4o-mini`
 
 ## Important
-
-The Mini App API URL is:
-`https://uniuz-production.up.railway.app`
-
-Teacher announcements can target multiple groups. After publishing, UniUZ:
-1. stores the announcement;
-2. shows it in the Mini App for matching groups;
-3. sends a Telegram notification to students in those groups.
-
-The Telegram notification requires students to have previously interacted with the bot so their Telegram ID is stored in the database.
+The 10/day limit is a UniUZ user quota. OpenAI API usage is not free; your server still needs a funded OpenAI API key. Admins marked unlimited bypass the UniUZ quota.
 
 ## Deploy
+Replace the project files with the files in this package, commit, and deploy.
 
-Replace the project files, commit, and let Railway redeploy.
+Check:
+`/api/health`
 
-Recommended commit:
-`Rebuild UniUZ Mini App with student teacher admin features`
+Expected JSON contains `ok: true` and version `2026-08-11-simple`.

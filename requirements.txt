@@ -1,7 +1,7 @@
-aiogram
-python-dotenv
-openai
-aiohttp
+aiogram>=3.22,<4
+python-dotenv>=1.0
+openai>=1.40
 Flask==3.0.3
 flask-cors==4.0.1
 gunicorn==22.0.0
+pypdf>=5.0

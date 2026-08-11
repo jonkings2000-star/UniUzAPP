@@ -1,1168 +1,418 @@
-# ==========================================================
-# UniUZ API
-# Flask backend for the Telegram Mini App
-# ==========================================================
-
+import base64
+import hashlib
+import hmac
 import json
 import os
-from urllib.parse import parse_qs
-from urllib.request import Request as URLRequest, urlopen
-from urllib.error import HTTPError, URLError
+import re
+import uuid
+from datetime import datetime
+from pathlib import Path
+from urllib.parse import parse_qsl
 
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+from openai import OpenAI
 
 import database
-
-try:
-    from openai import OpenAI
-except Exception:
-    OpenAI = None
-
 
 app = Flask(__name__)
 CORS(app)
 database.init_db()
 
+BASE_DIR = Path(__file__).resolve().parent
+UPLOAD_DIR = BASE_DIR / "uploads"
+UPLOAD_DIR.mkdir(exist_ok=True)
 
-# ==========================================================
-# APP FACTORY
-# ==========================================================
+API_VERSION = "2026-08-11-simple"
+AI_LIMIT = 10
+AI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+ai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
-def create_app():
-    return app
+UNIVERSITIES = [
+    {"id": "ajou", "name": "Ajou", "full_name": "Ajou University in Tashkent"}
+]
 
+FACULTIES = [
+    "Architecture",
+    "Interior Design",
+    "Civil Systems Engineering",
+    "Electrical & Computer Engineering",
+    "AI Software",
+    "IT Business",
+    "Business Administration",
+    "English Philology & Management",
+    "Korean Philology & Management",
+]
 
-# ==========================================================
-# TELEGRAM AUTH
-# ==========================================================
-
-def get_telegram_user():
-    init_data = request.headers.get("X-Telegram-Init-Data", "").strip()
-
+# Telegram Mini App initData validation.
+def telegram_user_from_init_data(init_data):
     if not init_data:
         return None
-
     try:
-        values = parse_qs(init_data)
-        raw_user = values.get("user")
-
+        pairs = dict(parse_qsl(init_data, keep_blank_values=True))
+        raw_user = pairs.get("user")
         if not raw_user:
             return None
-
-        return json.loads(raw_user[0])
-
+        bot_token = os.getenv("BOT_TOKEN", "")
+        if bot_token:
+            received_hash = pairs.pop("hash", None)
+            if not received_hash:
+                return None
+            data_check = "\n".join(f"{k}={pairs[k]}" for k in sorted(pairs))
+            secret = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+            calc = hmac.new(secret, data_check.encode(), hashlib.sha256).hexdigest()
+            if not hmac.compare_digest(calc, received_hash):
+                return None
+        return json.loads(raw_user)
     except Exception as exc:
-        print("Telegram auth parse error:", exc)
+        print("Telegram auth error:", exc)
         return None
 
 
-def require_user():
-    user = get_telegram_user()
-
+def current_user():
+    user = telegram_user_from_init_data(request.headers.get("X-Telegram-Init-Data", ""))
     if not user or not user.get("id"):
         return None
-
-    database.add_user(
-        user_id=user["id"],
-        username=user.get("username"),
-        full_name=(
-            user.get("first_name", "")
-            + " "
-            + user.get("last_name", "")
-        ).strip()
-    )
-
+    database.add_user(user["id"], user.get("username"), (user.get("first_name", "") + " " + user.get("last_name", "")).strip())
     return user
 
 
-def require_admin():
-    user = require_user()
-
+def auth():
+    user = current_user()
     if not user:
-        return None
+        return None, (jsonify({"error": "Unauthorized"}), 401)
+    return user, None
 
+
+def admin_auth():
+    user, err = auth()
+    if err:
+        return None, err
     if not database.is_admin(user["id"]):
-        return None
-
-    return user
-
-
-def require_teacher():
-    user = require_user()
-
-    if not user:
-        return None
-
-    teacher = database.get_teacher(user["id"])
-
-    if not teacher or teacher["status"] != "approved":
-        return None
-
-    return user
+        return None, (jsonify({"error": "Forbidden"}), 403)
+    return user, None
 
 
-# ==========================================================
-# HELPERS
-# ==========================================================
-
-def json_rows(rows):
-    return [dict(row) for row in rows]
+def safe_filename(name):
+    name = re.sub(r"[^\w.\- ]+", "_", name or "file")
+    return name[:120]
 
 
-def telegram_api(method, payload):
-    token = os.getenv("BOT_TOKEN")
-
-    if not token:
-        return False, "BOT_TOKEN is not configured"
-
-    url = f"https://api.telegram.org/bot{token}/{method}"
-
-    try:
-        body = json.dumps(payload).encode("utf-8")
-        req = URLRequest(
-            url,
-            data=body,
-            headers={
-                "Content-Type": "application/json"
-            },
-            method="POST"
-        )
-
-        with urlopen(req, timeout=15) as response:
-            data = json.loads(
-                response.read().decode("utf-8")
-            )
-
-        if data.get("ok"):
-            return True, data
-
-        return False, data.get("description", "Telegram API error")
-
-    except (HTTPError, URLError, TimeoutError) as exc:
-        return False, str(exc)
-    except Exception as exc:
-        return False, str(exc)
+def save_upload(file, user_id, prefix):
+    if not file or not file.filename:
+        return None, None, None
+    ext = Path(file.filename).suffix.lower()
+    filename = f"{user_id}_{prefix}_{uuid.uuid4().hex}{ext}"
+    path = UPLOAD_DIR / filename
+    file.save(path)
+    return str(path), safe_filename(file.filename), file.mimetype
 
 
-def notify_students(
-    department,
-    group_names,
-    title,
-    message,
-    file_id=None,
-    file_type=None
-):
-    students = database.get_students_by_groups(
-        department,
-        group_names
+def ai_json_from_text(text):
+    if not ai_client:
+        raise RuntimeError("OPENAI_API_KEY is not configured")
+    prompt = """Extract a student's weekly university schedule from the text. Return JSON only with key items, an array. Each item: day_of_week (1 Monday..7 Sunday), day_name, start_time HH:MM, end_time HH:MM, subject, room, teacher, notes. Ignore unrelated text. If a field is unknown use an empty string."""
+    response = ai_client.chat.completions.create(
+        model=AI_MODEL,
+        temperature=0,
+        response_format={"type": "json_object"},
+        messages=[{"role":"system","content":prompt},{"role":"user","content":text[:30000]}],
     )
-
-    sent = 0
-    failed = 0
-
-    for student in students:
-        telegram_id = student["id"]
-
-        text = (
-            f"📢 <b>{title}</b>\n\n"
-            f"{message}\n\n"
-            f"👥 {student['group_name']}"
-        )
-
-        ok, _ = telegram_api(
-            "sendMessage",
-            {
-                "chat_id": telegram_id,
-                "text": text,
-                "parse_mode": "HTML"
-            }
-        )
-
-        if ok:
-            sent += 1
-        else:
-            failed += 1
-
-        if ok and file_id:
-            if file_type == "photo":
-                telegram_api(
-                    "sendPhoto",
-                    {
-                        "chat_id": telegram_id,
-                        "photo": file_id
-                    }
-                )
-            elif file_type == "document":
-                telegram_api(
-                    "sendDocument",
-                    {
-                        "chat_id": telegram_id,
-                        "document": file_id
-                    }
-                )
-
-    return {
-        "students": len(students),
-        "sent": sent,
-        "failed": failed
-    }
+    return json.loads(response.choices[0].message.content)
 
 
-def get_valid_groups(department, groups):
-    available = set(database.get_groups(department))
-
-    result = []
-    for group in groups or []:
-        group = str(group).strip()
-        if group and group in available and group not in result:
-            result.append(group)
-
-    return result
-
-
-# ==========================================================
-# VERSION
-# ==========================================================
-
-@app.get("/api/version")
-def version():
-    return jsonify({
-        "ok": True,
-        "service": "UniUZ API",
-        "version": "2026-08-11-v3"
-    })
+def ai_json_from_image(path, mime):
+    if not ai_client:
+        raise RuntimeError("OPENAI_API_KEY is not configured")
+    data = base64.b64encode(Path(path).read_bytes()).decode()
+    data_url = f"data:{mime};base64,{data}"
+    prompt = "Extract the weekly university schedule from this image. Return JSON only with key items. Each item: day_of_week 1-7, day_name, start_time HH:MM, end_time HH:MM, subject, room, teacher, notes. Ignore unrelated text."
+    response = ai_client.chat.completions.create(
+        model=AI_MODEL,
+        temperature=0,
+        response_format={"type": "json_object"},
+        messages=[
+            {"role":"system","content":prompt},
+            {"role":"user","content":[{"type":"text","text":"Parse this schedule."},{"type":"image_url","image_url":{"url":data_url}}]},
+        ],
+    )
+    return json.loads(response.choices[0].message.content)
 
 
-# ==========================================================
-# HEALTH
-# ==========================================================
+def extract_pdf_text(path):
+    try:
+        from pypdf import PdfReader
+        reader = PdfReader(path)
+        return "\n".join(page.extract_text() or "" for page in reader.pages)
+    except Exception:
+        return ""
+
+
+def ai_chat(user_id, message):
+    if not ai_client:
+        raise RuntimeError("OPENAI_API_KEY is not configured")
+    schedule = [dict(x) for x in database.get_schedule(user_id)]
+    homework = [dict(x) for x in database.get_homework(user_id)]
+    context = json.dumps({"schedule": schedule, "homework": homework}, ensure_ascii=False)
+    system = """You are UniUZ student assistant. Answer in the user's language when possible. Use the student's saved schedule and homework. Be concise and practical. Never invent a class or deadline. If information is missing, say so."""
+    response = ai_client.chat.completions.create(
+        model=AI_MODEL,
+        temperature=0.3,
+        messages=[
+            {"role":"system","content":system},
+            {"role":"system","content":"Student data:\n" + context[:50000]},
+            {"role":"user","content":message[:8000]},
+        ],
+    )
+    return response.choices[0].message.content
+
 
 @app.get("/api/health")
 def health():
-    return jsonify({
-        "ok": True,
-        "service": "UniUZ API",
-        "status": "online"
-    })
+    return jsonify({"ok": True, "service": "UniUZ API", "version": API_VERSION})
 
-
-# ==========================================================
-# PROFILE
-# ==========================================================
 
 @app.get("/api/me")
 def me():
-    user = require_user()
-
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-
+    user, err = auth()
+    if err: return err
     profile = database.get_user(user["id"])
-    teacher = database.get_teacher(user["id"])
-
-    return jsonify({
-        "ok": True,
-        "telegram": user,
-        "telegram_user": user,
-        "profile": dict(profile) if profile else None,
-        "teacher_status": (
-            teacher["status"] if teacher else None
-        ),
-        "teacher": (
-            dict(teacher) if teacher else None
-        ),
-        "is_admin": database.is_admin(user["id"])
-    })
+    status = database.ai_status(user["id"], AI_LIMIT)
+    return jsonify({"ok": True, "user": dict(profile), "is_admin": database.is_admin(user["id"]), "ai": status})
 
 
-@app.get("/api/departments")
-def get_departments():
-    user = require_user()
-
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    conn = database.get_connection()
-    cur = conn.cursor()
-
-    cur.execute("""
-        SELECT DISTINCT department
-        FROM groups
-        WHERE department IS NOT NULL
-        AND TRIM(department) != ''
-        ORDER BY department
-    """)
-
-    rows = cur.fetchall()
-    conn.close()
-
-    return jsonify({
-        "items": [row["department"] for row in rows]
-    })
+@app.post("/api/language")
+def language():
+    user, err = auth()
+    if err: return err
+    lang = (request.get_json(silent=True) or {}).get("language", "ru")
+    if lang not in {"ru", "en"}: return jsonify({"error":"Unsupported language"}), 400
+    database.set_language(user["id"], lang)
+    return jsonify({"ok": True, "language": lang})
 
 
-@app.get("/api/groups")
-def get_groups():
-    user = require_user()
-
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    department = request.args.get("department", "").strip()
-
-    if not department:
-        return jsonify({
-            "error": "Department is required"
-        }), 400
-
-    return jsonify({
-        "items": database.get_groups(department)
-    })
+@app.get("/api/setup")
+def setup():
+    user, err = auth()
+    if err: return err
+    return jsonify({"universities": UNIVERSITIES, "faculties": FACULTIES, "user": dict(database.get_user(user["id"]))})
 
 
 @app.post("/api/profile")
-def save_profile():
-    user = require_user()
-
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-
+def profile():
+    user, err = auth()
+    if err: return err
     data = request.get_json(silent=True) or {}
+    university = (data.get("university") or "").strip()
+    department = (data.get("department") or "").strip()
+    group_name = (data.get("group_name") or "").strip()
+    full_name = (data.get("full_name") or "").strip()
+    language = data.get("language")
+    if university not in {x["id"] for x in UNIVERSITIES}:
+        return jsonify({"error":"Choose a university"}), 400
+    if department not in FACULTIES:
+        return jsonify({"error":"Choose a faculty"}), 400
+    if not group_name or len(group_name) > 80:
+        return jsonify({"error":"Enter your group"}), 400
+    if len(full_name.split()) < 2:
+        return jsonify({"error":"Enter first and last name"}), 400
+    database.update_profile(user["id"], university, department, group_name, full_name, language)
+    return jsonify({"ok": True, "user": dict(database.get_user(user["id"]))})
 
-    university = data.get("university")
-    department = str(data.get("department") or "").strip()
-    group_name = str(data.get("group_name") or "").strip()
-    role = str(data.get("role") or "student").strip()
 
-    if role not in {"student", "teacher"}:
-        role = "student"
-
-    if not department:
-        return jsonify({
-            "error": "Department is required"
-        }), 400
-
-    if not group_name:
-        return jsonify({
-            "error": "Group is required"
-        }), 400
-
-    if group_name not in database.get_groups(department):
-        return jsonify({
-            "error": "Group not found"
-        }), 400
-
-    database.update_user(
-        user_id=user["id"],
-        university=university,
-        department=department,
-        group_name=group_name,
-        role=role
-    )
-
+@app.get("/api/reminders")
+def reminders():
+    user, err = auth()
+    if err: return err
     profile = database.get_user(user["id"])
+    return jsonify({"enabled": bool(profile["reminders_enabled"])})
 
-    return jsonify({
-        "ok": True,
-        "profile": dict(profile) if profile else None
-    })
 
+@app.post("/api/reminders")
+def reminders_set():
+    user, err = auth()
+    if err: return err
+    enabled = bool((request.get_json(silent=True) or {}).get("enabled", True))
+    database.set_reminders(user["id"], enabled)
+    return jsonify({"ok": True, "enabled": enabled})
 
-# ==========================================================
-# TEACHER REQUEST / STATUS
-# ==========================================================
-
-@app.post("/api/teacher/request")
-def teacher_request():
-    user = require_user()
-
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    existing = database.get_teacher(user["id"])
-
-    if existing:
-        return jsonify({
-            "ok": True,
-            "status": existing["status"]
-        })
-
-    database.add_teacher_request(
-        telegram_id=user["id"],
-        full_name=(
-            user.get("first_name", "")
-            + " "
-            + user.get("last_name", "")
-        ).strip()
-    )
-
-    return jsonify({
-        "ok": True,
-        "status": "pending"
-    })
-
-
-@app.get("/api/teacher/status")
-def teacher_status():
-    user = require_user()
-
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    teacher = database.get_teacher(user["id"])
-
-    return jsonify({
-        "ok": True,
-        "status": (
-            teacher["status"]
-            if teacher else "none"
-        )
-    })
-
-
-# ==========================================================
-# ADMIN - TEACHER REQUESTS
-# ==========================================================
-
-@app.get("/api/admin/teacher-requests")
-def admin_teacher_requests():
-    if not require_admin():
-        return jsonify({"error": "Forbidden"}), 403
-
-    rows = database.get_pending_teachers()
-
-    return jsonify({
-        "items": json_rows(rows)
-    })
-
-
-@app.post("/api/admin/teacher/<int:telegram_id>/approve")
-def approve_teacher(telegram_id):
-    if not require_admin():
-        return jsonify({"error": "Forbidden"}), 403
-
-    database.approve_teacher(telegram_id)
-
-    return jsonify({"ok": True})
-
-
-@app.post("/api/admin/teacher/<int:telegram_id>/reject")
-def reject_teacher(telegram_id):
-    if not require_admin():
-        return jsonify({"error": "Forbidden"}), 403
-
-    database.reject_teacher(telegram_id)
-
-    return jsonify({"ok": True})
-
-
-# ==========================================================
-# ADMIN - STATISTICS
-# ==========================================================
-
-@app.get("/api/admin/statistics")
-def admin_statistics():
-    if not require_admin():
-        return jsonify({"error": "Forbidden"}), 403
-
-    return jsonify({
-        "stats": database.get_statistics()
-    })
-
-
-# ==========================================================
-# ADMIN - USERS
-# ==========================================================
-
-@app.get("/api/admin/users")
-def admin_users():
-    if not require_admin():
-        return jsonify({"error": "Forbidden"}), 403
-
-    limit = min(
-        max(int(request.args.get("limit", 200)), 1),
-        500
-    )
-    offset = max(
-        int(request.args.get("offset", 0)),
-        0
-    )
-
-    rows = database.get_users(
-        limit=limit,
-        offset=offset
-    )
-
-    return jsonify({
-        "items": json_rows(rows)
-    })
-
-
-@app.post("/api/admin/users/<int:user_id>/role")
-def admin_user_role(user_id):
-    if not require_admin():
-        return jsonify({"error": "Forbidden"}), 403
-
-    data = request.get_json(silent=True) or {}
-    role = str(data.get("role") or "student").strip()
-
-    if role not in {"student", "teacher", "admin"}:
-        return jsonify({
-            "error": "Invalid role"
-        }), 400
-
-    if role == "admin":
-        database.add_admin(
-            user_id,
-            added_by=get_telegram_user()["id"]
-        )
-        database.update_user_role(user_id, "admin")
-    else:
-        database.update_user_role(
-            user_id,
-            role
-        )
-        database.remove_admin(
-            user_id,
-            requester_id=get_telegram_user()["id"]
-        )
-
-    return jsonify({"ok": True})
-
-
-@app.delete("/api/admin/users/<int:user_id>")
-def admin_delete_user(user_id):
-    admin = require_admin()
-
-    if not admin:
-        return jsonify({"error": "Forbidden"}), 403
-
-    if user_id == admin["id"]:
-        return jsonify({
-            "error": "You cannot delete yourself"
-        }), 400
-
-    database.delete_user(user_id)
-
-    return jsonify({"ok": True})
-
-
-# ==========================================================
-# ADMIN - MANAGE ADMINS
-# ==========================================================
-
-@app.get("/api/admin/admins")
-def admin_list_admins():
-    if not require_admin():
-        return jsonify({"error": "Forbidden"}), 403
-
-    return jsonify({
-        "items": json_rows(database.get_admins())
-    })
-
-
-@app.post("/api/admin/admins")
-def admin_add_admin():
-    admin = require_admin()
-
-    if not admin:
-        return jsonify({"error": "Forbidden"}), 403
-
-    data = request.get_json(silent=True) or {}
-
-    try:
-        telegram_id = int(data.get("telegram_id"))
-    except (TypeError, ValueError):
-        return jsonify({
-            "error": "Telegram ID is required"
-        }), 400
-
-    added = database.add_admin(
-        telegram_id,
-        added_by=admin["id"]
-    )
-
-    return jsonify({
-        "ok": True,
-        "added": added
-    })
-
-
-@app.delete("/api/admin/admins/<int:telegram_id>")
-def admin_remove_admin(telegram_id):
-    admin = require_admin()
-
-    if not admin:
-        return jsonify({"error": "Forbidden"}), 403
-
-    if telegram_id == admin["id"]:
-        return jsonify({
-            "error": "You cannot remove yourself"
-        }), 400
-
-    removed = database.remove_admin(
-        telegram_id,
-        requester_id=admin["id"]
-    )
-
-    return jsonify({
-        "ok": True,
-        "removed": removed
-    })
-
-
-# ==========================================================
-# STUDENT HOMEWORK
-# ==========================================================
-
-@app.get("/api/homework")
-def homework():
-    user = require_user()
-
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    profile = database.get_user(user["id"])
-
-    if not profile:
-        return jsonify({
-            "items": [],
-            "profile_required": True
-        })
-
-    department = profile["department"] or ""
-    group_name = profile["group_name"] or ""
-
-    if not department or not group_name:
-        return jsonify({
-            "items": [],
-            "profile_required": True
-        })
-
-    return jsonify({
-        "items": json_rows(
-            database.get_student_homework(
-                department,
-                group_name
-            )
-        ),
-        "profile_required": False
-    })
-
-
-# ==========================================================
-# TEACHER HOMEWORK
-# ==========================================================
-
-@app.post("/api/teacher/homework/create")
-def create_homework():
-    user = require_teacher()
-
-    if not user:
-        return jsonify({
-            "error": "Teacher approval required"
-        }), 403
-
-    data = request.get_json(silent=True) or {}
-
-    department = str(
-        data.get("department") or ""
-    ).strip()
-    group_name = str(
-        data.get("group_name") or ""
-    ).strip()
-    title = str(
-        data.get("title") or ""
-    ).strip()
-    description = str(
-        data.get("description") or ""
-    ).strip()
-    deadline = str(
-        data.get("deadline") or ""
-    ).strip()
-
-    profile = database.get_user(user["id"])
-
-    if not department:
-        department = (
-            profile["department"]
-            if profile and profile["department"]
-            else ""
-        )
-
-    if not department:
-        return jsonify({
-            "error": "Choose department first"
-        }), 400
-
-    if not title:
-        return jsonify({
-            "error": "Title is required"
-        }), 400
-
-    if not group_name:
-        return jsonify({
-            "error": "Choose a group"
-        }), 400
-
-    if group_name not in database.get_groups(department):
-        return jsonify({
-            "error": "Group not found"
-        }), 400
-
-    homework_id = database.add_homework(
-        teacher_id=user["id"],
-        department=department,
-        group_name=group_name,
-        title=title,
-        description=description,
-        deadline=deadline
-    )
-
-    return jsonify({
-        "ok": True,
-        "id": homework_id
-    })
-
-
-@app.get("/api/teacher/homework")
-def teacher_homework():
-    user = require_teacher()
-
-    if not user:
-        return jsonify({
-            "error": "Teacher approval required"
-        }), 403
-
-    return jsonify({
-        "items": json_rows(
-            database.get_teacher_homework(user["id"])
-        )
-    })
-
-
-@app.delete("/api/teacher/homework/<int:homework_id>")
-def teacher_delete_homework(homework_id):
-    user = require_teacher()
-
-    if not user:
-        return jsonify({
-            "error": "Teacher approval required"
-        }), 403
-
-    database.delete_homework(
-        homework_id,
-        user["id"]
-    )
-
-    return jsonify({"ok": True})
-
-
-# ==========================================================
-# ANNOUNCEMENTS - STUDENT
-# ==========================================================
-
-@app.get("/api/announcements")
-def announcements():
-    user = require_user()
-
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    profile = database.get_user(user["id"])
-
-    if not profile:
-        return jsonify({
-            "items": [],
-            "profile_required": True
-        })
-
-    department = profile["department"] or ""
-    group_name = profile["group_name"] or ""
-
-    if not department or not group_name:
-        return jsonify({
-            "items": [],
-            "profile_required": True
-        })
-
-    return jsonify({
-        "items": json_rows(
-            database.get_student_announcements(
-                department,
-                group_name
-            )
-        )
-    })
-
-
-# ==========================================================
-# ANNOUNCEMENTS - TEACHER
-# ==========================================================
-
-@app.get("/api/teacher/announcements")
-def teacher_announcements():
-    user = require_teacher()
-
-    if not user:
-        return jsonify({
-            "error": "Teacher approval required"
-        }), 403
-
-    rows = database.get_teacher_announcements(user["id"])
-    items = []
-
-    for row in rows:
-        item = dict(row)
-        raw_groups = item.get("target_groups") or ""
-        item["target_groups"] = [
-            g for g in raw_groups.split("||")
-            if g
-        ]
-        items.append(item)
-
-    return jsonify({
-        "items": items
-    })
-
-
-@app.post("/api/teacher/announcements/create")
-def create_announcement():
-    user = require_teacher()
-
-    if not user:
-        return jsonify({
-            "error": "Teacher approval required"
-        }), 403
-
-    data = request.get_json(silent=True) or {}
-
-    profile = database.get_user(user["id"])
-
-    department = str(
-        data.get("department")
-        or (
-            profile["department"]
-            if profile and profile["department"]
-            else ""
-        )
-        or ""
-    ).strip()
-
-    title = str(
-        data.get("title") or ""
-    ).strip()
-
-    message = str(
-        data.get("message") or ""
-    ).strip()
-
-    group_names = data.get("group_names") or []
-
-    if isinstance(group_names, str):
-        group_names = [group_names]
-
-    if not department:
-        return jsonify({
-            "error": "Choose department first"
-        }), 400
-
-    if not title:
-        return jsonify({
-            "error": "Title is required"
-        }), 400
-
-    if not message:
-        return jsonify({
-            "error": "Message is required"
-        }), 400
-
-    group_names = get_valid_groups(
-        department,
-        group_names
-    )
-
-    if not group_names:
-        return jsonify({
-            "error": "Choose at least one group"
-        }), 400
-
-    file_id = data.get("file_id")
-    file_type = data.get("file_type")
-
-    announcement_id = database.add_announcement(
-        teacher_id=user["id"],
-        department=department,
-        group_names=group_names,
-        title=title,
-        message=message,
-        file_id=file_id,
-        file_type=file_type
-    )
-
-    notification = notify_students(
-        department=department,
-        group_names=group_names,
-        title=title,
-        message=message,
-        file_id=file_id,
-        file_type=file_type
-    )
-
-    return jsonify({
-        "ok": True,
-        "id": announcement_id,
-        "groups": group_names,
-        "notification": notification
-    })
-
-
-@app.delete("/api/teacher/announcements/<int:announcement_id>")
-def teacher_delete_announcement(announcement_id):
-    user = require_teacher()
-
-    if not user:
-        return jsonify({
-            "error": "Teacher approval required"
-        }), 403
-
-    database.delete_announcement(
-        announcement_id,
-        user["id"]
-    )
-
-    return jsonify({"ok": True})
-
-
-# ==========================================================
-# SCHEDULE
-# ==========================================================
 
 @app.get("/api/schedule")
 def schedule():
-    user = require_user()
-
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    profile = database.get_user(user["id"])
-
-    if not profile or not profile["department"] or not profile["group_name"]:
-        return jsonify({
-            "available": False,
-            "profile_required": True
-        })
-
-    file_id = database.get_schedule_image(
-        profile["department"],
-        profile["group_name"]
-    )
-
-    return jsonify({
-        "available": bool(file_id),
-        "file_id": file_id
-    })
+    user, err = auth()
+    if err: return err
+    return jsonify({"items": [dict(x) for x in database.get_schedule(user["id"]) ]})
 
 
-@app.get("/api/schedule/file")
-def schedule_file():
-    user = require_user()
-
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    profile = database.get_user(user["id"])
-
-    if not profile or not profile["department"] or not profile["group_name"]:
-        return jsonify({
-            "error": "Profile is incomplete"
-        }), 400
-
-    file_id = database.get_schedule_image(
-        profile["department"],
-        profile["group_name"]
-    )
-
-    if not file_id:
-        return jsonify({
-            "error": "Schedule not found"
-        }), 404
-
-    token = os.getenv("BOT_TOKEN")
-    if not token:
-        return jsonify({
-            "error": "BOT_TOKEN is not configured"
-        }), 500
-
-    ok, result = telegram_api(
-        "getFile",
-        {"file_id": file_id}
-    )
-
-    if not ok:
-        return jsonify({
-            "error": str(result)
-        }), 502
-
-    file_path = result.get("result", {}).get("file_path")
-
-    if not file_path:
-        return jsonify({
-            "error": "Telegram file path not found"
-        }), 502
-
+@app.post("/api/schedule/upload")
+def schedule_upload():
+    user, err = auth()
+    if err: return err
+    file = request.files.get("file")
+    if not file:
+        return jsonify({"error":"Upload an image or PDF"}), 400
+    path, original, mime = save_upload(file, user["id"], "schedule")
+    if not path: return jsonify({"error":"Invalid file"}), 400
     try:
-        file_url = (
-            f"https://api.telegram.org/file/bot"
-            f"{token}/{file_path}"
-        )
-
-        with urlopen(file_url, timeout=20) as response:
-            data = response.read()
-            content_type = (
-                response.headers.get(
-                    "Content-Type",
-                    "application/octet-stream"
-                )
-            )
-
-        return Response(
-            data,
-            mimetype=content_type
-        )
-
+        if mime == "application/pdf" or Path(path).suffix.lower() == ".pdf":
+            text = extract_pdf_text(path)
+            if not text.strip():
+                return jsonify({"error":"Could not read this PDF"}), 400
+            parsed = ai_json_from_text(text)
+        elif mime and mime.startswith("image/"):
+            parsed = ai_json_from_image(path, mime)
+        else:
+            return jsonify({"error":"Use JPG, PNG or PDF"}), 400
+        items = parsed.get("items", [])
+        valid=[]
+        for x in items:
+            if x.get("subject") and x.get("start_time"):
+                valid.append(x)
+        if not valid:
+            return jsonify({"error":"No schedule entries found"}), 400
+        database.clear_schedule(user["id"])
+        fid = database.save_schedule_file(user["id"], original, mime, path)
+        database.add_schedule_items(user["id"], valid, fid)
+        return jsonify({"ok": True, "items": [dict(x) for x in database.get_schedule(user["id"]) ]})
     except Exception as exc:
-        return jsonify({
-            "error": str(exc)
-        }), 502
+        print("Schedule parse error:", exc)
+        return jsonify({"error": str(exc)}), 500
 
 
-# ==========================================================
-# AI
-# ==========================================================
+@app.get("/api/homework")
+def homework():
+    user, err = auth()
+    if err: return err
+    return jsonify({"items": [dict(x) for x in database.get_homework(user["id"]) ]})
+
+
+@app.post("/api/homework")
+def homework_create():
+    user, err = auth()
+    if err: return err
+    title=(request.form.get("title") or "").strip()
+    description=(request.form.get("description") or "").strip()
+    due_at=(request.form.get("due_at") or "").strip()
+    if not title or not due_at:
+        return jsonify({"error":"Title and due date are required"}), 400
+    file=request.files.get("file")
+    path=original=mime=None
+    if file and file.filename:
+        path, original, mime = save_upload(file, user["id"], "homework")
+    hid=database.add_homework(user["id"], title, description, due_at, path, original, mime)
+    return jsonify({"ok":True,"id":hid})
+
+
+@app.patch("/api/homework/<int:homework_id>")
+def homework_done(homework_id):
+    user, err = auth()
+    if err: return err
+    completed=bool((request.get_json(silent=True) or {}).get("completed", True))
+    database.set_homework_completed(user["id"], homework_id, completed)
+    return jsonify({"ok":True})
+
+
+@app.delete("/api/homework/<int:homework_id>")
+def homework_delete(homework_id):
+    user, err = auth()
+    if err: return err
+    row=database.get_homework_item(user["id"], homework_id)
+    if row and row["file_path"]:
+        try: Path(row["file_path"]).unlink(missing_ok=True)
+        except Exception: pass
+    database.delete_homework(user["id"], homework_id)
+    return jsonify({"ok":True})
+
+
+@app.get("/api/ai/usage")
+def ai_usage():
+    user, err=auth()
+    if err: return err
+    return jsonify(database.ai_status(user["id"], AI_LIMIT))
+
 
 @app.post("/api/ai")
 def ai():
-    user = require_user()
-
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    if OpenAI is None:
-        return jsonify({
-            "error": "OpenAI package is not installed"
-        }), 500
-
-    api_key = os.getenv("OPENAI_API_KEY")
-
-    if not api_key:
-        return jsonify({
-            "error": "OPENAI_API_KEY is not configured"
-        }), 503
-
-    data = request.get_json(silent=True) or {}
-    messages = data.get("messages") or []
-
-    if not messages:
-        text = str(data.get("message") or "").strip()
-        if text:
-            messages = [
-                {
-                    "role": "user",
-                    "content": text
-                }
-            ]
-
-    if not messages:
-        return jsonify({
-            "error": "Message is required"
-        }), 400
-
-    safe_messages = []
-
-    for item in messages[-20:]:
-        role = item.get("role")
-        content = item.get("content")
-
-        if role not in {"user", "assistant", "system"}:
-            continue
-
-        if not isinstance(content, str):
-            continue
-
-        safe_messages.append({
-            "role": role,
-            "content": content[:6000]
-        })
-
-    client = OpenAI(api_key=api_key)
-
+    user, err=auth()
+    if err: return err
+    message=(request.get_json(silent=True) or {}).get("message", "").strip()
+    if not message: return jsonify({"error":"Message is required"}), 400
+    if not database.ai_can_use(user["id"], AI_LIMIT):
+        status = database.ai_status(user["id"], AI_LIMIT)
+        return jsonify({"error":"Daily AI limit reached", "used":status["used"], "limit":AI_LIMIT}), 429
     try:
-        response = client.chat.completions.create(
-            model=os.getenv(
-                "OPENAI_MODEL",
-                "gpt-4o-mini"
-            ),
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are UniUZ AI Assistant. "
-                        "Help university students with studying, "
-                        "assignments, schedules and general questions. "
-                        "Answer clearly and concisely."
-                    )
-                },
-                *safe_messages
-            ]
-        )
-
-        answer = response.choices[0].message.content or ""
-
-        return jsonify({
-            "ok": True,
-            "answer": answer
-        })
-
+        answer=ai_chat(user["id"], message)
+        database.consume_ai(user["id"], AI_LIMIT)
+        return jsonify({"ok":True,"answer":answer,"usage":database.ai_status(user["id"],AI_LIMIT)})
     except Exception as exc:
-        print("AI error:", exc)
-
-        return jsonify({
-            "error": "AI request failed"
-        }), 502
+        print("AI error:",exc)
+        return jsonify({"error":"AI is temporarily unavailable"}), 500
 
 
-# ==========================================================
-# ERRORS
-# ==========================================================
+@app.get("/api/admin/stats")
+def admin_stats():
+    user, err=admin_auth()
+    if err: return err
+    return jsonify(database.stats())
+
+
+@app.get("/api/admin/users")
+def admin_users():
+    user, err=admin_auth()
+    if err: return err
+    q=request.args.get("q", "")
+    rows=database.list_users(q=q)
+    return jsonify({"items":[dict(x) for x in rows]})
+
+
+@app.post("/api/admin/users/<int:user_id>/unlimited-ai")
+def admin_unlimited(user_id):
+    user, err=admin_auth()
+    if err: return err
+    enabled=bool((request.get_json(silent=True) or {}).get("enabled", True))
+    if not database.get_user(user_id): return jsonify({"error":"User not found"}),404
+    database.set_ai_unlimited(user_id, enabled)
+    return jsonify({"ok":True,"enabled":enabled})
+
+
+@app.post("/api/admin/admins")
+def admin_add():
+    user, err=admin_auth()
+    if err: return err
+    telegram_id=int((request.get_json(silent=True) or {}).get("telegram_id",0))
+    if not telegram_id: return jsonify({"error":"Telegram ID is required"}),400
+    database.add_admin(telegram_id,user["id"])
+    return jsonify({"ok":True})
+
+
+@app.get("/api/admin/admins")
+def admins():
+    user, err=admin_auth()
+    if err: return err
+    return jsonify({"items":[dict(x) for x in database.get_admins()]})
+
+
+@app.delete("/api/admin/admins/<int:telegram_id>")
+def admin_remove(telegram_id):
+    user, err=admin_auth()
+    if err: return err
+    if telegram_id == user["id"]:
+        return jsonify({"error":"You cannot remove yourself"}),400
+    database.remove_admin(telegram_id)
+    return jsonify({"ok":True})
+
 
 @app.errorhandler(404)
-def not_found(error):
-    return jsonify({
-        "error": "Endpoint not found"
-    }), 404
+def not_found(_):
+    return jsonify({"error":"Endpoint not found"}),404
 
 
 @app.errorhandler(500)
-def server_error(error):
-    print("Internal server error:", error)
+def server_error(exc):
+    print("500:",exc)
+    return jsonify({"error":"Internal server error"}),500
 
-    return jsonify({
-        "error": "Internal server error"
-    }), 500
-
-
-# ==========================================================
-# START
-# ==========================================================
 
 if __name__ == "__main__":
-    port = int(
-        os.environ.get("PORT", 8080)
-    )
-
-    app.run(
-        host="0.0.0.0",
-        port=port
-    )
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT","8080")))

@@ -1,86 +1,24 @@
-# ==========================================================
-# UniUZ SERVER
-# Mini App + API
-# ==========================================================
-
 import os
-
+from flask import send_from_directory
 from web_api import app
 
-from flask import send_from_directory
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-
-BASE_DIR = os.path.dirname(
-    os.path.abspath(__file__)
-)
-
-
-# ==========================================================
-# MINI APP FILES
-# ==========================================================
-
-
-@app.route("/")
+@app.get("/")
 def index():
+    return send_from_directory(BASE_DIR, "index.html")
 
-    return send_from_directory(
-        BASE_DIR,
-        "index.html"
-    )
+@app.get("/app.js")
+def js():
+    return send_from_directory(BASE_DIR, "app.js")
 
-
-
-@app.route("/style.css")
+@app.get("/style.css")
 def css():
+    return send_from_directory(BASE_DIR, "style.css")
 
-    return send_from_directory(
-        BASE_DIR,
-        "style.css"
-    )
-
-
-
-@app.route("/app.js")
-def javascript():
-
-    return send_from_directory(
-        BASE_DIR,
-        "app.js"
-    )
-
-
-
-@app.route("/favicon.ico")
+@app.get("/favicon.ico")
 def favicon():
-
-    return "", 204
-
-
-
-# ==========================================================
-# START
-# ==========================================================
-
+    return ("", 204)
 
 if __name__ == "__main__":
-
-
-    port = int(
-        os.environ.get(
-            "PORT",
-            8080
-        )
-    )
-
-
-    print("==============================")
-    print("UniUZ Server Started")
-    print(f"PORT: {port}")
-    print("Mini App + API ONLINE")
-    print("==============================")
-
-
-    app.run(
-        host="0.0.0.0",
-        port=port
-    )
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
