@@ -173,8 +173,10 @@ def hw():
 def complete(hid):
     u = user_required()
     if not u: return jsonify(error="Unauthorized"), 401
-    database.complete_homework(int(u["telegram_id"]), hid, True)
-    return jsonify(ok=True)
+    d = request.get_json(silent=True) or {}
+    completed = bool(d.get("completed", True))
+    database.complete_homework(int(u["telegram_id"]), hid, completed)
+    return jsonify(ok=True, completed=completed)
 
 @app.delete("/api/homework/<int:hid>")
 def delete_hw(hid):
