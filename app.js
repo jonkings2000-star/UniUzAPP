@@ -83,41 +83,178 @@ function chooseGroup(uni,fac){app.innerHTML=`<div class="wrap">${brand()}<div cl
 function chooseName(uni,fac){const g=document.getElementById("grp").value.trim();if(!g)return toast(tr("group"));app.innerHTML=`<div class="wrap">${brand()}<div class="card"><h2>${tr("name")}</h2><input id="nm" class="input" placeholder="Jakhongir Karimov"><button class="btn primary" onclick="finishSetup('${esc(uni)}','${esc(fac)}','${esc(g)}')">${tr("save")}</button></div></div>`}
 async function finishSetup(uni,fac,g){const n=document.getElementById("nm").value.trim();if(!n)return toast(tr("name"));const parts=n.split(/\s+/);try{const d=await api("/setup",{method:"POST",body:{language:lang,university:uni,department:fac,group_name:g,first_name:parts[0],last_name:parts.slice(1).join(" ")}});profile={...d.profile};try{const m=await api("/me");profile={...m.profile,is_admin:m.is_admin}}catch(e){}home()}catch(e){toast(e.message)}}
 
-function home(){layout(`${brand()}
+async function home(){
+
+let schedule=[];
+let homework=[];
+
+try{
+ const s=await api("/schedule");
+ schedule=s.items||[];
+}catch(e){}
+
+try{
+ const h=await api("/homework");
+ homework=h.items||[];
+}catch(e){}
+
+
+layout(`
+${brand()}
+
 <div class="hero">
  <div class="hero-row">
   <div>
    <div class="hello">Добрый день 👋</div>
    <h1>${esc(profile?.first_name||"Student")}</h1>
-   <p class="muted">${esc(profile?.department||"")} · ${esc(profile?.group_name||"")}</p>
+   <p class="muted">
+   ${esc(profile?.department||"")} · 
+   ${esc(profile?.group_name||"")}
+   </p>
   </div>
+
   <div class="avatar">🎓</div>
  </div>
 </div>
 
-<div class="card dashboard-card">
- <div class="section-title">🗓️ Сегодня</div>
- <div class="empty">Здесь будут ваши ближайшие пары</div>
-</div>
 
 <div class="card dashboard-card">
- <div class="section-title">📝 Ближайшие задания</div>
- <div class="empty">Нет срочных дедлайнов</div>
+
+<div class="section-title">
+🗓️ Сегодня
 </div>
+
+
+${
+schedule.length
+?
+schedule.slice(0,3).map(x=>`
+
+<div class="list-item">
+
+<b>
+${esc(x.start_time||"")}
+${esc(x.subject||"")}
+</b>
+
+<div class="muted">
+${esc(x.room||"")}
+</div>
+
+</div>
+
+`).join("")
+:
+`
+<div class="empty">
+🎉 Сегодня пар нет
+</div>
+`
+}
+
+</div>
+
+
+
+<div class="card dashboard-card">
+
+<div class="section-title">
+📝 Ближайшие задания
+</div>
+
+
+${
+homework.length
+?
+homework.slice(0,3).map(x=>`
+
+<div class="list-item">
+
+<b>
+${esc(x.title)}
+</b>
+
+<div class="muted">
+⏰ ${esc(x.due_at||"")}
+</div>
+
+</div>
+
+`).join("")
+:
+`
+<div class="empty">
+Нет активных заданий
+</div>
+`
+}
+
+
+</div>
+
+
 
 <div class="ai-card">
- <div class="ai-title">🤖 UniUZ AI</div>
- <p>Ваш персональный помощник</p>
- <button class="btn primary" onclick="showAI()">Спросить ИИ →</button>
+
+<div class="ai-title">
+🤖 UniUZ AI
 </div>
 
+<p>
+Ваш персональный помощник
+</p>
+
+<button class="btn primary"
+onclick="showAI()">
+Спросить ИИ →
+</button>
+
+</div>
+
+
+
 <div class="grid">
-<button class="btn" onclick="showSchedule()">🗓️ ${tr("schedule")}</button>
-<button class="btn" onclick="showHomework()">📝 ${tr("homework")}</button>
-<button class="btn" onclick="showReminders()">🔔 ${tr("reminders")}</button>
-<button class="btn" onclick="showProfile()">👤 ${tr("profile")}</button>
-${profile?.is_admin?`<button class="btn" onclick="showAdmin()">🔐 ${tr("admin")}</button>`:""}
-</div>`)}
+
+<button class="btn"
+onclick="showSchedule()">
+🗓️ ${tr("schedule")}
+</button>
+
+
+<button class="btn"
+onclick="showHomework()">
+📝 ${tr("homework")}
+</button>
+
+
+<button class="btn"
+onclick="showReminders()">
+🔔 ${tr("reminders")}
+</button>
+
+
+<button class="btn"
+onclick="showProfile()">
+👤 ${tr("profile")}
+</button>
+
+
+${
+profile?.is_admin
+?
+`
+<button class="btn"
+onclick="showAdmin()">
+🔐 ${tr("admin")}
+</button>
+`
+:""
+}
+
+</div>
+
+`)
+}
 async function showSchedule(){try{const d=await api("/schedule");const names=lang==="ru"?["Пн","Вт","Ср","Чт","Пт","Сб","Вс"]:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];layout(`${brand()}<div class="card"><div class="row"><h2>🗓️ ${tr("schedule")}</h2><label class="btn">📎 ${tr("upload")}<input id="sf" type="file" accept=".pdf,image/*" hidden></label></div><div id="sl">${d.items.length?d.items.map(x=>`<div class="list-item"><b>${names[x.day_of_week]} ${esc(x.start_time)} — ${esc(x.subject)}</b><div class="muted small">${esc(x.room||"")}</div></div>`).join(""):`<div class="empty">${tr("noData")}</div>`}</div></div>`,"schedule");document.getElementById("sf").onchange=uploadSchedule}catch(e){toast(e.message)}}
 async function uploadSchedule(e){const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append("file",f);try{await api("/schedule/upload",{method:"POST",body:fd});showSchedule()}catch(e){toast(e.message)}}
 async function showHomework(){try{const d=await api("/homework");layout(`${brand()}<div class="card"><h2>📝 ${tr("homework")}</h2><input id="ht" class="input" placeholder="${tr("title")}"><textarea id="hd" placeholder="${tr("description")}"></textarea><input id="hdate" class="input" type="datetime-local"><input id="hfile" class="input" type="file" accept=".pdf,image/*,.doc,.docx"><button class="btn primary" onclick="addHW()">${tr("add")}</button></div><div class="card">${d.items.length?d.items.map(x=>`<div class="list-item" style="${x.completed?"border:1px solid #3ccf7a;background:#10291d;border-radius:14px;padding:14px":""}"><div class="row"><b>${x.completed?"✅ ":""}${esc(x.title)}</b><span class="badge">${esc(x.due_at)}</span></div><p class="muted">${esc(x.description||"")}</p><div class="row"><button class="btn" onclick="toggleHW(${x.id},${x.completed?0:1})">${x.completed?"↩️ "+tr("done"):"✅ "+tr("done")}</button><button class="btn danger" onclick="deleteHW(${x.id})">${tr("delete")}</button></div></div>`).join(""):`<div class="empty">${tr("noData")}</div>`}</div>`,"homework")}catch(e){toast(e.message)}}
