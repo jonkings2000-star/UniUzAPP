@@ -1,4 +1,4 @@
-alert("UNIUZ TEST V6");
+
 // UniUZ Home v6 FINAL
 // UniUZ Home Dashboard v5 - schedule and homework cards
 // UniUZ Home Dashboard v4
