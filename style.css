@@ -106,3 +106,25 @@ margin:14px 0;
 @media(max-width:560px){
  .student-name{font-size:25px}
 }
+
+
+/* UniUZ Home v3 refinements */
+.profile-pill{
+ display:flex;
+ gap:8px;
+ flex-wrap:wrap;
+ margin-top:14px;
+}
+.profile-pill span{
+ background:#102746;
+ border:1px solid #315886;
+ border-radius:20px;
+ padding:8px 12px;
+ color:#b8c9e7;
+ font-size:12px;
+}
+.today-empty{
+ text-align:center;
+ padding:28px;
+ color:#91a6c5;
+}
