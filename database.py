@@ -1,96 +1,52 @@
 import sqlite3
-from datetime import datetime
-from zoneinfo import ZoneInfo
+import os
+from datetime import datetime, date
 
-DB_NAME = "uniuz.db"
-TZ = ZoneInfo("Asia/Tashkent")
+DB_NAME = os.environ.get("DB_NAME", "uniuz.db")
 
-
-def now_str():
-    return datetime.now(TZ).strftime("%Y-%m-%d %H:%M:%S")
-
-
-def today_str():
-    return datetime.now(TZ).strftime("%Y-%m-%d")
-
-
-def get_connection():
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys=ON")
-    return conn
-
+def conn():
+    c = sqlite3.connect(DB_NAME, check_same_thread=False)
+    c.row_factory = sqlite3.Row
+    return c
 
 def init_db():
-    conn = get_connection()
-    cur = conn.cursor()
+    c = conn()
+    cur = c.cursor()
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users(
-        id INTEGER PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        telegram_id INTEGER UNIQUE NOT NULL,
         username TEXT,
-        full_name TEXT,
+        first_name TEXT,
+        last_name TEXT,
+        language TEXT DEFAULT 'ru',
         university TEXT,
         department TEXT,
         group_name TEXT,
-        language TEXT DEFAULT 'ru',
         reminders_enabled INTEGER DEFAULT 1,
-        ai_unlimited INTEGER DEFAULT 0,
-        created_at TEXT,
-        updated_at TEXT
-    )
-    """)
-
-    # Migrate columns for existing UniUZ databases.
-    cur.execute("PRAGMA table_info(users)")
-    cols = {row[1] for row in cur.fetchall()}
-    migrations = {
-        "language": "ALTER TABLE users ADD COLUMN language TEXT DEFAULT 'ru'",
-        "reminders_enabled": "ALTER TABLE users ADD COLUMN reminders_enabled INTEGER DEFAULT 1",
-        "ai_unlimited": "ALTER TABLE users ADD COLUMN ai_unlimited INTEGER DEFAULT 0",
-        "updated_at": "ALTER TABLE users ADD COLUMN updated_at TEXT",
-    }
-    for col, sql in migrations.items():
-        if col not in cols:
-            cur.execute(sql)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS admins(
-        telegram_id INTEGER PRIMARY KEY,
-        added_by INTEGER,
-        created_at TEXT
+        unlimited_ai INTEGER DEFAULT 0,
+        ai_used_date TEXT,
+        ai_used_count INTEGER DEFAULT 0,
+        is_admin INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS schedule_files(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        filename TEXT,
-        mime_type TEXT,
-        storage_path TEXT,
-        parsed_at TEXT,
-        created_at TEXT,
-        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS schedule_items(
+    CREATE TABLE IF NOT EXISTS schedules(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         day_of_week INTEGER NOT NULL,
-        day_name TEXT,
+        subject TEXT NOT NULL,
         start_time TEXT NOT NULL,
         end_time TEXT,
-        subject TEXT NOT NULL,
         room TEXT,
         teacher TEXT,
-        notes TEXT,
-        source_file_id INTEGER,
-        created_at TEXT,
-        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY(source_file_id) REFERENCES schedule_files(id) ON DELETE SET NULL
+        raw_text TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id)
     )
     """)
 
@@ -101,236 +57,215 @@ def init_db():
         title TEXT NOT NULL,
         description TEXT,
         due_at TEXT NOT NULL,
-        file_path TEXT,
         file_name TEXT,
-        mime_type TEXT,
+        file_path TEXT,
         completed INTEGER DEFAULT 0,
-        created_at TEXT,
-        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id)
     )
     """)
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS ai_usage(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         usage_date TEXT NOT NULL,
-        requests INTEGER DEFAULT 0,
-        PRIMARY KEY(user_id, usage_date),
-        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS reminder_log(
-        user_id INTEGER NOT NULL,
-        reminder_key TEXT NOT NULL,
-        sent_at TEXT,
-        PRIMARY KEY(user_id, reminder_key),
-        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS settings(
-        key TEXT PRIMARY KEY,
-        value TEXT
-    )
-    """)
-
-    admin_id = None
+    # Safe migration for existing databases.
     try:
-        import os
-        admin_id = int(os.getenv("ADMIN_ID", "0"))
-    except ValueError:
+        cur.execute("ALTER TABLE homework ADD COLUMN file_path TEXT")
+        c.commit()
+    except sqlite3.OperationalError:
         pass
-    if admin_id:
-        cur.execute("""
-        INSERT OR IGNORE INTO admins(telegram_id, added_by, created_at)
-        VALUES(?,?,?)
-        """, (admin_id, admin_id, now_str()))
 
-    conn.commit()
-    conn.close()
+    c.commit()
+    c.close()
 
+def get_user(telegram_id):
+    c = conn()
+    row = c.execute("SELECT * FROM users WHERE telegram_id=?", (telegram_id,)).fetchone()
+    c.close()
+    return row
 
-def add_user(user_id, username=None, full_name=None):
-    conn = get_connection()
-    cur = conn.cursor()
-    now = now_str()
+def create_or_update_user(telegram_user):
+    tid = int(telegram_user["id"])
+    c = conn()
+    cur = c.cursor()
     cur.execute("""
-    INSERT INTO users(id, username, full_name, created_at, updated_at)
-    VALUES(?,?,?,?,?)
-    ON CONFLICT(id) DO UPDATE SET
+    INSERT INTO users(telegram_id, username, first_name, last_name)
+    VALUES(?,?,?,?)
+    ON CONFLICT(telegram_id) DO UPDATE SET
         username=excluded.username,
-        updated_at=excluded.updated_at
-    """, (user_id, username, full_name, now, now))
-    # Don't overwrite a manually entered name with an empty value.
-    if full_name:
-        cur.execute("UPDATE users SET full_name=? WHERE id=?", (full_name, user_id))
-    conn.commit()
-    conn.close()
+        first_name=excluded.first_name,
+        last_name=excluded.last_name,
+        updated_at=CURRENT_TIMESTAMP
+    """, (
+        tid,
+        telegram_user.get("username"),
+        telegram_user.get("first_name", ""),
+        telegram_user.get("last_name", "")
+    ))
+    c.commit()
+    row = cur.execute("SELECT * FROM users WHERE telegram_id=?", (tid,)).fetchone()
+    c.close()
+    return row
 
+def update_profile(telegram_id, **fields):
+    allowed = {
+        "language","university","department","group_name",
+        "first_name","last_name","reminders_enabled"
+    }
+    fields = {k:v for k,v in fields.items() if k in allowed}
+    if not fields:
+        return get_user(telegram_id)
+    fields["updated_at"] = datetime.utcnow().isoformat()
+    c = conn()
+    sql = "UPDATE users SET " + ", ".join(f"{k}=?" for k in fields) + " WHERE telegram_id=?"
+    c.execute(sql, list(fields.values()) + [telegram_id])
+    c.commit()
+    row = c.execute("SELECT * FROM users WHERE telegram_id=?", (telegram_id,)).fetchone()
+    c.close()
+    return row
 
-def get_user(user_id):
-    conn = get_connection(); cur = conn.cursor()
-    cur.execute("SELECT * FROM users WHERE id=?", (user_id,))
-    row = cur.fetchone(); conn.close(); return row
+def set_unlimited(telegram_id, enabled):
+    c = conn()
+    c.execute("UPDATE users SET unlimited_ai=? WHERE telegram_id=?", (1 if enabled else 0, telegram_id))
+    c.commit()
+    c.close()
 
-
-def update_profile(user_id, university, department, group_name, full_name, language=None):
-    conn = get_connection(); cur = conn.cursor()
-    if language is None:
-        cur.execute("""
-        UPDATE users SET university=?, department=?, group_name=?, full_name=?, updated_at=? WHERE id=?
-        """, (university, department, group_name, full_name, now_str(), user_id))
+def consume_ai(telegram_id):
+    c = conn()
+    row = c.execute("SELECT unlimited_ai, ai_used_date, ai_used_count FROM users WHERE telegram_id=?", (telegram_id,)).fetchone()
+    if not row:
+        c.close()
+        return False, 0
+    today = date.today().isoformat()
+    count = row["ai_used_count"] if row["ai_used_date"] == today else 0
+    if row["unlimited_ai"]:
+        c.close()
+        return True, count
+    if count >= 10:
+        c.close()
+        return False, count
+    if row["ai_used_date"] != today:
+        c.execute("UPDATE users SET ai_used_date=?, ai_used_count=1 WHERE telegram_id=?", (today, telegram_id))
+        count = 1
     else:
-        cur.execute("""
-        UPDATE users SET university=?, department=?, group_name=?, full_name=?, language=?, updated_at=? WHERE id=?
-        """, (university, department, group_name, full_name, language, now_str(), user_id))
-    conn.commit(); conn.close()
+        c.execute("UPDATE users SET ai_used_count=ai_used_count+1 WHERE telegram_id=?", (telegram_id,))
+        count += 1
+    c.execute("INSERT INTO ai_usage(user_id, usage_date) SELECT id, ? FROM users WHERE telegram_id=?", (today, telegram_id))
+    c.commit()
+    c.close()
+    return True, count
 
+def save_schedule(telegram_id, items):
+    c = conn()
+    uid = c.execute("SELECT id FROM users WHERE telegram_id=?", (telegram_id,)).fetchone()["id"]
+    c.execute("DELETE FROM schedules WHERE user_id=?", (uid,))
+    for x in items:
+        c.execute("""
+        INSERT INTO schedules(user_id,day_of_week,subject,start_time,end_time,room,teacher,raw_text)
+        VALUES(?,?,?,?,?,?,?,?)
+        """, (uid, int(x["day_of_week"]), x["subject"], x["start_time"], x.get("end_time"),
+              x.get("room"), x.get("teacher"), x.get("raw_text")))
+    c.commit()
+    c.close()
 
-def set_language(user_id, language):
-    conn = get_connection(); conn.execute("UPDATE users SET language=?, updated_at=? WHERE id=?", (language, now_str(), user_id)); conn.commit(); conn.close()
+def get_schedule(telegram_id):
+    c = conn()
+    rows = c.execute("""
+    SELECT day_of_week,subject,start_time,end_time,room,teacher
+    FROM schedules s JOIN users u ON u.id=s.user_id
+    WHERE u.telegram_id=? ORDER BY day_of_week,start_time
+    """, (telegram_id,)).fetchall()
+    c.close()
+    return [dict(r) for r in rows]
 
+def add_homework(telegram_id, title, description, due_at, file_name=None, file_path=None):
+    c = conn()
+    uid = c.execute("SELECT id FROM users WHERE telegram_id=?", (telegram_id,)).fetchone()["id"]
+    cur = c.execute("""
+    INSERT INTO homework(user_id,title,description,due_at,file_name,file_path)
+    VALUES(?,?,?,?,?,?)
+    """, (uid,title,description,due_at,file_name,file_path))
+    hid = cur.lastrowid
+    c.commit()
+    c.close()
+    return hid
 
-def set_reminders(user_id, enabled):
-    conn = get_connection(); conn.execute("UPDATE users SET reminders_enabled=?, updated_at=? WHERE id=?", (1 if enabled else 0, now_str(), user_id)); conn.commit(); conn.close()
+def get_homework(telegram_id, include_completed=True):
+    c = conn()
+    sql = """
+    SELECT h.* FROM homework h JOIN users u ON u.id=h.user_id
+    WHERE u.telegram_id=?
+    """
+    params = [telegram_id]
+    if not include_completed:
+        sql += " AND h.completed=0"
+    sql += " ORDER BY due_at ASC"
+    rows = c.execute(sql, params).fetchall()
+    c.close()
+    return [dict(r) for r in rows]
 
+def complete_homework(telegram_id, hid, completed=True):
+    c = conn()
+    c.execute("""
+    UPDATE homework SET completed=?
+    WHERE id=? AND user_id=(SELECT id FROM users WHERE telegram_id=?)
+    """, (1 if completed else 0, hid, telegram_id))
+    c.commit()
+    c.close()
 
-def get_admins():
-    conn = get_connection(); cur = conn.cursor(); cur.execute("SELECT * FROM admins ORDER BY created_at"); rows=cur.fetchall(); conn.close(); return rows
+def delete_homework(telegram_id, hid):
+    c = conn()
+    c.execute("""
+    DELETE FROM homework
+    WHERE id=? AND user_id=(SELECT id FROM users WHERE telegram_id=?)
+    """, (hid, telegram_id))
+    c.commit()
+    c.close()
 
+def due_for_reminders():
+    c = conn()
+    rows = c.execute("""
+    SELECT u.telegram_id,u.language,u.first_name,u.reminders_enabled,
+           h.id AS homework_id,h.title,h.due_at
+    FROM users u JOIN homework h ON h.user_id=u.id
+    WHERE u.reminders_enabled=1 AND h.completed=0
+    """).fetchall()
+    c.close()
+    return [dict(r) for r in rows]
 
-def is_admin(user_id):
-    conn=get_connection(); cur=conn.cursor(); cur.execute("SELECT 1 FROM admins WHERE telegram_id=?", (user_id,)); ok=cur.fetchone() is not None; conn.close(); return ok
-
-
-def add_admin(user_id, added_by):
-    conn=get_connection(); cur=conn.cursor(); cur.execute("INSERT OR IGNORE INTO admins(telegram_id, added_by, created_at) VALUES(?,?,?)", (user_id, added_by, now_str())); conn.commit(); conn.close()
-
-
-def remove_admin(user_id):
-    conn=get_connection(); cur=conn.cursor(); cur.execute("DELETE FROM admins WHERE telegram_id=?", (user_id,)); conn.commit(); conn.close()
-
-
-def set_ai_unlimited(user_id, enabled):
-    conn=get_connection(); conn.execute("UPDATE users SET ai_unlimited=?, updated_at=? WHERE id=?", (1 if enabled else 0, now_str(), user_id)); conn.commit(); conn.close()
-
-
-def ai_usage(user_id):
-    conn=get_connection(); cur=conn.cursor(); day=today_str(); cur.execute("SELECT requests FROM ai_usage WHERE user_id=? AND usage_date=?", (user_id,day)); row=cur.fetchone(); conn.close(); return int(row[0]) if row else 0
-
-
-def consume_ai(user_id, limit=10):
-    conn=get_connection(); cur=conn.cursor(); day=today_str()
-    cur.execute("SELECT ai_unlimited FROM users WHERE id=?", (user_id,)); user=cur.fetchone()
-    unlimited=bool(user and user[0])
-    if not unlimited:
-        cur.execute("SELECT requests FROM ai_usage WHERE user_id=? AND usage_date=?", (user_id,day)); row=cur.fetchone(); used=int(row[0]) if row else 0
-        if used >= limit:
-            conn.close(); return False, used, limit
-        cur.execute("""
-        INSERT INTO ai_usage(user_id, usage_date, requests) VALUES(?,?,1)
-        ON CONFLICT(user_id, usage_date) DO UPDATE SET requests=requests+1
-        """, (user_id, day))
-        used += 1
-    else:
-        used=ai_usage(user_id)
-    conn.commit(); conn.close(); return True, used, None if unlimited else limit
-
-
-def ai_status(user_id, limit=10):
-    user=get_user(user_id); used=ai_usage(user_id); unlimited=bool(user and user["ai_unlimited"])
-    return {"used": used, "limit": None if unlimited else limit, "remaining": None if unlimited else max(0,limit-used), "unlimited": unlimited}
-
-def ai_can_use(user_id, limit=10):
-    user=get_user(user_id)
-    if user and user["ai_unlimited"]:
-        return True
-    return ai_usage(user_id) < limit
-
-
-def save_schedule_file(user_id, filename, mime_type, storage_path):
-    conn=get_connection(); cur=conn.cursor(); cur.execute("INSERT INTO schedule_files(user_id,filename,mime_type,storage_path,created_at) VALUES(?,?,?,?,?)", (user_id,filename,mime_type,storage_path,now_str())); fid=cur.lastrowid; conn.commit(); conn.close(); return fid
-
-
-def clear_schedule(user_id):
-    conn=get_connection(); cur=conn.cursor(); cur.execute("DELETE FROM schedule_items WHERE user_id=?", (user_id,)); cur.execute("DELETE FROM schedule_files WHERE user_id=?", (user_id,)); conn.commit(); conn.close()
-
-
-def add_schedule_items(user_id, items, source_file_id=None):
-    conn=get_connection(); cur=conn.cursor()
-    for item in items:
-        cur.execute("""
-        INSERT INTO schedule_items(user_id,day_of_week,day_name,start_time,end_time,subject,room,teacher,notes,source_file_id,created_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?)
-        """, (user_id,int(item.get("day_of_week",0)),item.get("day_name",""),item.get("start_time",""),item.get("end_time",""),item.get("subject",""),item.get("room",""),item.get("teacher",""),item.get("notes",""),source_file_id,now_str()))
-    conn.commit(); conn.close()
-
-
-def get_schedule(user_id):
-    conn=get_connection(); cur=conn.cursor(); cur.execute("SELECT * FROM schedule_items WHERE user_id=? ORDER BY day_of_week,start_time", (user_id,)); rows=cur.fetchall(); conn.close(); return rows
-
-
-def get_today_schedule(user_id, day_of_week):
-    conn=get_connection(); cur=conn.cursor(); cur.execute("SELECT * FROM schedule_items WHERE user_id=? AND day_of_week=? ORDER BY start_time", (user_id,day_of_week)); rows=cur.fetchall(); conn.close(); return rows
-
-
-def add_homework(user_id, title, description, due_at, file_path=None, file_name=None, mime_type=None):
-    conn=get_connection(); cur=conn.cursor(); cur.execute("INSERT INTO homework(user_id,title,description,due_at,file_path,file_name,mime_type,created_at) VALUES(?,?,?,?,?,?,?,?)", (user_id,title,description,due_at,file_path,file_name,mime_type,now_str())); hid=cur.lastrowid; conn.commit(); conn.close(); return hid
-
-
-def get_homework(user_id, include_completed=False):
-    conn=get_connection(); cur=conn.cursor()
-    q="SELECT * FROM homework WHERE user_id=?"
-    args=[user_id]
-    if not include_completed: q += " AND completed=0"
-    q += " ORDER BY due_at"
-    cur.execute(q,args); rows=cur.fetchall(); conn.close(); return rows
-
-
-def get_homework_item(user_id, homework_id):
-    conn=get_connection(); cur=conn.cursor(); cur.execute("SELECT * FROM homework WHERE id=? AND user_id=?", (homework_id,user_id)); row=cur.fetchone(); conn.close(); return row
-
-
-def set_homework_completed(user_id, homework_id, completed):
-    conn=get_connection(); conn.execute("UPDATE homework SET completed=? WHERE id=? AND user_id=?", (1 if completed else 0, homework_id,user_id)); conn.commit(); conn.close()
-
-
-def delete_homework(user_id, homework_id):
-    conn=get_connection(); conn.execute("DELETE FROM homework WHERE id=? AND user_id=?", (homework_id,user_id)); conn.commit(); conn.close()
-
-
-def reminder_sent(user_id, key):
-    conn=get_connection(); cur=conn.cursor(); cur.execute("SELECT 1 FROM reminder_log WHERE user_id=? AND reminder_key=?", (user_id,key)); ok=cur.fetchone() is not None; conn.close(); return ok
-
-
-def mark_reminder(user_id,key):
-    conn=get_connection(); conn.execute("INSERT OR IGNORE INTO reminder_log(user_id,reminder_key,sent_at) VALUES(?,?,?)", (user_id,key,now_str())); conn.commit(); conn.close()
-
-
-def get_reminder_users():
-    conn=get_connection(); cur=conn.cursor(); cur.execute("SELECT * FROM users WHERE reminders_enabled=1 AND (department IS NOT NULL OR group_name IS NOT NULL)"); rows=cur.fetchall(); conn.close(); return rows
-
+def schedule_reminders():
+    c = conn()
+    rows = c.execute("""
+    SELECT u.telegram_id,u.language,u.first_name,
+           s.subject,s.start_time,s.day_of_week
+    FROM users u JOIN schedules s ON s.user_id=u.id
+    WHERE u.reminders_enabled=1
+    """).fetchall()
+    c.close()
+    return [dict(r) for r in rows]
 
 def stats():
-    conn=get_connection(); cur=conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM users"); total=cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM users WHERE university IS NOT NULL AND university!=''"); profiles=cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM users WHERE ai_unlimited=1"); unlimited=cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM homework WHERE completed=0"); homework=cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM schedule_items"); schedule=cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM admins"); admins=cur.fetchone()[0]
-    conn.close()
-    return {"users":total,"completed_profiles":profiles,"ai_unlimited":unlimited,"open_homework":homework,"schedule_items":schedule,"admins":admins}
+    c = conn()
+    total = c.execute("SELECT COUNT(*) n FROM users").fetchone()["n"]
+    unlimited = c.execute("SELECT COUNT(*) n FROM users WHERE unlimited_ai=1").fetchone()["n"]
+    reminders = c.execute("SELECT COUNT(*) n FROM users WHERE reminders_enabled=1").fetchone()["n"]
+    today = date.today().isoformat()
+    ai_today = c.execute("SELECT COUNT(*) n FROM ai_usage WHERE usage_date=?", (today,)).fetchone()["n"]
+    c.close()
+    return {"total_users": total, "unlimited_ai": unlimited, "reminders_enabled": reminders, "ai_requests_today": ai_today}
 
-
-def list_users(limit=200, offset=0, q=""):
-    conn=get_connection(); cur=conn.cursor()
-    if q:
-        like=f"%{q}%"
-        cur.execute("SELECT * FROM users WHERE CAST(id AS TEXT) LIKE ? OR username LIKE ? OR full_name LIKE ? ORDER BY created_at DESC LIMIT ? OFFSET ?", (like,like,like,limit,offset))
-    else:
-        cur.execute("SELECT * FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?", (limit,offset))
-    rows=cur.fetchall(); conn.close(); return rows
+def all_users(limit=200):
+    c = conn()
+    rows = c.execute("""
+    SELECT telegram_id,username,first_name,last_name,language,university,
+           department,group_name,reminders_enabled,unlimited_ai,created_at
+    FROM users ORDER BY created_at DESC LIMIT ?
+    """, (limit,)).fetchall()
+    c.close()
+    return [dict(r) for r in rows]
