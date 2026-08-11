@@ -478,12 +478,9 @@ function showRoleScreen() {
 
     setNav(false);
 
-
-    const screen =
-        getScreen();
+    const screen = getScreen();
 
     if (!screen) return;
-
 
     screen.innerHTML = `
 
@@ -519,44 +516,24 @@ function showRoleScreen() {
                     ${escapeHtml(T("teacher"))}
                 </button>
 
-                ${
-                    isAdmin
-                        ? `
-                            <button
-                                type="button"
-                                id="adminBtn"
-                                class="role-button admin"
-                            >
-                                ${escapeHtml(T("admin"))}
-                            </button>
-                          `
-                        : ""
-                }
+                <!-- Админская кнопка всегда отображается.
+                     Доступ всё равно проверяется сервером. -->
+                <button
+                    type="button"
+                    id="adminBtn"
+                    class="role-button admin"
+                >
+                    ${escapeHtml(T("admin"))}
+                </button>
 
             </div>
 
         </div>
-
     `;
 
-
-    const studentButton =
-        document.getElementById(
-            "studentBtn"
-        );
-
-
-    const teacherButton =
-        document.getElementById(
-            "teacherBtn"
-        );
-
-
-    const adminButton =
-        document.getElementById(
-            "adminBtn"
-        );
-
+    const studentButton = document.getElementById("studentBtn");
+    const teacherButton = document.getElementById("teacherBtn");
+    const adminButton = document.getElementById("adminBtn");
 
     if (studentButton) {
 
@@ -565,12 +542,14 @@ function showRoleScreen() {
             async () => {
 
                 currentRole = "student";
+
                 localStorage.setItem(
                     "uniuz_role",
                     "student"
                 );
 
                 try {
+
                     await loadProfile();
 
                     const profile =
@@ -580,6 +559,7 @@ function showRoleScreen() {
                         !profile?.department ||
                         !profile?.group_name
                     ) {
+
                         await showStudentProfileSetup();
                         return;
                     }
@@ -597,7 +577,6 @@ function showRoleScreen() {
         );
     }
 
-
     if (teacherButton) {
 
         teacherButton.addEventListener(
@@ -606,11 +585,15 @@ function showRoleScreen() {
 
                 currentRole = "teacher";
 
+                localStorage.setItem(
+                    "uniuz_role",
+                    "teacher"
+                );
+
                 await requestTeacherAccess();
             }
         );
     }
-
 
     if (adminButton) {
 
@@ -635,20 +618,31 @@ async function requestTeacherAccess() {
 
         const data =
             await apiRequest(
-    "/api/teacher/request",
-    {
-        method:"POST",
-        body:{
-            telegram_id:
-            tg?.initDataUnsafe?.user?.id
-        }
-    }
-);
-
+                "/api/teacher/request",
+                {
+                    method: "POST",
+                    body: {
+                        telegram_id:
+                            tg?.initDataUnsafe?.user?.id
+                    }
+                }
+            );
 
         teacherStatus =
             data.status || "pending";
 
+        // Если преподаватель уже одобрен,
+        // сразу открываем кабинет.
+        if (
+            teacherStatus === "approved"
+        ) {
+
+            currentRole = "teacher";
+
+            showTeacherHome();
+
+            return;
+        }
 
         showTeacherStatus();
 
@@ -659,9 +653,9 @@ async function requestTeacherAccess() {
             error
         );
 
-
         showError(
-            error.message
+            error.message ||
+            "Не удалось отправить заявку преподавателя."
         );
     }
 }
