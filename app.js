@@ -1,3 +1,4 @@
+// UniUZ Schedule v1
 // UniUZ Profile v1
 // UniUZ Home Dashboard v5 - schedule and homework cards
 // UniUZ Home Dashboard v4
