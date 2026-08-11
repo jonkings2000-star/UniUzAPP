@@ -1,248 +1,39 @@
 <!DOCTYPE html>
 <html lang="ru">
-
 <head>
-
 <meta charset="UTF-8">
-
-<meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
->
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#07111f">
 <title>UniUZ</title>
-
-
-<link
-    rel="stylesheet"
-    href="style.css"
-/>
-
+<link rel="stylesheet" href="style.css">
 </head>
-
-
 <body>
 
+<div id="loading"><div class="loading-spinner"></div></div>
 
-<!-- Telegram Mini App -->
-
-
-<div id="loading">
-
-    <div class="loading-spinner"></div>
-
-</div>
-
-
-
-<!-- LANGUAGE SCREEN -->
-
-
-<section
-    id="languageScreen"
-    class="language-screen"
->
-
-
+<section id="languageScreen" class="language-screen">
     <div class="language-card">
-
-
-        <div class="logo">
-
-            🎓
-
-        </div>
-
-
-
-        <h1>
-
-            UniUZ
-
-        </h1>
-
-
-
-        <p>
-
-            Выберите язык /
-            Choose language /
-            언어를 선택하세요
-
-        </p>
-
-
-
-
-        <button
-            class="language-btn"
-            data-lang="ru"
-        >
-
-            🇷🇺 Русский
-
-        </button>
-
-
-
-
-        <button
-            class="language-btn"
-            data-lang="en"
-        >
-
-            🇬🇧 English
-
-        </button>
-
-
-
-
-        <button
-            class="language-btn"
-            data-lang="ko"
-        >
-
-            🇰🇷 한국어
-
-        </button>
-
-
-
+        <div class="logo">🎓</div>
+        <span class="eyebrow">UniUZ</span>
+        <h1>UniUZ</h1>
+        <p>Выберите язык</p>
+        <button class="language-btn" data-lang="ru">🇷🇺 Русский</button>
+        <button class="language-btn" data-lang="en">🇬🇧 English</button>
+        <button class="language-btn" data-lang="ko">🇰🇷 한국어</button>
     </div>
-
-
 </section>
-
-
-
-
-
-<!-- APP CONTENT -->
-
 
 <main id="screen"></main>
 
-
-
-
-
-<!-- NAVIGATION -->
-
-
 <nav class="bottom-nav">
-
-
-<button
-class="nav-item active"
-data-page="home"
->
-
-<span>
-🏠
-</span>
-
-<small>
-Главная
-</small>
-
-</button>
-
-
-
-<button
-class="nav-item"
-data-page="schedule"
->
-
-<span>
-📅
-</span>
-
-<small>
-Расписание
-</small>
-
-</button>
-
-
-
-
-<button
-class="nav-item"
-data-page="homework"
->
-
-<span>
-📝
-</span>
-
-<small>
-Задания
-</small>
-
-</button>
-
-
-
-
-<button
-class="nav-item"
-data-page="ai"
->
-
-<span>
-🤖
-</span>
-
-<small>
-ИИ
-</small>
-
-</button>
-
-
-
-
-<button
-class="nav-item"
-data-page="profile"
->
-
-<span>
-👤
-</span>
-
-<small>
-Профиль
-</small>
-
-</button>
-
-
-
+    <button class="nav-item active" data-page="home"><span>🏠</span><small>Главная</small></button>
+    <button class="nav-item" data-page="schedule"><span>📅</span><small>Расписание</small></button>
+    <button class="nav-item" data-page="homework"><span>📝</span><small>Задания</small></button>
+    <button class="nav-item" data-page="ai"><span>🤖</span><small>ИИ</small></button>
+    <button class="nav-item" data-page="profile"><span>👤</span><small>Профиль</small></button>
 </nav>
 
-
-
-
-
-<footer class="app-footer">
-
-@Uni_scheduleBot
-
-</footer>
-
-
-
-
-
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
-
 <script src="app.js"></script>
-
-
 </body>
-
 </html>

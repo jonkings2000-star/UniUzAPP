@@ -308,6 +308,27 @@ def init_db():
     """)
 
 
+    # Multiple target groups for each announcement.
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS announcement_targets(
+        announcement_id INTEGER NOT NULL,
+        department TEXT NOT NULL,
+        group_name TEXT NOT NULL,
+        PRIMARY KEY(announcement_id, department, group_name)
+    )
+    """)
+
+    # Backfill targets for announcements created by older versions.
+    cur.execute("""
+        INSERT OR IGNORE INTO announcement_targets(
+            announcement_id, department, group_name
+        )
+        SELECT id, department, group_name
+        FROM announcements
+        WHERE group_name IS NOT NULL
+        AND TRIM(group_name) != ''
+    """)
+
 
     conn.commit()
 
@@ -1491,246 +1512,285 @@ def delete_homework(
 def add_announcement(
     teacher_id,
     department,
-    group_name,
-    title,
-    message,
+    group_name=None,
+    title="",
+    message="",
     file_id=None,
-    file_type=None
+    file_type=None,
+    group_names=None
 ):
+    """
+    Create one announcement for one or many groups.
+    `group_name` is kept for backward compatibility.
+    """
 
-    conn=get_connection()
+    if group_names is None:
+        group_names = []
 
-    cur=conn.cursor()
+    if isinstance(group_names, str):
+        group_names = [group_names]
 
+    if group_name and group_name not in group_names:
+        group_names.insert(0, group_name)
 
+    group_names = list(dict.fromkeys(
+        str(g).strip() for g in group_names if str(g).strip()
+    ))
 
-    now=datetime.now().strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
+    if not group_names:
+        raise ValueError("At least one target group is required")
 
+    conn = get_connection()
+    cur = conn.cursor()
 
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    primary_group = group_names[0]
 
     cur.execute("""
     INSERT INTO announcements(
-
         teacher_id,
-
         department,
-
         group_name,
-
         title,
-
         message,
-
         file_id,
-
         file_type,
-
         created_at
-
     )
-
     VALUES(?,?,?,?,?,?,?,?)
-
-    """,(
+    """, (
         teacher_id,
-
         department,
-
-        group_name,
-
+        primary_group,
         title,
-
         message,
-
         file_id,
-
         file_type,
-
         now
-
     ))
 
+    announcement_id = cur.lastrowid
 
-
-    announcement_id=cur.lastrowid
-
-
+    for group in group_names:
+        cur.execute("""
+        INSERT OR IGNORE INTO announcement_targets(
+            announcement_id,
+            department,
+            group_name
+        )
+        VALUES(?,?,?)
+        """, (
+            announcement_id,
+            department,
+            group
+        ))
 
     conn.commit()
-
     conn.close()
 
-
-
     return announcement_id
-
-
-
 
 
 def get_students_by_group(
     department,
     group_name
 ):
-
-    conn=get_connection()
-
-    cur=conn.cursor()
-
-
+    conn = get_connection()
+    cur = conn.cursor()
 
     cur.execute("""
     SELECT id
-
     FROM users
-
     WHERE department=?
-
     AND group_name=?
-
-    """,(
+    """, (
         department,
-
         group_name
-
     ))
 
-
-
-    rows=cur.fetchall()
-
-
-
+    rows = cur.fetchall()
     conn.close()
-
-
-
     return rows
 
 
+def get_students_by_groups(
+    department,
+    group_names
+):
+    groups = [
+        str(g).strip()
+        for g in (group_names or [])
+        if str(g).strip()
+    ]
 
+    if not groups:
+        return []
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    placeholders = ",".join("?" for _ in groups)
+
+    cur.execute(f"""
+    SELECT id, username, full_name, group_name
+    FROM users
+    WHERE department=?
+    AND group_name IN ({placeholders})
+    ORDER BY id
+    """, [department, *groups])
+
+    rows = cur.fetchall()
+    conn.close()
+    return rows
 
 
 def get_student_announcements(
     department,
     group_name
 ):
-
-    conn=get_connection()
-
-    cur=conn.cursor()
-
-
+    conn = get_connection()
+    cur = conn.cursor()
 
     cur.execute("""
-    SELECT *
-
-    FROM announcements
-
-    WHERE department=?
-
-    AND group_name=?
-
-    ORDER BY id DESC
-
-    """,(
+    SELECT DISTINCT a.*
+    FROM announcements a
+    LEFT JOIN announcement_targets t
+        ON t.announcement_id = a.id
+    WHERE a.department=?
+    AND (
+        a.group_name=?
+        OR (
+            t.department=?
+            AND t.group_name=?
+        )
+    )
+    ORDER BY a.id DESC
+    """, (
         department,
-
+        group_name,
+        department,
         group_name
-
     ))
 
-
-
-    rows=cur.fetchall()
-
-
-
+    rows = cur.fetchall()
     conn.close()
-
-
-
     return rows
-
-
-
 
 
 def get_teacher_announcements(
     teacher_id
 ):
-
-    conn=get_connection()
-
-    cur=conn.cursor()
-
-
+    conn = get_connection()
+    cur = conn.cursor()
 
     cur.execute("""
-    SELECT *
-
-    FROM announcements
-
-    WHERE teacher_id=?
-
-    ORDER BY id DESC
-
-    """,(
+    SELECT
+        a.*,
+        GROUP_CONCAT(
+            t.group_name,
+            '||'
+        ) AS target_groups
+    FROM announcements a
+    LEFT JOIN announcement_targets t
+        ON t.announcement_id = a.id
+    WHERE a.teacher_id=?
+    GROUP BY a.id
+    ORDER BY a.id DESC
+    """, (
         teacher_id,
-
     ))
 
-
-
-    rows=cur.fetchall()
-
-
-
+    rows = cur.fetchall()
     conn.close()
-
-
-
     return rows
 
 
+def get_announcement_targets(
+    announcement_id
+):
+    conn = get_connection()
+    cur = conn.cursor()
 
+    cur.execute("""
+    SELECT department, group_name
+    FROM announcement_targets
+    WHERE announcement_id=?
+    ORDER BY group_name
+    """, (announcement_id,))
+
+    rows = cur.fetchall()
+    conn.close()
+    return rows
 
 
 def delete_announcement(
     announcement_id,
     teacher_id
 ):
+    conn = get_connection()
+    cur = conn.cursor()
 
-    conn=get_connection()
-
-    cur=conn.cursor()
-
-
+    cur.execute("""
+    DELETE FROM announcement_targets
+    WHERE announcement_id=?
+    """, (announcement_id,))
 
     cur.execute("""
     DELETE FROM announcements
-
     WHERE id=?
-
     AND teacher_id=?
-
-    """,(
+    """, (
         announcement_id,
-
         teacher_id
-
     ))
 
-
-
     conn.commit()
-
     conn.close()
 
 
 
+# ==========================================================
+# ADMIN USER MANAGEMENT
+# ==========================================================
+
+def get_users(limit=200, offset=0):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT *
+        FROM users
+        ORDER BY created_at DESC, id DESC
+        LIMIT ? OFFSET ?
+    """, (int(limit), int(offset)))
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+def update_user_role(user_id, role):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE users SET role=? WHERE id=?",
+        (role, user_id)
+    )
+    changed = cur.rowcount > 0
+    conn.commit()
+    conn.close()
+    return changed
+
+
+def delete_user(user_id):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "DELETE FROM users WHERE id=?",
+        (user_id,)
+    )
+    deleted = cur.rowcount > 0
+    conn.commit()
+    conn.close()
+    return deleted
 
 
 # ==========================================================

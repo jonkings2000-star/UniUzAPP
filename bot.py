@@ -7,8 +7,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from aiohttp import web
-from web_api import create_app
+from web_api import app as api_app
+import threading
+from werkzeug.serving import make_server
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import (
@@ -124,7 +125,9 @@ admin_state = {}
 
 
 def is_admin(user_id):
-    return user_id == ADMIN_ID
+    # Use the shared database so administrators added from
+    # the Mini App also have admin access in the Telegram bot.
+    return database.is_admin(user_id)
 
 
 # ==========================
@@ -1702,22 +1705,31 @@ async def main():
     print("UniUZ BOT STARTED")
 
     # Mini App API runs in the same Railway service as the bot.
-    # Railway exposes the service through the PORT environment variable.
+    # Flask is served in a background thread so aiogram can keep polling.
     port = int(os.getenv("PORT", "8080"))
 
-    api_app = create_app()
-    api_runner = web.AppRunner(api_app)
-    await api_runner.setup()
+    class APIServerThread(threading.Thread):
+        daemon = True
 
-    api_site = web.TCPSite(
-        api_runner,
-        host="0.0.0.0",
-        port=port
+        def __init__(self, application, host, port):
+            super().__init__()
+            self.server = make_server(host, port, application)
+            self.ctx = application.app_context()
+
+        def run(self):
+            self.ctx.push()
+            print(f"UniUZ Mini App API started on port {port}")
+            self.server.serve_forever()
+
+        def shutdown(self):
+            self.server.shutdown()
+
+    api_server = APIServerThread(
+        api_app,
+        "0.0.0.0",
+        port
     )
-
-    await api_site.start()
-
-    print(f"UniUZ Mini App API started on port {port}")
+    api_server.start()
 
     reminder_task = asyncio.create_task(
         reminder_worker()
@@ -1733,7 +1745,7 @@ async def main():
         except asyncio.CancelledError:
             pass
 
-        await api_runner.cleanup()
+        api_server.shutdown()
 
 
 if __name__ == "__main__":
