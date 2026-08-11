@@ -128,3 +128,44 @@ margin:14px 0;
  padding:28px;
  color:#91a6c5;
 }
+
+
+/* UniUZ Home v5 real data cards */
+.real-data-card{
+ background:linear-gradient(145deg,#0d2342,#09172b);
+ border:1px solid #284d7d;
+ border-radius:18px;
+ padding:14px;
+ margin-top:10px;
+}
+.real-row{
+ display:flex;
+ align-items:center;
+ gap:12px;
+ padding:10px;
+ border-radius:14px;
+ background:#102541;
+ margin-top:8px;
+}
+.real-time{
+ color:#42a5ff;
+ font-weight:800;
+ min-width:65px;
+}
+.real-title{
+ font-weight:700;
+}
+.real-sub{
+ color:#91a6c5;
+ font-size:12px;
+}
+.profile-badge{
+ display:inline-flex;
+ background:#102746;
+ border:1px solid #315886;
+ color:#c0d2ef;
+ padding:7px 12px;
+ border-radius:20px;
+ font-size:12px;
+ margin:4px;
+}
