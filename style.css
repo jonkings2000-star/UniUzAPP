@@ -43,8 +43,24 @@ button{cursor:pointer}
 }
 @keyframes spin{to{transform:rotate(360deg)}}
 
-.language-screen,.role-container,.setup-page{
-    min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
+.language-screen{
+    position:fixed;
+    inset:0;
+    z-index:900;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    overflow:auto;
+}
+
+.role-container,.setup-page{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
 }
 .language-card,.role-card,.setup-card,.form-card{
     width:min(100%,470px);

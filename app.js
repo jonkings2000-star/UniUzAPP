@@ -16,7 +16,7 @@ if (tg) {
     } catch (_) {}
 }
 
-let currentLanguage = "ru";
+let currentLanguage = localStorage.getItem("uniuz_language") || null;
 let currentRole = null;
 let teacherStatus = null;
 let isAdmin = false;
@@ -28,6 +28,7 @@ let cachedTeacherHomework = [];
 let cachedTeacherAnnouncements = [];
 let cachedDepartments = [];
 let cachedGroups = [];
+let currentPage = "home";
 
 const translations = {
     ru: {
@@ -234,14 +235,36 @@ function bindLanguageButtons() {
 
 async function selectLanguage(lang) {
     currentLanguage = translations[lang] ? lang : "ru";
+    localStorage.setItem("uniuz_language", currentLanguage);
     updateStaticTexts();
-    document.getElementById("languageScreen")?.style.setProperty("display","none");
-    setNav(false);
+    const languageScreen = document.getElementById("languageScreen");
+    if (languageScreen) languageScreen.style.display = "none";
+
     try {
         await loadProfile();
     } catch (_) {
-        cachedProfile=null; isAdmin=false; teacherStatus=null;
+        cachedProfile = null;
+        isAdmin = false;
+        teacherStatus = null;
     }
+
+    if (currentRole === "student") {
+        await enterStudent();
+        return;
+    }
+    if (currentRole === "teacher") {
+        if (teacherStatus === "approved") {
+            await ensureTeacherProfile();
+        } else {
+            showTeacherStatus();
+        }
+        return;
+    }
+    if (currentRole === "admin" && isAdmin) {
+        await openAdminPanel();
+        return;
+    }
+
     showRoleScreen();
 }
 
@@ -479,6 +502,7 @@ function renderHome() {
 }
 
 async function openPage(page) {
+    currentPage = page;
     document.querySelectorAll(".nav-item").forEach(x=>x.classList.toggle("active",x.dataset.page===page));
     if(page==="home"){renderHome();return;}
     if(page==="profile"){renderProfilePage();return;}
@@ -604,9 +628,15 @@ function renderProfilePage() {
         </section>`;
     document.getElementById("editProfile").onclick=()=>showProfileSetup(currentRole==="teacher"?"teacher":"student");
     document.getElementById("changeLang").onclick=()=>{
-        document.getElementById("languageScreen").style.display="flex"; setNav(false);
+        const languageScreen = document.getElementById("languageScreen");
+        if (languageScreen) languageScreen.style.display = "flex";
+        setNav(false);
     };
-    document.getElementById("changeRole").onclick=showRoleScreen;
+    document.getElementById("changeRole").onclick=async()=>{
+        currentRole = null;
+        setNav(false);
+        await showRoleScreen();
+    };
 }
 
 function showTeacherHome() {
@@ -792,11 +822,45 @@ function showError(text) {
 async function initializeUniUZ() {
     setNav(false);
     updateStaticTexts();
-    try { await loadProfile(); } catch (_) {}
+
+    const languageScreen = document.getElementById("languageScreen");
+    if (!currentLanguage) {
+        if (languageScreen) languageScreen.style.display = "flex";
+        return;
+    }
+
+    if (languageScreen) languageScreen.style.display = "none";
+
+    try {
+        await loadProfile();
+
+        if (currentRole === "student") {
+            await enterStudent();
+            return;
+        }
+
+        if (currentRole === "teacher") {
+            if (teacherStatus === "approved") {
+                await ensureTeacherProfile();
+            } else {
+                showTeacherStatus();
+            }
+            return;
+        }
+
+        // Every new session starts at the role selector.
+        await showRoleScreen();
+    } catch (error) {
+        // A new Telegram user may not exist in the database yet.
+        // They can still choose a role and complete their profile.
+        cachedProfile = null;
+        isAdmin = false;
+        teacherStatus = null;
+        await showRoleScreen();
+    }
 }
 
 document.addEventListener("DOMContentLoaded",async()=>{
     bindLanguageButtons();
-    updateStaticTexts();
     await initializeUniUZ();
 });
