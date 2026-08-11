@@ -1,4 +1,3 @@
-// UniUZ Premium Design v10
 const tg=window.Telegram?.WebApp||null;
 if(tg){try{tg.ready();tg.expand();}catch(e){}}
 const API="/api";
