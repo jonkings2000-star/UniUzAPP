@@ -597,12 +597,20 @@ def ai_file():
                     "detail": "auto"
                 })
             else:
-                # PDFs and supported documents can be passed as input_file.
-                encoded = base64.b64encode(raw).decode("ascii")
+                # PDFs and documents must be uploaded first to OpenAI Files API.
+                # Passing raw base64 in file_data causes invalid_value errors.
+                uploaded_file = openai_client.files.create(
+                    file=(
+                        os.path.basename(f.filename),
+                        raw,
+                        mime
+                    ),
+                    purpose="user_data"
+                )
+
                 content.append({
                     "type": "input_file",
-                    "filename": os.path.basename(f.filename),
-                    "file_data": encoded
+                    "file_id": uploaded_file.id
                 })
 
         response = openai_client.responses.create(
