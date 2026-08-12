@@ -643,6 +643,35 @@ def ai_file():
         )
 
         answer = response.output_text or "ИИ не вернул текстовый ответ."
+
+        # Автоматическое создание файла по смыслу запроса
+        auto_type, auto_title = detect_ai_output_file(question)
+        if auto_type:
+            try:
+                filename = _safe_generated_title(auto_title) + "." + auto_type
+                path = os.path.join(
+                    AI_GENERATED_DIR,
+                    f"{int(u['telegram_id'])}_{uuid.uuid4().hex}.{auto_type}"
+                )
+
+                if auto_type == "docx":
+                    _create_docx_file(path, auto_title, answer)
+                elif auto_type == "pdf":
+                    _create_pdf_file(path, auto_title, answer)
+                elif auto_type == "pptx":
+                    _create_pptx_file(path, auto_title, answer)
+
+                fid = database.save_ai_generated_file(
+                    int(u["telegram_id"]),
+                    filename,
+                    path,
+                    auto_type
+                )
+
+                if fid:
+                    answer += f"\n\nГотово ✅\n📎 {filename}\n⬇️ Файл создан UniUZ AI"
+            except Exception as file_error:
+                print("auto file generation error:", repr(file_error))
         database.save_ai_history(
             int(u["telegram_id"]),
             question or "Анализ файла",
@@ -669,28 +698,21 @@ def detect_ai_output_file(text):
     t = (text or "").lower()
 
     if any(x in t for x in [
-        "презентац",
-        "слайды",
-        "ppt",
-        "powerpoint"
+        "презентац", "слайды", "ppt", "pptx",
+        "powerpoint", "слайд"
     ]):
         return "pptx", "UniUZ_AI_Презентация"
 
     if any(x in t for x in [
-        "pdf",
-        "конспект",
-        "краткое содержание",
-        "сделай кратко",
-        "выжимка"
+        "конспект", "кратко", "короткий", "коротко",
+        "сократи", "summary", "шпаргалка",
+        "выжимка", "сделай краткое"
     ]):
         return "pdf", "UniUZ_AI_Конспект"
 
     if any(x in t for x in [
-        "реферат",
-        "документ",
-        "word",
-        "docx",
-        "эссе"
+        "реферат", "эссе", "доклад",
+        "оформи текст", "документ", "word"
     ]):
         return "docx", "UniUZ_AI_Документ"
 
