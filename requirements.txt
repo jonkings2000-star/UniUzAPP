@@ -5,3 +5,6 @@ openai>=1.40.0
 PyMuPDF>=1.24.0
 Pillow>=10.0.0
 aiogram
+reportlab
+python-docx
+python-pptx
