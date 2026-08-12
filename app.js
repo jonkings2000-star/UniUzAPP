@@ -444,8 +444,31 @@ function clearAIFile(){
 async function showAIHistory(){
  try{
   const d=await api("/ai/history");
-  layout(`${brand()}<div class="card"><h2>📚 История AI</h2>${(d.items||[]).map(x=>`<div class="list-item"><b>${esc(x.question||"")}</b><p>${esc(x.answer||"")}</p><div class="muted">${esc(x.created_at||"")}</div></div>`).join("") || '<div class="empty">История пока пустая</div>'}</div>`,"ai");
+  const items=d.items||[];
+
+  layout(`${brand()}
+   <div class="card">
+    <div class="row">
+     <h2>📚 История AI</h2>
+     <button class="btn" onclick="showAI()">← AI</button>
+    </div>
+   </div>
+
+   <div class="card">
+    ${items.length ? items.map(x=>`
+      <div class="list-item">
+       <b>${x.file_name?"📎 "+esc(x.file_name):"💬 AI запрос"}</b>
+       <p>👤 ${esc(x.question||"")}</p>
+       <p>🤖 ${esc(x.answer||"")}</p>
+       <button class="btn" onclick="continueAI(${x.id})">↩️ Продолжить</button>
+      </div>
+    `).join("") : `<div class="empty">История пока пустая</div>`}
+   </div>`,"ai");
  }catch(e){toast(e.message)}
+}
+
+function continueAI(id){
+ showAI();
 }
 
 function showAILimitInChat(){
