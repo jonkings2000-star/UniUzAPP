@@ -213,23 +213,120 @@ def ai_status():
         limit=None if u["unlimited_ai"] else 10
     )
 
-@app.post("/api/ai/premium-request")
-def ai_premium_request():
+
+@app.get("/api/ai/payment-info")
+def ai_payment_info():
     u = user_required()
     if not u:
         return jsonify(error="Unauthorized"), 401
+
+    card = os.environ.get("AI_PAYMENT_CARD", "").strip()
+    if not card:
+        return jsonify(error="Payment card is not configured by administrator"), 503
 
     return jsonify(
         ok=True,
         price=19900,
         currency="UZS",
-        message=(
-            "Безлимитный UniUZ AI стоит 19 900 сум в месяц. "
-            "Оплата помогает поддерживать работу ИИ и серверов, "
-            "чтобы приложение работало 24/7. "
-            "Для подключения подписки свяжитесь с администратором."
+        card_number=card
+    )
+
+
+def _send_receipt_to_admin(file_storage, user):
+    import uuid
+    import urllib.request
+
+    bot_token = os.environ.get("BOT_TOKEN", "").strip()
+    admin_chat_id = os.environ.get("ADMIN_CHAT_ID", "").strip() or os.environ.get("ADMIN_ID", "").strip()
+
+    if not bot_token or not admin_chat_id:
+        raise RuntimeError("BOT_TOKEN or ADMIN_CHAT_ID is not configured")
+
+    filename = file_storage.filename or f"receipt-{uuid.uuid4().hex}.bin"
+    content = file_storage.read()
+
+    # Telegram sendDocument multipart request without adding another dependency.
+    boundary = "----UniUZReceiptBoundary" + uuid.uuid4().hex
+    parts = []
+
+    def add_field(name, value):
+        parts.append(
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+            f"{value}\r\n"
+        .encode("utf-8")
+        )
+
+    add_field("chat_id", admin_chat_id)
+    add_field(
+        "caption",
+        (
+            "💳 <b>Новый чек на UniUZ AI</b>\n\n"
+            f"👤 {user.get('first_name','')} {user.get('last_name','')}\n"
+            f"🆔 Telegram ID: <code>{user.get('telegram_id')}</code>\n"
+            f"💰 Сумма: <b>19 900 UZS</b>\n"
+            "📌 Требуется проверка оплаты."
         )
     )
+
+    file_header = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="document"; filename="{filename}"\r\n'
+        f"Content-Type: application/octet-stream\r\n\r\n"
+    ).encode("utf-8")
+
+    body = b"".join(parts) + file_header + content + f"\r\n--{boundary}--\r\n".encode()
+
+    url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        method="POST",
+    )
+
+    with urllib.request.urlopen(req, timeout=20) as response:
+        result = json.loads(response.read().decode("utf-8"))
+
+    if not result.get("ok"):
+        raise RuntimeError("Telegram did not accept the receipt")
+
+
+@app.post("/api/ai/payment-receipt")
+def ai_payment_receipt():
+    u = user_required()
+    if not u:
+        return jsonify(error="Unauthorized"), 401
+
+    receipt = request.files.get("receipt")
+    if not receipt:
+        return jsonify(error="Receipt file required"), 400
+
+    filename = (receipt.filename or "").lower()
+    allowed = (
+        filename.endswith(".pdf")
+        or filename.endswith(".png")
+        or filename.endswith(".jpg")
+        or filename.endswith(".jpeg")
+        or filename.endswith(".webp")
+    )
+    if not allowed:
+        return jsonify(error="Receipt must be PDF, PNG, JPG or WEBP"), 400
+
+    try:
+        _send_receipt_to_admin(receipt, u)
+    except Exception as e:
+        print("Payment receipt error:", e)
+        return jsonify(error="Не удалось отправить чек администратору"), 500
+
+    return jsonify(
+        ok=True,
+        message=(
+            "Чек отправлен администратору. "
+            "После проверки оплаты вам включат безлимитный UniUZ AI."
+        )
+    )
+
 
 @app.post("/api/ai")
 def ai():
