@@ -8,7 +8,7 @@ import json
 
 from urllib.parse import parse_qs
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 
 import database
@@ -759,6 +759,38 @@ def teacher_announcements():
             for item in items
         ]
     })
+
+
+
+
+# ==========================================================
+# AI GENERATED FILE DOWNLOAD
+# ==========================================================
+
+@app.get("/api/ai/generated/<int:file_id>")
+def ai_generated_file(file_id):
+
+    user = require_user()
+
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    file = database.get_ai_generated_file(
+        user["id"],
+        file_id
+    )
+
+    if not file:
+        return jsonify({"error": "File not found"}), 404
+
+    if not os.path.exists(file["file_path"]):
+        return jsonify({"error": "File missing"}), 404
+
+    return send_file(
+        file["file_path"],
+        as_attachment=True,
+        download_name=file["filename"]
+    )
 
 
 # ==========================================================
