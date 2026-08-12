@@ -4,6 +4,7 @@ from urllib.parse import parse_qsl
 from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 import database
+from openai import OpenAI
 from ai_service import ask, extract_schedule_from_image, extract_schedule_from_pdf
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -13,6 +14,11 @@ os.makedirs(UPLOADS, exist_ok=True)
 app = Flask(__name__, static_folder=BASE, static_url_path="")
 CORS(app)
 database.init_db()
+
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
+openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+AI_FILE_MAX_BYTES = 10 * 1024 * 1024
+AI_FILE_MODEL = os.environ.get("AI_FILE_MODEL", "gpt-5-mini")
 
 
 # ============================================================
@@ -529,6 +535,96 @@ def ai_payment_receipt():
         ok=True,
         message="Чек отправлен администратору. После проверки вам включат безлимитный UniUZ AI."
     )
+
+
+@app.post("/api/ai/file")
+def ai_file():
+    u = user_required()
+    if not u:
+        return jsonify(error="Unauthorized"), 401
+
+    question = (request.form.get("message") or "").strip()
+    f = request.files.get("file")
+
+    if not question and not f:
+        return jsonify(error="Напишите вопрос или прикрепите файл"), 400
+
+    if f and f.filename:
+        raw = f.read()
+        if len(raw) > AI_FILE_MAX_BYTES:
+            return jsonify(error="Файл слишком большой. Максимум 10 МБ."), 413
+        f.stream.seek(0)
+    else:
+        raw = b""
+
+    allowed, used = database.consume_ai(int(u["telegram_id"]))
+    if not allowed:
+        return jsonify(error="Daily AI limit reached", used=used, limit=10), 429
+
+    if not openai_client:
+        return jsonify(error="OPENAI_API_KEY не настроен на Railway"), 500
+
+    try:
+        prompt = question or (
+            "Проанализируй прикреплённый материал и помоги студенту "
+            "решить задание. Объясни решение понятным языком и по шагам."
+        )
+
+        content = [{
+            "type": "input_text",
+            "text": (
+                "Ты UniUZ AI — помощник студента университета. "
+                "Помогай решать учебные задания, объясняй ход решения, "
+                "проверяй ответы и не выдумывай текст, которого не видно в файле.\n\n"
+                + prompt
+            )
+        }]
+
+        if f and f.filename:
+            import base64, mimetypes
+            mime = (
+                f.mimetype
+                or mimetypes.guess_type(f.filename)[0]
+                or "application/octet-stream"
+            ).lower()
+
+            # Images are sent as data URLs and analyzed visually.
+            if mime.startswith("image/"):
+                encoded = base64.b64encode(raw).decode("ascii")
+                content.append({
+                    "type": "input_image",
+                    "image_url": f"data:{mime};base64,{encoded}",
+                    "detail": "auto"
+                })
+            else:
+                # PDFs and supported documents can be passed as input_file.
+                encoded = base64.b64encode(raw).decode("ascii")
+                content.append({
+                    "type": "input_file",
+                    "filename": os.path.basename(f.filename),
+                    "file_data": encoded
+                })
+
+        response = openai_client.responses.create(
+            model=AI_FILE_MODEL,
+            input=[{
+                "role": "user",
+                "content": content
+            }]
+        )
+
+        answer = response.output_text or "ИИ не вернул текстовый ответ."
+
+        return jsonify(
+            ok=True,
+            answer=answer,
+            used=used,
+            limit=None if u["unlimited_ai"] else 10
+        )
+
+    except Exception as e:
+        print("AI file error:", repr(e))
+        return jsonify(error=f"Ошибка анализа файла: {e}"), 500
 
 
 @app.post("/api/ai")

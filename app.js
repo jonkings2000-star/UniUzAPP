@@ -364,89 +364,132 @@ async function loadHomeAIUsage(){
 }
 
 function showAI(){
- layout(`${brand()}<div class="card"><h2>🤖 ${tr("ai")}</h2><div id="chat"></div><textarea id="q" class="input" placeholder="${tr("question")}"></textarea><button class="btn primary" onclick="askAI()">${tr("send")}</button></div>`,"ai");
+ layout(`${brand()}
+  <div class="ai-card">
+   <div class="ai-title">🤖 UniUZ AI</div>
+   <p>Ваш персональный помощник</p>
+   <div id="ai-usage" class="badge" style="display:block;text-align:center;margin:12px 0">Загрузка...</div>
+  </div>
+  <div class="card">
+   <div id="chat"></div>
+   <textarea id="q" class="input" placeholder="${tr("question")}"></textarea>
+
+   <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
+    <label class="btn" style="flex:1;text-align:center;cursor:pointer">
+     📎 Прикрепить файл
+     <input id="ai-file" type="file"
+       accept="image/*,.pdf,.txt,.md,.csv,.docx,.pptx,.xlsx"
+       hidden onchange="aiFileSelected()">
+    </label>
+    <button class="btn" type="button" onclick="clearAIFile()">✕</button>
+   </div>
+
+   <div id="ai-file-name" class="muted small" style="display:none;margin:8px 0"></div>
+
+   <button class="btn primary" onclick="askAI()">Спросить ИИ →</button>
+  </div>`,"ai");
+
  loadAIStatusInChat();
 }
 
 async function loadAIStatusInChat(){
  try{
   const d=await api("/ai/status");
+  const el=document.getElementById("ai-usage");
+  if(el){
+   el.textContent=d.limit===null ? "∞ Безлимитный AI" : `${d.used}/10 запросов сегодня`;
+  }
   if(d.limit!==null && d.used>=10) showAILimitInChat();
  }catch(e){}
 }
 
+function aiFileSelected(){
+ const input=document.getElementById("ai-file");
+ const out=document.getElementById("ai-file-name");
+ if(!input||!out)return;
+ const file=input.files?.[0];
+ if(file){
+  out.style.display="block";
+  out.textContent=`📎 ${file.name} · ${Math.ceil(file.size/1024)} KB`;
+ }else{
+  out.style.display="none";
+  out.textContent="";
+ }
+}
+
+function clearAIFile(){
+ const input=document.getElementById("ai-file");
+ const out=document.getElementById("ai-file-name");
+ if(input)input.value="";
+ if(out){
+  out.style.display="none";
+  out.textContent="";
+ }
+}
+
 function showAILimitInChat(){
  const chat=document.getElementById("chat");
- if(!chat) return;
- if(document.getElementById("ai-limit-message")) return;
- chat.innerHTML += `
+ if(!chat)return;
+ if(document.getElementById("ai-limit-message"))return;
+ chat.innerHTML+=`
   <div class="list-item" id="ai-limit-message">
    <b>🤖 UniUZ AI</b>
    <p><b>Лимит AI на сегодня исчерпан.</b></p>
    <p>Вы использовали все <b>10 запросов</b> сегодня.</p>
    <p><b>Безлимитный UniUZ AI — 19 900 сум / месяц.</b></p>
-   <p>Оплата помогает поддерживать работу ИИ и серверов, чтобы UniUZ работал <b>24/7</b> и оставался доступным для студентов.</p>
+   <p>Оплата помогает поддерживать работу ИИ и серверов, чтобы UniUZ работал <b>24/7</b>.</p>
    <button class="btn primary" onclick="showPaymentInstructions()">💳 Оплатить 19 900 сум</button>
   </div>`;
 }
 
-async function showPaymentInstructions(){
- try{
-  const d=await api("/ai/payment-info");
-  const chat=document.getElementById("chat");
-  if(!chat) return;
-  const safeCard=esc(d.card_number||"Не указан");
-  chat.innerHTML += `
-   <div class="list-item" id="ai-payment-message">
-    <b>💳 Оплата безлимитного AI</b>
-    <p>Стоимость: <b>19 900 сум / месяц</b></p>
-    <p>Номер карты:</p>
-    <div class="badge" style="font-size:18px;word-break:break-all">${safeCard}</div>
-    <p>После оплаты отправьте чек ниже. Администратор проверит оплату и включит безлимитный AI.</p>
-    <input id="ai-receipt-file" type="file" accept="image/*,.pdf" class="input">
-    <button class="btn primary" onclick="sendPaymentReceipt()">📤 Отправить чек</button>
-   </div>`;
-  const file=document.getElementById("ai-receipt-file");
-  if(file) file.scrollIntoView({behavior:"smooth",block:"center"});
- }catch(e){toast(e.message)}
-}
-
-async function sendPaymentReceipt(){
- const input=document.getElementById("ai-receipt-file");
- const button=document.querySelector('#ai-payment-message button');
- const file=input?.files?.[0];
- if(!file){toast("Выберите чек.");return;}
- if(file.size>10*1024*1024){toast("Чек должен быть не больше 10 МБ.");return;}
- const form=new FormData();
- form.append("receipt",file,file.name);
- if(button){button.disabled=true;button.textContent="⏳ Отправка...";}
- try{
-  const d=await api("/ai/payment-receipt",{method:"POST",body:form});
-  const chat=document.getElementById("chat");
-  if(chat){
-   chat.innerHTML += `<div class="list-item"><b>✅ Чек отправлен</b><p>${esc(d.message||"Администратор получил чек. После проверки вам включат безлимитный AI.")}</p></div>`;
-  }
-  if(input) input.value="";
- }catch(e){
-  if(button){button.disabled=false;button.textContent="📤 Отправить чек";}
-  toast(e.message||"Не удалось отправить чек администратору");
- }
-}
-
 async function askAI(){
  const q=document.getElementById("q").value.trim();
- if(!q)return;
+ const file=document.getElementById("ai-file")?.files?.[0];
+
+ if(!q&&!file){
+  toast("Напишите вопрос или прикрепите файл");
+  return;
+ }
+
+ const button=document.querySelector('.card button[onclick="askAI()"]');
+ if(button){
+  button.disabled=true;
+  button.textContent="⏳ ИИ анализирует...";
+ }
+
  try{
-  const d=await api("/ai",{method:"POST",body:{message:q}});
-  document.getElementById("chat").innerHTML+=`<div class="list-item"><b>${esc(q)}</b><p>${esc(d.answer)}</p><span class="badge">${d.limit===null?"∞":`${d.used}/10`}</span></div>`;
+  const fd=new FormData();
+  fd.append("message",q);
+  if(file)fd.append("file",file);
+
+  const d=await api("/ai/file",{method:"POST",body:fd});
+
+  const question=q||"Проанализируй прикреплённый материал";
+  const fileLine=file?`<div class="muted">📎 ${esc(file.name)}</div>`:"";
+
+  document.getElementById("chat").innerHTML+=`
+   <div class="list-item">
+    <b>${esc(question)}</b>
+    ${fileLine}
+    <p>${esc(d.answer)}</p>
+    <span class="badge">${d.limit===null?"∞":`${d.used}/10`}</span>
+   </div>`;
+
   document.getElementById("q").value="";
+  clearAIFile();
   loadHomeAIUsage();
-  if(d.limit!==null && d.used>=10) showAILimitInChat();
+  loadAIStatusInChat();
+
  }catch(e){
-  if(e.status===429) showAILimitInChat();
-  else toast(e.message);
+  toast(e.message||"Не удалось получить ответ ИИ");
+ }finally{
+  if(button){
+   button.disabled=false;
+   button.textContent="Спросить ИИ →";
+  }
  }
 }
+
 
 async function showReminders(){try{const d=await api("/reminders");layout(`${brand()}<div class="card"><h2>🔔 ${tr("reminders")}</h2><p>${d.enabled?tr("enabled"):tr("disabled")}</p><button class="btn primary" onclick="toggleReminders(${!d.enabled})">${d.enabled?tr("disabled"):tr("enabled")}</button></div>`)}catch(e){toast(e.message)}}
 async function toggleReminders(enabled){try{await api("/reminders",{method:"POST",body:{enabled}});showReminders()}catch(e){toast(e.message)}}
