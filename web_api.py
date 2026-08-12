@@ -252,28 +252,126 @@ def se(e):
     return jsonify(error="Internal server error"), 500
 
 
-@app.get("/api/ai/usage")
-def ai_usage():
-    u = user_required()
-    if not u:
-        return jsonify(error="Unauthorized"), 401
-    return jsonify(
-        used=int(u["ai_used_count"] or 0),
-        limit=None if u["unlimited_ai"] else 10,
-        unlimited=bool(u["unlimited_ai"])
+# ==========================================================
+# TELEGRAM SCHEDULE REMINDERS
+# ==========================================================
+
+import threading
+import time
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+from urllib.request import Request, urlopen
+from urllib.parse import urlencode
+
+TASHKENT_TZ = ZoneInfo("Asia/Tashkent")
+PAIR_REMINDER_MINUTES = 15
+
+
+def _telegram_send_message(chat_id, text):
+    token = os.environ.get("BOT_TOKEN", "").strip()
+    if not token:
+        return False
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = urlencode({
+        "chat_id": str(chat_id),
+        "text": text,
+        "parse_mode": "HTML"
+    }).encode()
+
+    try:
+        req = Request(url, data=payload, method="POST")
+        with urlopen(req, timeout=10) as response:
+            return response.status == 200
+    except Exception as exc:
+        print(f"Telegram reminder error for {chat_id}: {exc}")
+        return False
+
+
+def _schedule_reminder_worker():
+    """
+    Checks every 30 seconds.
+    Schedule times are interpreted as Asia/Tashkent.
+    A reminder is sent exactly once when a class is 15 minutes away.
+    """
+    while True:
+        try:
+            now = datetime.now(TASHKENT_TZ)
+            today = now.date()
+            weekday = today.weekday()  # 0=Monday ... 6=Sunday
+
+            c = database.conn()
+            rows = c.execute("""
+                SELECT u.telegram_id,
+                       u.first_name,
+                       s.subject,
+                       s.start_time,
+                       s.room
+                FROM users u
+                JOIN schedules s ON s.user_id = u.id
+                WHERE u.reminders_enabled = 1
+                  AND s.day_of_week = ?
+            """, (weekday,)).fetchall()
+            c.close()
+
+            for row in rows:
+                start_text = str(row["start_time"] or "").strip()
+
+                try:
+                    start = datetime.strptime(
+                        f"{today.isoformat()} {start_text}",
+                        "%Y-%m-%d %H:%M"
+                    ).replace(tzinfo=TASHKENT_TZ)
+                except ValueError:
+                    continue
+
+                minutes_left = (start - now).total_seconds() / 60
+
+                # 15-minute reminder window.
+                # The 30-second worker interval prevents missing it.
+                if 14.0 <= minutes_left <= 15.5:
+                    if not database.claim_schedule_reminder(
+                        int(row["telegram_id"]),
+                        weekday,
+                        str(row["subject"] or ""),
+                        start_text,
+                        today.isoformat()
+                    ):
+                        continue
+
+                    room = str(row["room"] or "").strip()
+                    room_line = f"\n🏫 Аудитория: {room}" if room else ""
+
+                    name = str(row["first_name"] or "Студент")
+                    text = (
+                        f"🔔 <b>Напоминание о паре</b>\n\n"
+                        f"Привет, {name}!\n"
+                        f"Через <b>15 минут</b> начинается пара:\n\n"
+                        f"📚 <b>{row['subject']}</b>\n"
+                        f"🕐 Начало: <b>{start_text}</b>"
+                        f"{room_line}\n\n"
+                        f"🇺🇿 Время: Ташкент (Asia/Tashkent)"
+                    )
+
+                    _telegram_send_message(
+                        int(row["telegram_id"]),
+                        text
+                    )
+
+        except Exception as exc:
+            print(f"Schedule reminder worker error: {exc}")
+
+        time.sleep(30)
+
+
+def _start_schedule_reminder_worker():
+    thread = threading.Thread(
+        target=_schedule_reminder_worker,
+        name="uniuz-schedule-reminders",
+        daemon=True
     )
+    thread.start()
 
-@app.get("/api/notifications")
-def notifications():
-    u = user_required()
-    if not u:
-        return jsonify(error="Unauthorized"), 401
 
-    items = []
-    for x in database.get_homework(int(u["telegram_id"]), include_completed=False)[:5]:
-        items.append({"icon":"📝","title":x["title"],"time":x["due_at"]})
-
-    for x in database.get_schedule(int(u["telegram_id"]))[:5]:
-        items.append({"icon":"🗓️","title":x["subject"],"time":x["start_time"]})
-
-    return jsonify(items=items)
+# Start once when the Flask module is loaded.
+_start_schedule_reminder_worker()

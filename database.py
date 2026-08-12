@@ -269,3 +269,39 @@ def all_users(limit=200):
     """, (limit,)).fetchall()
     c.close()
     return [dict(r) for r in rows]
+
+
+# ==========================================================
+# TELEGRAM CLASS REMINDERS
+# ==========================================================
+
+def claim_schedule_reminder(telegram_id, day_of_week, subject, start_time, reminder_date):
+    """
+    Atomically claims a pair reminder so it is sent only once.
+    reminder_date is the date in Asia/Tashkent (YYYY-MM-DD).
+    """
+    c = conn()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS sent_schedule_reminders(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            telegram_id INTEGER NOT NULL,
+            reminder_date TEXT NOT NULL,
+            day_of_week INTEGER NOT NULL,
+            subject TEXT NOT NULL,
+            start_time TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(telegram_id, reminder_date, day_of_week, subject, start_time)
+        )
+    """)
+    try:
+        c.execute("""
+            INSERT INTO sent_schedule_reminders
+            (telegram_id, reminder_date, day_of_week, subject, start_time)
+            VALUES(?,?,?,?,?)
+        """, (telegram_id, reminder_date, day_of_week, subject, start_time))
+        c.commit()
+        claimed = True
+    except sqlite3.IntegrityError:
+        claimed = False
+    c.close()
+    return claimed
