@@ -17,7 +17,7 @@ group:"Введите вашу группу",name:"Имя и фамилия",con
 schedule:"Расписание",homework:"Мои домашние задания",ai:"ИИ",reminders:"Напоминания",
 profile:"Профиль",save:"Сохранить",upload:"Загрузить расписание",add:"Добавить",
 enabled:"Напоминания включены",disabled:"Напоминания выключены",logout:"Сменить профиль",
-admin:"Админ-панель",stats:"Статистика",users:"Пользователи",unlimited:"Безлимитный ИИ",
+admin:"Админ-панель",stats:"Статистика",users:"Пользователи",unlimited:"Безлимитный ИИ",payments:"Платежи",pendingPayments:"Ожидают проверки",approve:"Одобрить",reject:"Отклонить",openReceipt:"Открыть чек",approved:"Одобрено",rejected:"Отклонено",pending:"На проверке",
 question:"Напишите вопрос...",send:"Отправить",title:"Название",description:"Описание",
 due:"Дата и время сдачи",done:"Выполнено",delete:"Удалить",noData:"Пока ничего нет",
 back:"Назад",language:"Язык",facultyPlaceholder:"Например: AI Software"
@@ -27,7 +27,7 @@ chooseLanguage:"Choose language",university:"Choose university",faculty:"Choose 
 group:"Enter your group",name:"First and last name",continue:"Continue",home:"Home",
 schedule:"Schedule",homework:"My homework",ai:"AI",reminders:"Reminders",profile:"Profile",
 save:"Save",upload:"Upload schedule",add:"Add",enabled:"Reminders enabled",disabled:"Reminders disabled",
-logout:"Change profile",admin:"Admin panel",stats:"Statistics",users:"Users",unlimited:"Unlimited AI",
+logout:"Change profile",admin:"Admin panel",stats:"Statistics",users:"Users",unlimited:"Unlimited AI",payments:"Payments",pendingPayments:"Pending review",approve:"Approve",reject:"Reject",openReceipt:"Open receipt",approved:"Approved",rejected:"Rejected",pending:"Pending",
 question:"Write a question...",send:"Send",title:"Title",description:"Description",
 due:"Due date and time",done:"Completed",delete:"Delete",noData:"Nothing yet",back:"Back",
 language:"Language",facultyPlaceholder:"For example: AI Software"
@@ -265,18 +265,24 @@ async function showPaymentInstructions(){
 
 async function sendPaymentReceipt(){
  const input=document.getElementById("ai-receipt-file");
+ const button=document.querySelector('#ai-payment-message button');
  const file=input?.files?.[0];
  if(!file){toast("Выберите чек.");return;}
  if(file.size>10*1024*1024){toast("Чек должен быть не больше 10 МБ.");return;}
  const form=new FormData();
  form.append("receipt",file,file.name);
+ if(button){button.disabled=true;button.textContent="⏳ Отправка...";}
  try{
   const d=await api("/ai/payment-receipt",{method:"POST",body:form});
   const chat=document.getElementById("chat");
   if(chat){
    chat.innerHTML += `<div class="list-item"><b>✅ Чек отправлен</b><p>${esc(d.message||"Администратор получил чек. После проверки вам включат безлимитный AI.")}</p></div>`;
   }
- }catch(e){toast(e.message)}
+  if(input) input.value="";
+ }catch(e){
+  if(button){button.disabled=false;button.textContent="📤 Отправить чек";}
+  toast(e.message||"Не удалось отправить чек администратору");
+ }
 }
 
 async function askAI(){
@@ -299,10 +305,64 @@ async function toggleReminders(enabled){try{await api("/reminders",{method:"POST
 function showProfile(){layout(`${brand()}<div class="card"><h2>👤 ${tr("profile")}</h2><p><b>${esc(profile.first_name)} ${esc(profile.last_name)}</b></p><p>${esc(profile.university)}</p><p>${esc(profile.department)}</p><p>${esc(profile.group_name)}</p><button class="btn" onclick="chooseLanguage()">${tr("language")}</button><button class="btn danger" onclick="chooseUniversity()">${tr("logout")}</button></div>`)}
 async function showAdmin(){
  try{
-  const [st,u]=await Promise.all([api("/admin/stats"),api("/admin/users")]);
-  layout(`${brand()}<div class="card"><h2>🔐 ${tr("admin")}</h2><p>${tr("stats")}: ${st.total_users}</p><p>🤖 AI today: ${st.ai_requests_today}</p><p>♾️ ${tr("unlimited")}: ${st.unlimited_ai}</p></div><div class="card"><h3>${tr("users")}</h3><input id="adminId" class="input" placeholder="Telegram ID"><button class="btn primary" onclick="addAdmin()">${tr("add")} admin</button>${u.items.map(x=>`<div class="list-item"><div><b>${esc(x.first_name)} ${esc(x.last_name)}</b><div class="muted">${x.telegram_id} · ${esc(x.group_name||"")}</div></div><button class="btn" onclick="grant(${x.telegram_id},${!x.unlimited_ai})">${x.unlimited_ai?"∞":"+"}</button></div>`).join("")}</div>`);
+  const [st,u,p]=await Promise.all([api("/admin/stats"),api("/admin/users"),api("/admin/payments")]);
+  const pending=(p.items||[]).filter(x=>x.status==="pending");
+  const statusLabel=x=>x.status==="approved"?"✅ Одобрено":x.status==="rejected"?"❌ Отклонено":"⏳ На проверке";
+  layout(`${brand()}
+   <div class="card">
+    <h2>🔐 ${tr("admin")}</h2>
+    <div class="list-item"><b>👥 ${tr("users")}</b><span class="badge">${st.total_users||0}</span></div>
+    <div class="list-item"><b>🤖 AI сегодня</b><span class="badge">${st.ai_requests_today||0}</span></div>
+    <div class="list-item"><b>♾️ ${tr("unlimited")}</b><span class="badge">${st.unlimited_ai||0}</span></div>
+    <div class="list-item"><b>💳 ${tr("pendingPayments")}</b><span class="badge">${pending.length}</span></div>
+   </div>
+
+   <div class="card">
+    <h3>💳 ${tr("payments")}</h3>
+    ${pending.length ? pending.map(x=>`
+      <div class="list-item">
+       <div>
+        <b>${esc(x.first_name)} ${esc(x.last_name)}</b>
+        <div class="muted">ID: ${x.telegram_id} · ${esc(x.group_name||"")}</div>
+        <div class="muted">19 900 UZS · ${esc(x.created_at||"")}</div>
+        <div class="muted">${esc(x.filename)}</div>
+       </div>
+       <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn" onclick="openPaymentReceipt(${x.id})">📄 ${tr("openReceipt")}</button>
+        <button class="btn primary" onclick="approvePayment(${x.id})">✅ ${tr("approve")}</button>
+        <button class="btn danger" onclick="rejectPayment(${x.id})">❌ ${tr("reject")}</button>
+       </div>
+      </div>`).join(""):`<div class="empty">Нет платежей на проверке</div>`}
+   </div>
+
+   <div class="card">
+    <h3>👥 ${tr("users")}</h3>
+    <input id="adminId" class="input" placeholder="Telegram ID">
+    <button class="btn primary" onclick="addAdmin()">${tr("add")} admin</button>
+    ${(u.items||[]).map(x=>`<div class="list-item"><div><b>${esc(x.first_name)} ${esc(x.last_name)}</b><div class="muted">${x.telegram_id} · ${esc(x.group_name||"")}</div></div><button class="btn" onclick="grant(${x.telegram_id},${!x.unlimited_ai})">${x.unlimited_ai?"∞":"+"}</button></div>`).join("")}
+   </div>`,"home");
  }catch(e){toast(e.message)}
 }
+
+async function openPaymentReceipt(id){
+ try{
+  const r=await fetch(`${API}/admin/payments/${id}/receipt`,{headers:{"X-Telegram-Init-Data":tg?.initData||""}});
+  if(!r.ok){let d={};try{d=await r.json()}catch{};throw new Error(d.error||`API ${r.status}`)}
+  const blob=await r.blob();
+  const url=URL.createObjectURL(blob);
+  window.open(url,"_blank");
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+ }catch(e){toast(e.message||"Не удалось открыть чек")}
+}
+async function approvePayment(id){
+ if(!confirm("Подтвердить оплату и включить безлимитный AI на 30 дней?")) return;
+ try{await api(`/admin/payments/${id}/approve`,{method:"POST",body:{}});toast("Оплата подтверждена. AI без ограничений активирован на 30 дней.");showAdmin()}catch(e){toast(e.message)}
+}
+async function rejectPayment(id){
+ if(!confirm("Отклонить этот чек?")) return;
+ try{await api(`/admin/payments/${id}/reject`,{method:"POST",body:{}});toast("Чек отклонён.");showAdmin()}catch(e){toast(e.message)}
+}
+
 async function grant(id,enabled){try{await api("/admin/unlimited",{method:"POST",body:{telegram_id:id,enabled}});showAdmin()}catch(e){toast(e.message)}}
 
 start();

@@ -1,6 +1,7 @@
-import os, json, hmac, hashlib
+import os, json, hmac, hashlib, uuid
+from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 import database
 from ai_service import ask, extract_schedule_from_image, extract_schedule_from_pdf
@@ -12,6 +13,61 @@ os.makedirs(UPLOADS, exist_ok=True)
 app = Flask(__name__, static_folder=BASE, static_url_path="")
 CORS(app)
 database.init_db()
+
+
+# ============================================================
+# AI PAYMENT REQUESTS / SUBSCRIPTIONS
+# ============================================================
+PAYMENTS_DIR = os.path.join(UPLOADS, "ai_payments")
+os.makedirs(PAYMENTS_DIR, exist_ok=True)
+
+
+def init_payment_tables():
+    c = database.conn()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS ai_payment_requests(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            telegram_id INTEGER NOT NULL,
+            amount INTEGER NOT NULL DEFAULT 19900,
+            currency TEXT NOT NULL DEFAULT 'UZS',
+            filename TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            telegram_message_id INTEGER,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            reviewed_at TEXT,
+            reviewed_by INTEGER,
+            expires_at TEXT
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS ai_subscriptions(
+            telegram_id INTEGER PRIMARY KEY,
+            expires_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    c.commit()
+    c.close()
+
+
+def sync_ai_subscription(u):
+    """Expire paid AI only; manually granted unlimited_ai without a subscription stays active."""
+    if not u or not bool(u["unlimited_ai"]):
+        return u
+    c = database.conn()
+    row = c.execute(
+        "SELECT expires_at FROM ai_subscriptions WHERE telegram_id=?",
+        (int(u["telegram_id"]),)
+    ).fetchone()
+    c.close()
+    if row and row["expires_at"] <= datetime.now(timezone.utc).isoformat():
+        database.set_unlimited(int(u["telegram_id"]), False)
+        return database.get_user(int(u["telegram_id"]))
+    return u
+
+
+init_payment_tables()
 
 def telegram_user():
     raw = request.headers.get("X-Telegram-Init-Data", "")
@@ -41,7 +97,8 @@ def user_required():
     u = telegram_user()
     if not u:
         return None
-    return database.create_or_update_user(u)
+    row = database.create_or_update_user(u)
+    return sync_ai_subscription(row)
 
 def admin_required():
     u = user_required()
@@ -232,64 +289,130 @@ def ai_payment_info():
     )
 
 
-def _send_receipt_to_admin(file_storage, user):
+def _get_payment_admin_chat_id():
+    """Return the Telegram chat id where payment receipts must be sent.
+
+    Priority:
+    1) ADMIN_CHAT_ID
+    2) ADMIN_ID
+    3) first user marked as admin in the UniUZ database
+    """
+    explicit = (
+        os.environ.get("ADMIN_CHAT_ID", "").strip()
+        or os.environ.get("ADMIN_ID", "").strip()
+    )
+    if explicit:
+        return explicit
+
+    try:
+        conn = database.conn()
+        row = conn.execute(
+            "SELECT telegram_id FROM users WHERE is_admin=1 ORDER BY telegram_id LIMIT 1"
+        ).fetchone()
+        conn.close()
+        if row:
+            return str(row[0])
+    except Exception as e:
+        print("payment admin lookup error:", e)
+
+    return ""
+
+
+def _telegram_multipart_request(method, chat_id, file_storage, caption):
+    """Send a receipt to Telegram using the Bot API."""
     import uuid
     import urllib.request
+    import urllib.error
 
     bot_token = os.environ.get("BOT_TOKEN", "").strip()
-    admin_chat_id = os.environ.get("ADMIN_CHAT_ID", "").strip() or os.environ.get("ADMIN_ID", "").strip()
+    if not bot_token:
+        raise RuntimeError("BOT_TOKEN is not configured")
 
-    if not bot_token or not admin_chat_id:
-        raise RuntimeError("BOT_TOKEN or ADMIN_CHAT_ID is not configured")
-
-    filename = file_storage.filename or f"receipt-{uuid.uuid4().hex}.bin"
+    filename = os.path.basename(file_storage.filename or f"receipt-{uuid.uuid4().hex}.bin")
     content = file_storage.read()
+    if not content:
+        raise RuntimeError("The uploaded receipt is empty")
 
-    # Telegram sendDocument multipart request without adding another dependency.
     boundary = "----UniUZReceiptBoundary" + uuid.uuid4().hex
-    parts = []
 
-    def add_field(name, value):
-        parts.append(
+    def field(name, value):
+        return (
             f"--{boundary}\r\n"
             f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
             f"{value}\r\n"
-        .encode("utf-8")
-        )
+        ).encode("utf-8")
 
-    add_field("chat_id", admin_chat_id)
-    add_field(
-        "caption",
+    body = []
+    body.append(field("chat_id", chat_id))
+    body.append(field("caption", caption))
+    body.append(field("parse_mode", "HTML"))
+
+    mime = file_storage.mimetype or "application/octet-stream"
+    body.append(
         (
-            "💳 <b>Новый чек на UniUZ AI</b>\n\n"
-            f"👤 {user.get('first_name','')} {user.get('last_name','')}\n"
-            f"🆔 Telegram ID: <code>{user.get('telegram_id')}</code>\n"
-            f"💰 Сумма: <b>19 900 UZS</b>\n"
-            "📌 Требуется проверка оплаты."
-        )
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{method}"; filename="{filename}"\r\n'
+            f"Content-Type: {mime}\r\n\r\n"
+        ).encode("utf-8")
     )
+    body.append(content)
+    body.append(f"\r\n--{boundary}--\r\n".encode("utf-8"))
 
-    file_header = (
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="document"; filename="{filename}"\r\n'
-        f"Content-Type: application/octet-stream\r\n\r\n"
-    ).encode("utf-8")
-
-    body = b"".join(parts) + file_header + content + f"\r\n--{boundary}--\r\n".encode()
-
-    url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
+    url = f"https://api.telegram.org/bot{bot_token}/{method}"
     req = urllib.request.Request(
         url,
-        data=body,
+        data=b"".join(body),
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
         method="POST",
     )
 
-    with urllib.request.urlopen(req, timeout=20) as response:
-        result = json.loads(response.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=25) as response:
+            raw = response.read().decode("utf-8")
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Telegram HTTP {e.code}: {raw}") from e
+    except Exception as e:
+        raise RuntimeError(f"Telegram request failed: {e}") from e
+
+    try:
+        result = json.loads(raw)
+    except Exception as e:
+        raise RuntimeError(f"Invalid Telegram response: {raw[:500]}") from e
 
     if not result.get("ok"):
-        raise RuntimeError("Telegram did not accept the receipt")
+        raise RuntimeError(
+            f"Telegram rejected receipt: {result.get('description', 'unknown error')}"
+        )
+
+    return result
+
+
+def _send_receipt_to_admin(file_storage, user):
+    admin_chat_id = _get_payment_admin_chat_id()
+    if not admin_chat_id:
+        raise RuntimeError(
+            "Admin chat is not configured. Set ADMIN_ID or ADMIN_CHAT_ID in Railway Variables."
+        )
+
+    caption = (
+        "💳 <b>Новый чек на UniUZ AI</b>\n\n"
+        f"👤 {user.get('first_name', '')} {user.get('last_name', '')}\n"
+        f"🆔 Telegram ID: <code>{user.get('telegram_id')}</code>\n"
+        f"💰 Сумма: <b>19 900 UZS</b>\n"
+        "📌 Требуется проверка оплаты."
+    )
+
+    filename = (file_storage.filename or "").lower()
+    method = "sendDocument" if filename.endswith(".pdf") else "sendPhoto"
+
+    # Telegram's sendPhoto expects the field name `photo`, while sendDocument expects `document`.
+    return _telegram_multipart_request(
+        "photo" if method == "sendPhoto" else "document",
+        admin_chat_id,
+        file_storage,
+        caption,
+    )
 
 
 @app.post("/api/ai/payment-receipt")
@@ -302,29 +425,63 @@ def ai_payment_receipt():
     if not receipt:
         return jsonify(error="Receipt file required"), 400
 
-    filename = (receipt.filename or "").lower()
-    allowed = (
-        filename.endswith(".pdf")
-        or filename.endswith(".png")
-        or filename.endswith(".jpg")
-        or filename.endswith(".jpeg")
-        or filename.endswith(".webp")
-    )
+    filename = os.path.basename(receipt.filename or "receipt")
+    lower = filename.lower()
+    allowed = lower.endswith((".pdf", ".png", ".jpg", ".jpeg", ".webp"))
     if not allowed:
         return jsonify(error="Receipt must be PDF, PNG, JPG or WEBP"), 400
+    if request.content_length and request.content_length > 12 * 1024 * 1024:
+        return jsonify(error="Receipt must be no larger than 10 MB"), 400
 
+    c = database.conn()
+    pending = c.execute(
+        "SELECT id FROM ai_payment_requests WHERE telegram_id=? AND status='pending' ORDER BY id DESC LIMIT 1",
+        (int(u["telegram_id"]),)
+    ).fetchone()
+    c.close()
+    if pending:
+        return jsonify(error="У вас уже есть чек на проверке администратором."), 409
+
+    ext = os.path.splitext(filename)[1].lower() or ".bin"
+    stored_name = f"{int(u['telegram_id'])}_{uuid.uuid4().hex}{ext}"
+    path = os.path.join(PAYMENTS_DIR, stored_name)
     try:
-        _send_receipt_to_admin(receipt, u)
+        receipt.save(path)
+        caption = (
+            "💳 <b>Новый чек на UniUZ AI</b>\n\n"
+            f"👤 {u.get('first_name','')} {u.get('last_name','')}\n"
+            f"🆔 Telegram ID: <code>{u.get('telegram_id')}</code>\n"
+            f"💰 Сумма: <b>19 900 UZS</b>\n"
+            "📌 Проверьте чек в админ-панели и примите решение."
+        )
+        # Re-open because Telegram sender consumes the stream.
+        with open(path, "rb") as fp:
+            class StoredFile:
+                filename = filename
+                mimetype = receipt.mimetype or "application/octet-stream"
+                def read(self):
+                    return fp.read()
+            result = _send_receipt_to_admin(StoredFile(), u)
+
+        msg_id = ((result or {}).get("result") or {}).get("message_id")
+        c = database.conn()
+        cur = c.execute("""
+            INSERT INTO ai_payment_requests
+            (telegram_id, amount, currency, filename, file_path, status, telegram_message_id)
+            VALUES(?,?,?,?,?,?,?)
+        """, (int(u["telegram_id"]), 19900, "UZS", filename, path, "pending", msg_id))
+        c.commit(); c.close()
     except Exception as e:
+        try:
+            if os.path.exists(path): os.remove(path)
+        except Exception:
+            pass
         print("Payment receipt error:", e)
         return jsonify(error="Не удалось отправить чек администратору"), 500
 
     return jsonify(
         ok=True,
-        message=(
-            "Чек отправлен администратору. "
-            "После проверки оплаты вам включат безлимитный UniUZ AI."
-        )
+        message="Чек отправлен администратору. После проверки вам включат безлимитный UniUZ AI."
     )
 
 
@@ -344,10 +501,99 @@ def ai():
     except Exception as e:
         return jsonify(error=str(e)), 500
 
+@app.get("/api/admin/payments")
+def admin_payments():
+    if not admin_required(): return jsonify(error="Forbidden"), 403
+    c = database.conn()
+    rows = c.execute("""
+        SELECT p.*, u.first_name, u.last_name, u.username, u.department, u.group_name
+        FROM ai_payment_requests p
+        LEFT JOIN users u ON u.telegram_id=p.telegram_id
+        ORDER BY CASE WHEN p.status='pending' THEN 0 ELSE 1 END, p.id DESC
+        LIMIT 100
+    """).fetchall()
+    c.close()
+    items=[]
+    for r in rows:
+        items.append({
+            "id": r["id"], "telegram_id": r["telegram_id"], "amount": r["amount"],
+            "currency": r["currency"], "filename": r["filename"], "status": r["status"],
+            "created_at": r["created_at"], "reviewed_at": r["reviewed_at"],
+            "expires_at": r["expires_at"], "first_name": r["first_name"] or "",
+            "last_name": r["last_name"] or "", "username": r["username"] or "",
+            "department": r["department"] or "", "group_name": r["group_name"] or ""
+        })
+    return jsonify(items=items)
+
+
+@app.get("/api/admin/payments/<int:payment_id>/receipt")
+def admin_payment_receipt(payment_id):
+    if not admin_required(): return jsonify(error="Forbidden"), 403
+    c = database.conn()
+    row = c.execute("SELECT file_path, filename FROM ai_payment_requests WHERE id=?", (payment_id,)).fetchone()
+    c.close()
+    if not row or not os.path.isfile(row["file_path"]):
+        return jsonify(error="Receipt not found"), 404
+    return send_file(row["file_path"], download_name=row["filename"], as_attachment=False)
+
+
+def _notify_user(chat_id, text):
+    import urllib.request
+    import urllib.parse
+    token = os.environ.get("BOT_TOKEN", "").strip()
+    if not token: return
+    data = urllib.parse.urlencode({"chat_id": str(chat_id), "text": text, "parse_mode": "HTML"}).encode()
+    req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage", data=data, method="POST")
+    try:
+        urllib.request.urlopen(req, timeout=10).read()
+    except Exception as e:
+        print("notify user:", e)
+
+
+@app.post("/api/admin/payments/<int:payment_id>/approve")
+def admin_payment_approve(payment_id):
+    admin = admin_required()
+    if not admin: return jsonify(error="Forbidden"), 403
+    c = database.conn()
+    row = c.execute("SELECT * FROM ai_payment_requests WHERE id=?", (payment_id,)).fetchone()
+    if not row: c.close(); return jsonify(error="Payment not found"), 404
+    if row["status"] != "pending": c.close(); return jsonify(error="Payment already reviewed"), 409
+    expires = datetime.now(timezone.utc) + timedelta(days=30)
+    exp = expires.isoformat()
+    c.execute("UPDATE ai_payment_requests SET status='approved', reviewed_at=?, reviewed_by=?, expires_at=? WHERE id=?",
+              (datetime.now(timezone.utc).isoformat(), int(admin["telegram_id"]), exp, payment_id))
+    c.execute("INSERT INTO ai_subscriptions(telegram_id, expires_at, updated_at) VALUES(?,?,?) ON CONFLICT(telegram_id) DO UPDATE SET expires_at=excluded.expires_at, updated_at=excluded.updated_at",
+              (int(row["telegram_id"]), exp, datetime.now(timezone.utc).isoformat()))
+    c.commit(); c.close()
+    database.set_unlimited(int(row["telegram_id"]), True)
+    _notify_user(int(row["telegram_id"]), "✅ <b>Оплата подтверждена!</b>\n\nБезлимитный UniUZ AI активирован на 30 дней.\nДата окончания: <b>" + expires.astimezone(timezone.utc).strftime("%d.%m.%Y %H:%M UTC") + "</b>.")
+    return jsonify(ok=True, expires_at=exp)
+
+
+@app.post("/api/admin/payments/<int:payment_id>/reject")
+def admin_payment_reject(payment_id):
+    admin = admin_required()
+    if not admin: return jsonify(error="Forbidden"), 403
+    c = database.conn()
+    row = c.execute("SELECT * FROM ai_payment_requests WHERE id=?", (payment_id,)).fetchone()
+    if not row: c.close(); return jsonify(error="Payment not found"), 404
+    if row["status"] != "pending": c.close(); return jsonify(error="Payment already reviewed"), 409
+    c.execute("UPDATE ai_payment_requests SET status='rejected', reviewed_at=?, reviewed_by=? WHERE id=?",
+              (datetime.now(timezone.utc).isoformat(), int(admin["telegram_id"]), payment_id))
+    c.commit(); c.close()
+    _notify_user(int(row["telegram_id"]), "❌ <b>Чек не подтверждён.</b>\n\nПроверьте сумму и данные оплаты и при необходимости отправьте новый чек.")
+    return jsonify(ok=True)
+
+
 @app.get("/api/admin/stats")
 def admin_stats():
     if not admin_required(): return jsonify(error="Forbidden"), 403
-    return jsonify(database.stats())
+    stats = database.stats()
+    c = database.conn()
+    stats["pending_payments"] = c.execute("SELECT COUNT(*) FROM ai_payment_requests WHERE status='pending'").fetchone()[0]
+    stats["approved_payments"] = c.execute("SELECT COUNT(*) FROM ai_payment_requests WHERE status='approved'").fetchone()[0]
+    c.close()
+    return jsonify(stats)
 
 @app.get("/api/admin/users")
 def admin_users():
@@ -359,7 +605,10 @@ def admin_unlimited():
     if not admin_required(): return jsonify(error="Forbidden"), 403
     d = request.get_json(silent=True) or {}
     tid = int(d.get("telegram_id",0))
-    database.set_unlimited(tid, bool(d.get("enabled")))
+    enabled = bool(d.get("enabled"))
+    database.set_unlimited(tid, enabled)
+    if not enabled:
+        c = database.conn(); c.execute("DELETE FROM ai_subscriptions WHERE telegram_id=?", (tid,)); c.commit(); c.close()
     return jsonify(ok=True)
 
 @app.post("/api/admin/add")
