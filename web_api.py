@@ -320,7 +320,6 @@ def _get_payment_admin_chat_id():
 
 def _telegram_multipart_request(method, chat_id, file_storage, caption):
     """Send a receipt to Telegram using the Bot API."""
-    import uuid
     import urllib.request
     import urllib.error
 
@@ -358,7 +357,13 @@ def _telegram_multipart_request(method, chat_id, file_storage, caption):
     body.append(content)
     body.append(f"\r\n--{boundary}--\r\n".encode("utf-8"))
 
-    url = f"https://api.telegram.org/bot{bot_token}/{method}"
+    telegram_method = {
+        "document": "sendDocument",
+        "photo": "sendPhoto",
+        "sendDocument": "sendDocument",
+        "sendPhoto": "sendPhoto",
+    }.get(method, method)
+    url = f"https://api.telegram.org/bot{bot_token}/{telegram_method}"
     req = urllib.request.Request(
         url,
         data=b"".join(body),
