@@ -1,5 +1,6 @@
 
 // UniUZ Home v6 FINAL
+// FIX: Home 'Сегодня' filters schedule by Tashkent weekday
 // UniUZ Home Dashboard v5 - schedule and homework cards
 // UniUZ Home Dashboard v4
 // UniUZ Home Dashboard v3
@@ -90,8 +91,25 @@ let homework=[];
 
 try{
  const s=await api("/schedule");
- schedule=s.items||[];
-}catch(e){}
+ const allSchedule=Array.isArray(s.items)?s.items:[];
+
+ // UniUZ uses day_of_week: 0=Monday ... 6=Sunday.
+ // Use Tashkent time so the "Сегодня" card always matches Uzbekistan time.
+ const todayIndex = ({
+  Mon:0, Tue:1, Wed:2, Thu:3, Fri:4, Sat:5, Sun:6
+ })[
+  new Intl.DateTimeFormat("en-US", {
+   timeZone:"Asia/Tashkent",
+   weekday:"short"
+  }).format(new Date())
+ ];
+
+ schedule=allSchedule.filter(
+  x => Number(x.day_of_week) === todayIndex
+ );
+}catch(e){
+ schedule=[];
+}
 
 try{
  const h=await api("/homework");
