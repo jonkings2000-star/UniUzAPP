@@ -474,7 +474,20 @@ async function askAI(){
  const button=document.querySelector('.card button[onclick="askAI()"]');
  if(button){
   button.disabled=true;
-  button.textContent="⏳ ИИ анализирует...";
+  button.textContent="⏳ Анализирую...";
+ }
+
+ const chat=document.getElementById("chat");
+ const loadingId="ai-loading-"+Date.now();
+
+ if(chat && file){
+  chat.innerHTML+=`
+   <div class="list-item" id="${loadingId}">
+    <b>🤖 ИИ анализирует файл...</b>
+    <p>⏳ Загружаю документ<br>
+    ⏳ Читаю материал<br>
+    ⏳ Готовлю ответ</p>
+   </div>`;
  }
 
  try{
@@ -486,6 +499,9 @@ async function askAI(){
 
   const question=q||"Проанализируй прикреплённый материал";
   const fileLine=file?`<div class="muted">📎 ${esc(file.name)}</div>`:"";
+
+  const loading=document.getElementById(loadingId);
+  if(loading) loading.remove();
 
   document.getElementById("chat").innerHTML+=`
    <div class="list-item">
