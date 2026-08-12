@@ -454,8 +454,8 @@ def ai_payment_receipt():
         receipt.save(path)
         caption = (
             "💳 <b>Новый чек на UniUZ AI</b>\n\n"
-            f"👤 {u.get('first_name','')} {u.get('last_name','')}\n"
-            f"🆔 Telegram ID: <code>{u.get('telegram_id')}</code>\n"
+            f"👤 {u['first_name'] or ''} {u['last_name'] or ''}\n"
+            f"🆔 Telegram ID: <code>{u['telegram_id']}</code>\n"
             f"💰 Сумма: <b>19 900 UZS</b>\n"
             "📌 Проверьте чек в админ-панели и примите решение."
         )
