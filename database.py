@@ -345,3 +345,18 @@ def get_ai_history(telegram_id, limit=30):
     """, (telegram_id, limit)).fetchall()
     c.close()
     return [dict(r) for r in rows]
+
+
+def get_ai_context(telegram_id, limit=10):
+    c = conn()
+    rows = c.execute("""
+        SELECT h.question,h.answer,h.file_name
+        FROM ai_history h
+        JOIN users u ON u.id=h.user_id
+        WHERE u.telegram_id=?
+        ORDER BY h.id DESC
+        LIMIT ?
+    """, (telegram_id, limit)).fetchall()
+    c.close()
+    rows = list(reversed(rows))
+    return [dict(r) for r in rows]
