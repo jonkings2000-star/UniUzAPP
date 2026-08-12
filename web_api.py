@@ -579,14 +579,28 @@ def ai_file():
             "решить задание. Объясни решение понятным языком и по шагам."
         )
 
+        history_text = ""
+        try:
+            history = database.get_ai_history(int(u["telegram_id"])) or []
+            if history:
+                history_text = "\n\nПредыдущий диалог пользователя:\n" + "\n".join(
+                    [
+                        f"Пользователь: {x.get('question','')}\nUniUZ AI: {x.get('answer','')}"
+                        for x in history[-5:]
+                    ]
+                )
+        except Exception as e:
+            print("AI history context:", repr(e))
+
         content = [{
             "type": "input_text",
             "text": (
                 "Ты UniUZ AI — помощник студента университета. "
-                "Отвечай на запрос пользователя. "
+                "Используй предыдущий диалог, если пользователь продолжает тему. "
+                "Не проси повторно отправлять файл, если контекст уже содержит информацию. "
                 "Помогай решать учебные задания, объясняй ход решения, "
                 "проверяй ответы и не выдумывай текст, которого не видно в файле.\n\n"
-                + "\n\nНовый запрос:\n" + prompt
+                + history_text + "\n\nНовый запрос:\n" + prompt
             )
         }]
 
@@ -671,6 +685,8 @@ def ai_file():
         return jsonify(
             ok=True,
             answer=answer,
+            file_id=locals().get("fid"),
+            filename=locals().get("filename"),
             used=used,
             limit=None if u["unlimited_ai"] else 10
         )
