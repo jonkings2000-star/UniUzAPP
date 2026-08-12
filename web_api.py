@@ -395,10 +395,16 @@ def _send_receipt_to_admin(file_storage, user):
             "Admin chat is not configured. Set ADMIN_ID or ADMIN_CHAT_ID in Railway Variables."
         )
 
+    def value(name, default=""):
+        try:
+            return user[name]
+        except (KeyError, IndexError, TypeError):
+            return default
+
     caption = (
         "💳 <b>Новый чек на UniUZ AI</b>\n\n"
-        f"👤 {user.get('first_name', '')} {user.get('last_name', '')}\n"
-        f"🆔 Telegram ID: <code>{user.get('telegram_id')}</code>\n"
+        f"👤 {value('first_name')} {value('last_name')}\n"
+        f"🆔 Telegram ID: <code>{value('telegram_id')}</code>\n"
         f"💰 Сумма: <b>19 900 UZS</b>\n"
         "📌 Требуется проверка оплаты."
     )
