@@ -9,6 +9,8 @@ from ai_service import ask, extract_schedule_from_image, extract_schedule_from_p
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 UPLOADS = os.path.join(BASE, "uploads")
+GENERATED_AI_DIR = os.path.join(UPLOADS, "ai_generated")
+os.makedirs(GENERATED_AI_DIR, exist_ok=True)
 os.makedirs(UPLOADS, exist_ok=True)
 
 app = Flask(__name__, static_folder=BASE, static_url_path="")
@@ -118,6 +120,42 @@ def admin_required():
 @app.get("/")
 def index():
     return send_from_directory(BASE, "index.html")
+
+
+
+def detect_ai_output_file(text):
+    t=(text or "").lower()
+    if any(x in t for x in ["презентац","слайды","ppt","powerpoint"]):
+        return "pptx","UniUZ_AI_Презентация"
+    if any(x in t for x in ["конспект","кратко","короткий","сократи","шпаргалка","summary"]):
+        return "pdf","UniUZ_AI_Конспект"
+    if any(x in t for x in ["реферат","эссе","доклад","word","документ"]):
+        return "docx","UniUZ_AI_Документ"
+    return None,None
+
+def create_ai_file(fmt, title, text):
+    import os, uuid
+    name=f"{uuid.uuid4().hex}.{fmt}"
+    path=os.path.join(GENERATED_AI_DIR,name)
+    if fmt=="pdf":
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet
+        doc=SimpleDocTemplate(path)
+        styles=getSampleStyleSheet()
+        doc.build([Paragraph(title,styles["Heading2"]),Spacer(1,12),Paragraph(text.replace("\n","<br/>"),styles["BodyText"])])
+    elif fmt=="docx":
+        from docx import Document
+        d=Document(); d.add_heading(title,1); d.add_paragraph(text); d.save(path)
+    else:
+        from pptx import Presentation
+        p=Presentation()
+        for part in text.split("\n\n")[:8]:
+            s=p.slides.add_slide(p.slide_layouts[1])
+            s.shapes.title.text=title
+            s.placeholders[1].text=part[:500]
+        p.save(path)
+    return name
+
 
 @app.get("/api/health")
 def health():
@@ -544,6 +582,16 @@ def ai_history():
         return jsonify(error="Unauthorized"), 401
     return jsonify(items=database.get_ai_history(int(u["telegram_id"])))
 
+
+
+@app.get("/api/ai/generated/<name>")
+def ai_generated(name):
+    u=user_required()
+    if not u: return jsonify(error="Unauthorized"),401
+    safe=os.path.basename(name)
+    return send_file(os.path.join(GENERATED_AI_DIR,safe), as_attachment=True, download_name=safe)
+
+
 @app.post("/api/ai/file")
 def ai_file():
     u = user_required()
@@ -629,6 +677,16 @@ def ai_file():
         )
 
         answer = response.output_text or "ИИ не вернул текстовый ответ."
+        file_info=None
+        fmt,title=detect_ai_output_file(question)
+        if fmt:
+            try:
+                filename=create_ai_file(fmt,title,answer)
+                file_info={"filename":filename,"url":"/api/ai/generated/"+filename}
+                answer += "\n\nГотово ✅\n📎 "+title+"."+fmt+"\n⬇️ Скачать файл"
+            except Exception as e:
+                print("AI file create:",e)
+
         database.save_ai_history(
             int(u["telegram_id"]),
             question or "Анализ файла",
@@ -640,7 +698,8 @@ def ai_file():
             ok=True,
             answer=answer,
             used=used,
-            limit=None if u["unlimited_ai"] else 10
+            limit=None if u["unlimited_ai"] else 10,
+            file=file_info
         )
 
     except Exception as e:
