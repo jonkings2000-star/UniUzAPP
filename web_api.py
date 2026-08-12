@@ -318,7 +318,7 @@ def _get_payment_admin_chat_id():
     return ""
 
 
-def _telegram_multipart_request(method, chat_id, file_storage, caption):
+def _telegram_multipart_request(api_method, file_field, chat_id, file_storage, caption):
     """Send a receipt to Telegram using the Bot API."""
     import uuid
     import urllib.request
@@ -351,14 +351,14 @@ def _telegram_multipart_request(method, chat_id, file_storage, caption):
     body.append(
         (
             f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="{method}"; filename="{filename}"\r\n'
+            f'Content-Disposition: form-data; name="{file_field}"; filename="{filename}"\r\n'
             f"Content-Type: {mime}\r\n\r\n"
         ).encode("utf-8")
     )
     body.append(content)
     body.append(f"\r\n--{boundary}--\r\n".encode("utf-8"))
 
-    url = f"https://api.telegram.org/bot{bot_token}/{method}"
+    url = f"https://api.telegram.org/bot{bot_token}/{api_method}"
     req = urllib.request.Request(
         url,
         data=b"".join(body),
@@ -403,12 +403,11 @@ def _send_receipt_to_admin(file_storage, user):
         "📌 Требуется проверка оплаты."
     )
 
-    filename = (file_storage.filename or "").lower()
-    method = "sendDocument" if filename.endswith(".pdf") else "sendPhoto"
-
-    # Telegram's sendPhoto expects the field name `photo`, while sendDocument expects `document`.
+    # Use sendDocument for every receipt. It accepts PDF and image files and avoids
+    # Telegram sendPhoto restrictions on image formats/resolution.
     return _telegram_multipart_request(
-        "photo" if method == "sendPhoto" else "document",
+        "sendDocument",
+        "document",
         admin_chat_id,
         file_storage,
         caption,
@@ -476,8 +475,8 @@ def ai_payment_receipt():
             if os.path.exists(path): os.remove(path)
         except Exception:
             pass
-        print("Payment receipt error:", e)
-        return jsonify(error="Не удалось отправить чек администратору"), 500
+        print("Payment receipt error:", repr(e))
+        return jsonify(error=f"Не удалось отправить чек администратору: {e}"), 500
 
     return jsonify(
         ok=True,

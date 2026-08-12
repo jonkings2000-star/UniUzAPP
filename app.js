@@ -169,10 +169,23 @@ layout(`
 <div class="ai-card">
  <div class="ai-title">🤖 UniUZ AI</div>
  <p>Ваш персональный помощник</p>
+ <div id="home-ai-status" class="muted" style="margin:8px 0">⏳ Загружаем лимит...</div>
  <button class="btn primary" onclick="showAI()">
  Спросить ИИ →
  </button>
 </div>
+
+${profile?.is_admin ? `
+<div class="card" style="border:1px solid rgba(255,255,255,.12)">
+ <div class="row" style="justify-content:space-between;align-items:center">
+  <div>
+   <h3 style="margin:0">🔐 Админ-панель</h3>
+   <div class="muted small">Управление пользователями и оплатами</div>
+  </div>
+  <button class="btn primary" onclick="showAdmin()">Открыть →</button>
+ </div>
+</div>
+` : ""}
 
 
 <div class="quick-grid-v2">
@@ -195,6 +208,17 @@ layout(`
 
 `)
 
+try {
+ const ai=await api("/ai/status");
+ const el=document.getElementById("home-ai-status");
+ if(el){
+  el.innerHTML = ai.limit===null ? "♾️ <b>Безлимитный AI</b>" : `🤖 Запросы сегодня: <b>${ai.used}/10</b>`;
+ }
+} catch(e) {
+ const el=document.getElementById("home-ai-status");
+ if(el) el.textContent="🤖 Лимит: 10 запросов в день";
+}
+
 }
 async function showSchedule(){try{const d=await api("/schedule");const names=lang==="ru"?["Пн","Вт","Ср","Чт","Пт","Сб","Вс"]:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];layout(`${brand()}<div class="card"><div class="row"><h2>🗓️ ${tr("schedule")}</h2><label class="btn">📎 ${tr("upload")}<input id="sf" type="file" accept=".pdf,image/*" hidden></label></div><div id="sl">${d.items.length?d.items.map(x=>`<div class="list-item"><b>${names[x.day_of_week]} ${esc(x.start_time)} — ${esc(x.subject)}</b><div class="muted small">${esc(x.room||"")}</div></div>`).join(""):`<div class="empty">${tr("noData")}</div>`}</div></div>`,"schedule");document.getElementById("sf").onchange=uploadSchedule}catch(e){toast(e.message)}}
 async function uploadSchedule(e){const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append("file",f);try{await api("/schedule/upload",{method:"POST",body:fd});showSchedule()}catch(e){toast(e.message)}}
@@ -216,15 +240,20 @@ async function toggleHW(id,completed){try{await api(`/homework/${id}/complete`,{
 async function deleteHW(id){try{await api(`/homework/${id}`,{method:"DELETE"});showHomework()}catch(e){toast(e.message)}}
 
 function showAI(){
- layout(`${brand()}<div class="card"><h2>🤖 ${tr("ai")}</h2><div id="chat"></div><textarea id="q" class="input" placeholder="${tr("question")}"></textarea><button class="btn primary" onclick="askAI()">${tr("send")}</button></div>`,"ai");
+ layout(`${brand()}<div class="card"><h2>🤖 ${tr("ai")}</h2><div id="ai-counter" class="badge" style="display:inline-block;margin-bottom:10px">⏳ ...</div><div id="chat"></div><textarea id="q" class="input" placeholder="${tr("question")}"></textarea><button class="btn primary" onclick="askAI()">${tr("send")}</button></div>`,"ai");
  loadAIStatusInChat();
 }
 
 async function loadAIStatusInChat(){
  try{
   const d=await api("/ai/status");
+  const counter=document.getElementById("ai-counter");
+  if(counter) counter.innerHTML=d.limit===null ? "♾️ Безлимитный AI" : `🤖 Сегодня: ${d.used}/10`;
   if(d.limit!==null && d.used>=10) showAILimitInChat();
- }catch(e){}
+ }catch(e){
+  const counter=document.getElementById("ai-counter");
+  if(counter) counter.textContent="🤖 Лимит: 10 запросов в день";
+ }
 }
 
 function showAILimitInChat(){
