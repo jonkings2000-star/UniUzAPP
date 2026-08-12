@@ -86,6 +86,18 @@ def init_db():
     )
     """)
 
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS ai_generated_files(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        filename TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        file_type TEXT NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id)
+    )
+    """)
+
     # Safe migration for existing databases.
     try:
         cur.execute("ALTER TABLE homework ADD COLUMN file_path TEXT")
@@ -360,3 +372,28 @@ def get_ai_context(telegram_id, limit=10):
     c.close()
     rows = list(reversed(rows))
     return [dict(r) for r in rows]
+
+
+def save_ai_generated_file(telegram_id, filename, file_path, file_type):
+    c = conn()
+    user = c.execute("SELECT id FROM users WHERE telegram_id=?", (telegram_id,)).fetchone()
+    if not user:
+        c.close()
+        return None
+    cur = c.execute("INSERT INTO ai_generated_files(user_id,filename,file_path,file_type) VALUES(?,?,?,?)",
+                    (user["id"], filename, file_path, file_type))
+    fid = cur.lastrowid
+    c.commit()
+    c.close()
+    return fid
+
+
+def get_ai_generated_file(telegram_id, file_id):
+    c = conn()
+    row = c.execute("""
+        SELECT f.id,f.filename,f.file_path,f.file_type,f.created_at
+        FROM ai_generated_files f JOIN users u ON u.id=f.user_id
+        WHERE f.id=? AND u.telegram_id=?
+    """,(file_id,telegram_id)).fetchone()
+    c.close()
+    return dict(row) if row else None
