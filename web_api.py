@@ -1,4 +1,4 @@
-import os, json, hmac, hashlib, uuid
+import os, json, hmac, hashlib, uuid, re
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl
 from flask import Flask, request, jsonify, send_from_directory, send_file
@@ -9,9 +9,9 @@ from ai_service import ask, extract_schedule_from_image, extract_schedule_from_p
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 UPLOADS = os.path.join(BASE, "uploads")
-GENERATED_AI_DIR = os.path.join(UPLOADS, "ai_generated")
-os.makedirs(GENERATED_AI_DIR, exist_ok=True)
 os.makedirs(UPLOADS, exist_ok=True)
+AI_GENERATED_DIR = os.path.join(UPLOADS, "ai_generated")
+os.makedirs(AI_GENERATED_DIR, exist_ok=True)
 
 app = Flask(__name__, static_folder=BASE, static_url_path="")
 CORS(app)
@@ -120,42 +120,6 @@ def admin_required():
 @app.get("/")
 def index():
     return send_from_directory(BASE, "index.html")
-
-
-
-def detect_ai_output_file(text):
-    t=(text or "").lower()
-    if any(x in t for x in ["презентац","слайды","ppt","powerpoint"]):
-        return "pptx","UniUZ_AI_Презентация"
-    if any(x in t for x in ["конспект","кратко","короткий","сократи","шпаргалка","summary"]):
-        return "pdf","UniUZ_AI_Конспект"
-    if any(x in t for x in ["реферат","эссе","доклад","word","документ"]):
-        return "docx","UniUZ_AI_Документ"
-    return None,None
-
-def create_ai_file(fmt, title, text):
-    import os, uuid
-    name=f"{uuid.uuid4().hex}.{fmt}"
-    path=os.path.join(GENERATED_AI_DIR,name)
-    if fmt=="pdf":
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-        from reportlab.lib.styles import getSampleStyleSheet
-        doc=SimpleDocTemplate(path)
-        styles=getSampleStyleSheet()
-        doc.build([Paragraph(title,styles["Heading2"]),Spacer(1,12),Paragraph(text.replace("\n","<br/>"),styles["BodyText"])])
-    elif fmt=="docx":
-        from docx import Document
-        d=Document(); d.add_heading(title,1); d.add_paragraph(text); d.save(path)
-    else:
-        from pptx import Presentation
-        p=Presentation()
-        for part in text.split("\n\n")[:8]:
-            s=p.slides.add_slide(p.slide_layouts[1])
-            s.shapes.title.text=title
-            s.placeholders[1].text=part[:500]
-        p.save(path)
-    return name
-
 
 @app.get("/api/health")
 def health():
@@ -582,16 +546,6 @@ def ai_history():
         return jsonify(error="Unauthorized"), 401
     return jsonify(items=database.get_ai_history(int(u["telegram_id"])))
 
-
-
-@app.get("/api/ai/generated/<name>")
-def ai_generated(name):
-    u=user_required()
-    if not u: return jsonify(error="Unauthorized"),401
-    safe=os.path.basename(name)
-    return send_file(os.path.join(GENERATED_AI_DIR,safe), as_attachment=True, download_name=safe)
-
-
 @app.post("/api/ai/file")
 def ai_file():
     u = user_required()
@@ -625,13 +579,25 @@ def ai_file():
             "решить задание. Объясни решение понятным языком и по шагам."
         )
 
+        context = database.get_ai_context(int(u["telegram_id"]), 10)
+        history_text = ""
+        if context:
+            history_text = "\n\nПредыдущий диалог пользователя:\n" + "\n".join(
+                [
+                    f"Пользователь: {x.get('question','')}\nUniUZ AI: {x.get('answer','')}"
+                    for x in context
+                ]
+            )
+
         content = [{
             "type": "input_text",
             "text": (
                 "Ты UniUZ AI — помощник студента университета. "
+                "Используй предыдущий диалог, если пользователь продолжает тему. "
+                "Не проси повторно отправлять файл, если контекст уже содержит информацию. "
                 "Помогай решать учебные задания, объясняй ход решения, "
                 "проверяй ответы и не выдумывай текст, которого не видно в файле.\n\n"
-                + prompt
+                + history_text + "\n\nНовый запрос:\n" + prompt
             )
         }]
 
@@ -677,16 +643,39 @@ def ai_file():
         )
 
         answer = response.output_text or "ИИ не вернул текстовый ответ."
-        file_info=None
-        fmt,title=detect_ai_output_file(question)
-        if fmt:
-            try:
-                filename=create_ai_file(fmt,title,answer)
-                file_info={"filename":filename,"url":"/api/ai/generated/"+filename}
-                answer += "\n\nГотово ✅\n📎 "+title+"."+fmt+"\n⬇️ Скачать файл"
-            except Exception as e:
-                print("AI file create:",e)
+        generated_file_id = None
+        generated_filename = None
 
+        # Автоматическое создание файла по смыслу запроса
+        auto_type, auto_title = detect_ai_output_file(question)
+        if auto_type:
+            try:
+                filename = _safe_generated_title(auto_title) + "." + auto_type
+                path = os.path.join(
+                    AI_GENERATED_DIR,
+                    f"{int(u['telegram_id'])}_{uuid.uuid4().hex}.{auto_type}"
+                )
+
+                if auto_type == "docx":
+                    _create_docx_file(path, auto_title, answer)
+                elif auto_type == "pdf":
+                    _create_pdf_file(path, auto_title, answer)
+                elif auto_type == "pptx":
+                    _create_pptx_file(path, auto_title, answer)
+
+                fid = database.save_ai_generated_file(
+                    int(u["telegram_id"]),
+                    filename,
+                    path,
+                    auto_type
+                )
+                generated_file_id = fid
+                generated_filename = filename
+
+                if fid:
+                    answer += f"\n\nГотово ✅\n📎 {filename}"
+            except Exception as file_error:
+                print("auto file generation error:", repr(file_error))
         database.save_ai_history(
             int(u["telegram_id"]),
             question or "Анализ файла",
@@ -697,15 +686,136 @@ def ai_file():
         return jsonify(
             ok=True,
             answer=answer,
-            file_info=file_info,
             used=used,
             limit=None if u["unlimited_ai"] else 10,
-            file=file_info
+            file_id=generated_file_id,
+            filename=generated_filename
         )
 
     except Exception as e:
         print("AI file error:", repr(e))
         return jsonify(error=f"Ошибка анализа файла: {e}"), 500
+
+
+
+
+
+def detect_ai_output_file(text):
+    t = (text or "").lower()
+
+    if any(x in t for x in [
+        "презентац", "слайды", "ppt", "pptx",
+        "powerpoint", "слайд"
+    ]):
+        return "pptx", "UniUZ_AI_Презентация"
+
+    if any(x in t for x in [
+        "конспект", "кратко", "короткий", "коротко",
+        "сократи", "summary", "шпаргалка",
+        "выжимка", "сделай краткое"
+    ]):
+        return "pdf", "UniUZ_AI_Конспект"
+
+    if any(x in t for x in [
+        "реферат", "эссе", "доклад",
+        "оформи текст", "документ", "word"
+    ]):
+        return "docx", "UniUZ_AI_Документ"
+
+    return None, None
+
+def _safe_generated_title(title):
+    title=(title or "UniUZ_AI").strip()
+    title=re.sub(r"[^\w\s\-а-яА-ЯёЁ]","",title,flags=re.UNICODE)
+    title=re.sub(r"\s+","_",title)[:80]
+    return title or "UniUZ_AI"
+
+
+def _create_docx_file(path,title,content):
+    from docx import Document
+    doc=Document(); doc.add_heading(title,level=1)
+    for part in re.split(r"\n\s*\n",content.strip()):
+        if part.strip(): doc.add_paragraph(part.strip())
+    doc.save(path)
+
+
+def _create_pdf_file(path,title,content):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.units import mm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from xml.sax.saxutils import escape
+    styles=getSampleStyleSheet()
+    ts=ParagraphStyle("UniUZTitle",parent=styles["Title"],alignment=TA_CENTER,spaceAfter=12)
+    bs=ParagraphStyle("UniUZBody",parent=styles["BodyText"],leading=16,spaceAfter=8)
+    doc=SimpleDocTemplate(path,pagesize=A4,rightMargin=18*mm,leftMargin=18*mm,topMargin=18*mm,bottomMargin=18*mm)
+    story=[Paragraph(escape(title),ts)]
+    for part in re.split(r"\n\s*\n",content.strip()):
+        text=escape(part.strip()).replace("\n","<br/>")
+        if text: story += [Paragraph(text,bs),Spacer(1,4)]
+    doc.build(story)
+
+
+def _create_pptx_file(path,title,content):
+    from pptx import Presentation
+    from pptx.util import Pt
+    prs=Presentation()
+    s=prs.slides.add_slide(prs.slide_layouts[0]); s.shapes.title.text=title
+    s.placeholders[1].text="Создано UniUZ AI"
+    parts=[x.strip() for x in re.split(r"\n\s*\n",content.strip()) if x.strip()] or [content.strip()]
+    slides=[]; cur=[]
+    for part in parts:
+        if len("\n".join(cur+[part]))>1100 and cur:
+            slides.append("\n".join(cur)); cur=[]
+        cur.append(part)
+    if cur: slides.append("\n".join(cur))
+    for i,text in enumerate(slides[:20],1):
+        sl=prs.slides.add_slide(prs.slide_layouts[1]); sl.shapes.title.text=f"{title} — {i}"
+        tf=sl.placeholders[1].text_frame; tf.clear()
+        p=tf.paragraphs[0]; p.text=text[:5000]; p.font.size=Pt(20)
+    prs.save(path)
+
+
+@app.post("/api/ai/create-file")
+def ai_create_file():
+    u=user_required()
+    if not u: return jsonify(error="Unauthorized"),401
+    d=request.get_json(silent=True) or {}
+    file_type=str(d.get("type","")).lower().strip()
+    title=str(d.get("title","UniUZ AI")).strip()
+    content=str(d.get("content","")).strip()
+    if file_type not in ("docx","pdf","pptx"):
+        return jsonify(error="Поддерживаются DOCX, PDF и PPTX"),400
+    if not content: return jsonify(error="Нет текста для создания файла"),400
+    if len(content)>120000: return jsonify(error="Текст слишком большой"),413
+    safe=_safe_generated_title(title); filename=safe+"."+file_type
+    path=os.path.join(AI_GENERATED_DIR,f"{int(u['telegram_id'])}_{uuid.uuid4().hex}.{file_type}")
+    try:
+        if file_type=="docx": _create_docx_file(path,title,content)
+        elif file_type=="pdf": _create_pdf_file(path,title,content)
+        else: _create_pptx_file(path,title,content)
+        fid=database.save_ai_generated_file(int(u["telegram_id"]),filename,path,file_type)
+        if not fid: raise RuntimeError("Не удалось сохранить файл")
+        return jsonify(ok=True,id=fid,filename=filename,file_type=file_type)
+    except Exception as e:
+        try:
+            if os.path.exists(path): os.remove(path)
+        except Exception: pass
+        print("AI create file error:",repr(e))
+        return jsonify(error=f"Не удалось создать файл: {e}"),500
+
+
+@app.get("/api/ai/generated/<int:file_id>")
+def ai_generated_file(file_id):
+    u=user_required()
+    if not u: return jsonify(error="Unauthorized"),401
+    row=database.get_ai_generated_file(int(u["telegram_id"]),file_id)
+    if not row or not os.path.isfile(row["file_path"]):
+        return jsonify(error="Файл не найден"),404
+    response=send_file(row["file_path"],as_attachment=True,download_name=row["filename"])
+    response.headers["Cache-Control"]="private, no-store"
+    return response
 
 
 @app.post("/api/ai")

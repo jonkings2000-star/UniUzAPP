@@ -534,13 +534,16 @@ async function askAI(){
   const loading=document.getElementById(loadingId);
   if(loading) loading.remove();
 
-  document.getElementById("chat").innerHTML+=`
-   <div class="list-item">
+   const answerId="ai-answer-"+Date.now();
+   document.getElementById("chat").innerHTML+=`
+   <div class="list-item" id="${answerId}">
     <b>${esc(question)}</b>
     ${fileLine}
     <p>${esc(d.answer)}</p>
-    ${d.file_info && d.file_info.url ? `<button class="btn" type="button" onclick="downloadAIFile('${d.file_info.url}','${esc(d.file_info.filename||'UniUZ_AI_File')}')">⬇️ Скачать файл</button>` : ""}
     <span class="badge">${d.limit===null?"∞":`${d.used}/10`}</span>
+    ${d.file_id ? `<div style="margin-top:10px">
+       <button class="btn primary" type="button" onclick="downloadAIFile(${d.file_id}, '${esc(d.filename||"UniUZ_AI_File")}')">⬇️ Скачать файл</button>
+      </div>` : ""}
    </div>`;
 
   document.getElementById("q").value="";
@@ -558,6 +561,23 @@ async function askAI(){
  }
 }
 
+
+
+async function downloadAIFile(id,name){
+ try{
+  const r=await fetch(`${API}/ai/generated/${id}`,{
+   headers:{"X-Telegram-Init-Data":tg?.initData||""}
+  });
+  if(!r.ok) throw new Error("Файл не найден");
+  const blob=await r.blob();
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=name;
+  a.click();
+  URL.revokeObjectURL(url);
+ }catch(e){toast(e.message||"Не удалось скачать файл")}
+}
 
 async function showReminders(){try{const d=await api("/reminders");layout(`${brand()}<div class="card"><h2>🔔 ${tr("reminders")}</h2><p>${d.enabled?tr("enabled"):tr("disabled")}</p><button class="btn primary" onclick="toggleReminders(${!d.enabled})">${d.enabled?tr("disabled"):tr("enabled")}</button></div>`)}catch(e){toast(e.message)}}
 async function toggleReminders(enabled){try{await api("/reminders",{method:"POST",body:{enabled}});showReminders()}catch(e){toast(e.message)}}
@@ -631,18 +651,4 @@ async function addAdmin(){
  const id=document.getElementById("adminId").value.trim();
  if(!id)return;
  try{await api("/admin/add",{method:"POST",body:{telegram_id:id}});toast("Admin added");showAdmin()}catch(e){toast(e.message)}
-}
-
-
-async function downloadAIFile(url, filename){
- try{
-  const r=await fetch(`${API}${url}`,{headers:{"X-Telegram-Init-Data":tg.initData}});
-  if(!r.ok) throw new Error("download");
-  const blob=await r.blob();
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download=filename;
-  a.click();
-  URL.revokeObjectURL(a.href);
- }catch(e){toast("Не удалось скачать файл")}
 }
