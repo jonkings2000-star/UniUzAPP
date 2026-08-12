@@ -161,6 +161,22 @@ async def main():
 
     bot = Bot(BOT_TOKEN)
 
+    # One-time test mode:
+    # TEST_TELEGRAM_ID=123456789 python reminders.py
+    test_id = os.environ.get("TEST_TELEGRAM_ID")
+    if test_id:
+        conn = database.conn()
+        try:
+            rows = today_schedule_for_user(conn, int(test_id), tashkent_now().weekday())
+            text = format_schedule(rows)
+        finally:
+            conn.close()
+
+        await bot.send_message(int(test_id), "🧪 <b>Тест утреннего уведомления</b>\\n\\n" + text, parse_mode="HTML")
+        print(f"[TEST] sent morning reminder to {test_id}")
+        await bot.session.close()
+        return
+
     print("UniUZ Morning Reminders STARTED")
     print(
         f"Timezone: Asia/Tashkent | "
