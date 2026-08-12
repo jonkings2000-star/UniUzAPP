@@ -368,6 +368,7 @@ function showAI(){
   <div class="ai-card">
    <div class="ai-title">🤖 UniUZ AI</div>
    <p>Ваш персональный помощник</p>
+   <button class="btn" onclick="showAIHistory()">📚 История AI</button>
    <div id="ai-usage" class="badge" style="display:block;text-align:center;margin:12px 0">Загрузка...</div>
   </div>
   <div class="card">
@@ -438,6 +439,13 @@ function clearAIFile(){
   out.style.display="none";
   out.textContent="";
  }
+}
+
+async function showAIHistory(){
+ try{
+  const d=await api("/ai/history");
+  layout(`${brand()}<div class="card"><h2>📚 История AI</h2>${(d.items||[]).map(x=>`<div class="list-item"><b>${esc(x.question||"")}</b><p>${esc(x.answer||"")}</p><div class="muted">${esc(x.created_at||"")}</div></div>`).join("") || '<div class="empty">История пока пустая</div>'}</div>`,"ai");
+ }catch(e){toast(e.message)}
 }
 
 function showAILimitInChat(){
@@ -526,22 +534,6 @@ async function askAI(){
  }
 }
 
-
-async function showAIHistory(){
- try{
-  const d=await api("/ai/history");
-  layout(`${brand()}<div class="card"><div class="row"><h2>📚 История AI</h2><button class="btn" onclick="showAI()">Назад</button></div></div>
-  <div class="card">${
-   d.items.length ? d.items.map(x=>`
-    <div class="list-item">
-     ${x.file_name?`<div class="muted">📎 ${esc(x.file_name)}</div>`:""}
-     <b>${esc(x.question||"")}</b>
-     <p>${esc(x.answer)}</p>
-     <div class="muted small">${esc(x.created_at)}</div>
-    </div>`).join("") : `<div class="empty">История пуста</div>`
-  }</div>`,"ai");
- }catch(e){toast(e.message)}
-}
 
 async function showReminders(){try{const d=await api("/reminders");layout(`${brand()}<div class="card"><h2>🔔 ${tr("reminders")}</h2><p>${d.enabled?tr("enabled"):tr("disabled")}</p><button class="btn primary" onclick="toggleReminders(${!d.enabled})">${d.enabled?tr("disabled"):tr("enabled")}</button></div>`)}catch(e){toast(e.message)}}
 async function toggleReminders(enabled){try{await api("/reminders",{method:"POST",body:{enabled}});showReminders()}catch(e){toast(e.message)}}
