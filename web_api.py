@@ -389,33 +389,34 @@ def _telegram_multipart_request(method, chat_id, file_storage, caption):
 
 
 def _send_receipt_to_admin(file_storage, user):
-    # sqlite3.Row does not implement .get(); normalize it to a dict first.
+    """Send any receipt file to the configured admin as a Telegram document."""
+    from html import escape
     user = dict(user)
     admin_chat_id = _get_payment_admin_chat_id()
     if not admin_chat_id:
-        raise RuntimeError(
-            "Admin chat is not configured. Set ADMIN_ID or ADMIN_CHAT_ID in Railway Variables."
-        )
+        raise RuntimeError("ADMIN_ID/ADMIN_CHAT_ID is not configured")
+
+    first_name = escape(str(user.get("first_name") or ""))
+    last_name = escape(str(user.get("last_name") or ""))
+    telegram_id = escape(str(user.get("telegram_id") or ""))
+    filename = os.path.basename(file_storage.filename or f"receipt-{uuid.uuid4().hex}.bin")
 
     caption = (
         "💳 <b>Новый чек на UniUZ AI</b>\n\n"
-        f"👤 {user.get('first_name', '')} {user.get('last_name', '')}\n"
-        f"🆔 Telegram ID: <code>{user.get('telegram_id')}</code>\n"
-        f"💰 Сумма: <b>19 900 UZS</b>\n"
+        f"👤 {first_name} {last_name}\n"
+        f"🆔 Telegram ID: <code>{telegram_id}</code>\n"
+        "💰 Сумма: <b>19 900 UZS</b>\n"
         "📌 Требуется проверка оплаты."
     )
 
-    filename = (file_storage.filename or "").lower()
-    method = "sendDocument" if filename.endswith(".pdf") else "sendPhoto"
-
-    # Telegram's sendPhoto expects the field name `photo`, while sendDocument expects `document`.
+    # Always use sendDocument. Telegram accepts JPG/PNG/WEBP/PDF as documents,
+    # which avoids different sendPhoto/sendDocument multipart formats.
     return _telegram_multipart_request(
-        "photo" if method == "sendPhoto" else "document",
+        "document",
         admin_chat_id,
         file_storage,
         caption,
     )
-
 
 @app.post("/api/ai/payment-receipt")
 def ai_payment_receipt():
@@ -479,8 +480,8 @@ def ai_payment_receipt():
             if os.path.exists(path): os.remove(path)
         except Exception:
             pass
-        print("Payment receipt error:", e)
-        return jsonify(error="Не удалось отправить чек администратору"), 500
+        print("Payment receipt error:", repr(e))
+        return jsonify(error=f"Не удалось отправить чек администратору: {e}"), 500
 
     return jsonify(
         ok=True,

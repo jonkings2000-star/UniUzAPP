@@ -169,6 +169,7 @@ layout(`
 <div class="ai-card">
  <div class="ai-title">🤖 UniUZ AI</div>
  <p>Ваш персональный помощник</p>
+ <div id="home-ai-usage" class="ai-usage">Загрузка...</div>
  <button class="btn primary" onclick="showAI()">
  Спросить ИИ →
  </button>
@@ -194,7 +195,7 @@ layout(`
 </div>
 
 `)
-
+ loadHomeAIUsage();
 }
 async function showSchedule(){try{const d=await api("/schedule");const names=lang==="ru"?["Пн","Вт","Ср","Чт","Пт","Сб","Вс"]:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];layout(`${brand()}<div class="card"><div class="row"><h2>🗓️ ${tr("schedule")}</h2><label class="btn">📎 ${tr("upload")}<input id="sf" type="file" accept=".pdf,image/*" hidden></label></div><div id="sl">${d.items.length?d.items.map(x=>`<div class="list-item"><b>${names[x.day_of_week]} ${esc(x.start_time)} — ${esc(x.subject)}</b><div class="muted small">${esc(x.room||"")}</div></div>`).join(""):`<div class="empty">${tr("noData")}</div>`}</div></div>`,"schedule");document.getElementById("sf").onchange=uploadSchedule}catch(e){toast(e.message)}}
 async function uploadSchedule(e){const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append("file",f);try{await api("/schedule/upload",{method:"POST",body:fd});showSchedule()}catch(e){toast(e.message)}}
@@ -214,6 +215,19 @@ async function addHW(){
 }
 async function toggleHW(id,completed){try{await api(`/homework/${id}/complete`,{method:"POST",body:{completed:!!completed}});showHomework()}catch(e){toast(e.message)}}
 async function deleteHW(id){try{await api(`/homework/${id}`,{method:"DELETE"});showHomework()}catch(e){toast(e.message)}}
+
+async function loadHomeAIUsage(){
+ try{
+  const d=await api("/ai/status");
+  const el=document.getElementById("home-ai-usage");
+  if(el){
+   el.textContent=d.limit===null ? "∞ Безлимитный AI" : `${d.used}/10 запросов сегодня`;
+  }
+ }catch(e){
+  const el=document.getElementById("home-ai-usage");
+  if(el) el.textContent="0/10 запросов сегодня";
+ }
+}
 
 function showAI(){
  layout(`${brand()}<div class="card"><h2>🤖 ${tr("ai")}</h2><div id="chat"></div><textarea id="q" class="input" placeholder="${tr("question")}"></textarea><button class="btn primary" onclick="askAI()">${tr("send")}</button></div>`,"ai");
@@ -292,6 +306,7 @@ async function askAI(){
   const d=await api("/ai",{method:"POST",body:{message:q}});
   document.getElementById("chat").innerHTML+=`<div class="list-item"><b>${esc(q)}</b><p>${esc(d.answer)}</p><span class="badge">${d.limit===null?"∞":`${d.used}/10`}</span></div>`;
   document.getElementById("q").value="";
+  loadHomeAIUsage();
   if(d.limit!==null && d.used>=10) showAILimitInChat();
  }catch(e){
   if(e.status===429) showAILimitInChat();
