@@ -580,13 +580,17 @@ def ai_file():
         )
 
         history_text = ""
-        if context:
-            history_text = "\n\nПредыдущий диалог пользователя:\n" + "\n".join(
-                [
-                    f"Пользователь: {x.get('question','')}\nUniUZ AI: {x.get('answer','')}"
-                    for x in context
-                ]
-            )
+        try:
+            history = database.get_ai_history(int(u["telegram_id"])) or []
+            if history:
+                history_text = "\n\nПредыдущий диалог пользователя:\n" + "\n".join(
+                    [
+                        f"Пользователь: {x.get('question','')}\nUniUZ AI: {x.get('answer','')}"
+                        for x in history[-5:]
+                    ]
+                )
+        except Exception as e:
+            print("AI history context:", repr(e))
 
         content = [{
             "type": "input_text",
@@ -681,6 +685,8 @@ def ai_file():
         return jsonify(
             ok=True,
             answer=answer,
+            file_id=locals().get("fid"),
+            filename=locals().get("filename"),
             used=used,
             limit=None if u["unlimited_ai"] else 10
         )
@@ -824,9 +830,10 @@ def ai():
     try:
         answer = ask(u, question, database.get_schedule(int(u["telegram_id"])), database.get_homework(int(u["telegram_id"])))
 
-        # Automatic file generation for normal AI chat requests
         file_id = None
         filename = None
+
+        # Автоматическое создание файла для обычного AI чата
         try:
             auto_type, auto_title = detect_ai_output_file(question)
             if auto_type:
@@ -851,11 +858,12 @@ def ai():
                 )
 
                 if file_id:
-                    answer += f"\\n\\nГотово ✅\\n📎 {filename}"
+                    answer += f"\n\nГотово ✅\n📎 {filename}"
         except Exception as file_error:
-            print("auto text file generation error:", repr(file_error))
+            print("auto text file error:", repr(file_error))
 
         database.save_ai_history(int(u["telegram_id"]), question, answer)
+
         return jsonify(
             ok=True,
             answer=answer,
