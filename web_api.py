@@ -1,1261 +1,279 @@
-import os
-import json
-import hmac
-import hashlib
-import urllib.parse
-from datetime import datetime, timezone
-
+import os, json, hmac, hashlib
+from urllib.parse import parse_qsl
 from flask import Flask, request, jsonify, send_from_directory
-
+from flask_cors import CORS
 import database
+from ai_service import ask, extract_schedule_from_image, extract_schedule_from_pdf
 
+BASE = os.path.dirname(os.path.abspath(__file__))
+UPLOADS = os.path.join(BASE, "uploads")
+os.makedirs(UPLOADS, exist_ok=True)
 
-# ============================================================
-# APP
-# ============================================================
-
-app = Flask(__name__)
-
+app = Flask(__name__, static_folder=BASE, static_url_path="")
+CORS(app)
 database.init_db()
 
+def telegram_user():
+    raw = request.headers.get("X-Telegram-Init-Data", "")
+    if not raw:
+        # Useful only for local browser testing if a TEST_TELEGRAM_ID is configured.
+        tid = os.environ.get("TEST_TELEGRAM_ID")
+        if tid:
+            return {"id": int(tid), "first_name": "Test", "last_name": "User"}
+        return None
+    try:
+        bot_token = os.environ.get("BOT_TOKEN", "")
+        pairs = dict(parse_qsl(raw, keep_blank_values=True))
+        received = pairs.pop("hash", None)
+        if not received or not bot_token:
+            return None
+        check = "\n".join(f"{k}={v}" for k,v in sorted(pairs.items()))
+        secret = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+        calc = hmac.new(secret, check.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(calc, received):
+            return None
+        return json.loads(pairs["user"])
+    except Exception as e:
+        print("auth:", e)
+        return None
 
-# ============================================================
-# MINI APP STATIC FILES
-# ============================================================
+def user_required():
+    u = telegram_user()
+    if not u:
+        return None
+    return database.create_or_update_user(u)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
+def admin_required():
+    u = user_required()
+    if not u:
+        return None
+    admin_id = os.environ.get("ADMIN_ID", "")
+    if str(u["telegram_id"]) != str(admin_id) and not u["is_admin"]:
+        return None
+    return u
 
 @app.get("/")
-def miniapp_index():
-    return send_from_directory(BASE_DIR, "index.html")
+def index():
+    return send_from_directory(BASE, "index.html")
 
-
-@app.get("/<path:filename>")
-def miniapp_static(filename):
-    # Keep /api/* handled by Flask API routes; serve frontend assets otherwise.
-    if filename.startswith("api/"):
-        return not_found(None)
-    return send_from_directory(BASE_DIR, filename)
-
-
-# ============================================================
-# CONFIG
-# ============================================================
-
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-
-if not BOT_TOKEN:
-    print("WARNING: BOT_TOKEN is not set.")
-
-
-ADMIN_ID = int(
-    os.getenv(
-        "ADMIN_ID",
-        "6477136658"
-    )
-)
-
-
-# ============================================================
-# CORS
-# ============================================================
-
-@app.after_request
-def add_cors_headers(response):
-
-    response.headers[
-        "Access-Control-Allow-Origin"
-    ] = "*"
-
-    response.headers[
-        "Access-Control-Allow-Headers"
-    ] = (
-        "Content-Type, "
-        "X-Telegram-Init-Data"
-    )
-
-    response.headers[
-        "Access-Control-Allow-Methods"
-    ] = (
-        "GET, POST, OPTIONS"
-    )
-
-    response.headers[
-        "Access-Control-Max-Age"
-    ] = "86400"
-
-    return response
-
-
-# ============================================================
-# TELEGRAM INIT DATA
-# ============================================================
-
-def validate_telegram_init_data(
-    init_data: str
-):
-
-    if not init_data:
-        return None
-
-    if not BOT_TOKEN:
-        return None
-
-    try:
-
-        parsed = urllib.parse.parse_qsl(
-            init_data,
-            keep_blank_values=True
-        )
-
-
-        data = dict(parsed)
-
-
-        received_hash = data.pop(
-            "hash",
-            None
-        )
-
-
-        if not received_hash:
-            return None
-
-
-        secret_key = hmac.new(
-            b"WebAppData",
-            BOT_TOKEN.encode(),
-            hashlib.sha256
-        ).digest()
-
-
-        data_check_string = "\n".join(
-            f"{key}={data[key]}"
-            for key in sorted(
-                data.keys()
-            )
-        )
-
-
-        calculated_hash = hmac.new(
-            secret_key,
-            data_check_string.encode(),
-            hashlib.sha256
-        ).hexdigest()
-
-
-        if not hmac.compare_digest(
-            calculated_hash,
-            received_hash
-        ):
-
-            return None
-
-
-        user_json = data.get(
-            "user"
-        )
-
-
-        if not user_json:
-            return None
-
-
-        telegram_user = json.loads(
-            urllib.parse.unquote(
-                user_json
-            )
-        )
-
-
-        return telegram_user
-
-
-    except Exception as exc:
-
-        print(
-            "Telegram initData validation error:",
-            exc
-        )
-
-        return None
-
-
-# ============================================================
-# AUTH
-# ============================================================
-
-def get_telegram_user():
-
-    init_data = request.headers.get(
-        "X-Telegram-Init-Data",
-        ""
-    )
-
-
-    return validate_telegram_init_data(
-        init_data
-    )
-
-
-def require_user():
-
-    telegram_user = get_telegram_user()
-
-
-    if not telegram_user:
-        return None
-
-
-    user_id = telegram_user.get("id")
-
-
-    if not user_id:
-        return None
-
-
-    return telegram_user
-
-
-def is_admin_user(
-    telegram_user
-):
-
-    if not telegram_user:
-        return False
-
-
-    try:
-
-        return (
-            int(
-                telegram_user.get(
-                    "id",
-                    0
-                )
-            )
-            ==
-            ADMIN_ID
-        )
-
-    except Exception:
-
-        return False
-
-
-# ============================================================
-# SERIALIZERS
-# ============================================================
-
-def serialize_teacher(
-    teacher
-):
-
-    if not teacher:
-        return None
-
-
-    return {
-
-        "telegram_id":
-            teacher["telegram_id"],
-
-        "full_name":
-            teacher["full_name"],
-
-        "status":
-            teacher["status"],
-
-        "created_at":
-            teacher["created_at"]
-
-    }
-
-
-def serialize_user(
-    user
-):
-
-    if not user:
-        return None
-
-
-    return {
-
-        "id":
-            user["id"],
-
-        "username":
-            user["username"],
-
-        "full_name":
-            user["full_name"],
-
-        "university":
-            user["university"],
-
-        "department":
-            user["department"],
-
-        "group_name":
-            user["group_name"]
-
-    }
-
-
-# ============================================================
-# HEALTH
-# ============================================================
-
-@app.get(
-    "/api/health"
-)
+@app.get("/api/health")
 def health():
+    return jsonify(ok=True, service="UniUZ API", status="online", version="4")
 
-    return jsonify({
-
-        "ok": True,
-
-        "service":
-            "UniUZ API",
-
-        "status":
-            "online",
-
-        "time":
-            datetime.now(
-                timezone.utc
-            ).isoformat()
-
-    })
-
-
-# ============================================================
-# PROFILE
-# ============================================================
-
-@app.get(
-    "/api/me"
-)
-def api_me():
-
-    telegram_user = require_user()
-
-
-    if not telegram_user:
-
-        return jsonify({
-
-            "ok":
-                False,
-
-            "error":
-                "Unauthorized"
-
-        }), 401
-
-
-    telegram_id = telegram_user["id"]
-
-
-    first_name = telegram_user.get(
-            "first_name",
-            ""
-        )
-
-
-    last_name = telegram_user.get(
-            "last_name",
-            ""
-        )
-
-
-    full_name = (
-        f"{first_name} {last_name}"
-    ).strip()
-
-
-    if not full_name:
-
-        full_name = telegram_user.get(
-                "username",
-                "Unknown"
-            )
-
-
-    user = database.get_user(
-            telegram_id
-        )
-
-
-    teacher = database.get_teacher(
-            telegram_id
-        )
-
-
-    status = (
-
-        teacher["status"]
-
-        if teacher
-
-        else None
-
+@app.get("/api/me")
+def me():
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    admin_id = os.environ.get("ADMIN_ID", "")
+    return jsonify(
+        profile=dict(u),
+        is_admin=(str(u["telegram_id"]) == str(admin_id) or bool(u["is_admin"]))
     )
 
+@app.post("/api/setup")
+def setup():
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    d = request.get_json(silent=True) or {}
+    required = ["language","university","department","group_name","first_name","last_name"]
+    if any(not str(d.get(k,"")).strip() for k in required):
+        return jsonify(error="Fill all fields"), 400
+    row = database.update_profile(int(u["telegram_id"]), **{k:d[k].strip() for k in required})
+    return jsonify(ok=True, profile=dict(row))
 
-    role = (
+@app.put("/api/profile")
+def profile():
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    d = request.get_json(silent=True) or {}
+    row = database.update_profile(int(u["telegram_id"]), **d)
+    return jsonify(ok=True, profile=dict(row))
 
-        "teacher"
+@app.get("/api/schedule")
+def schedule():
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    return jsonify(items=database.get_schedule(int(u["telegram_id"])))
 
-        if status == "approved"
+@app.post("/api/schedule/upload")
+def schedule_upload():
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    f = request.files.get("file")
+    if not f: return jsonify(error="File required"), 400
+    name = f.filename or "schedule"
+    path = os.path.join(UPLOADS, f"{u['telegram_id']}_{name}")
+    f.save(path)
+    try:
+        if f.mimetype == "application/pdf" or name.lower().endswith(".pdf"):
+            items = extract_schedule_from_pdf(path)
+        elif f.mimetype.startswith("image/"):
+            items = extract_schedule_from_image(path, f.mimetype)
+        else:
+            return jsonify(error="Use PDF, JPG or PNG"), 400
+        database.save_schedule(int(u["telegram_id"]), items)
+        return jsonify(ok=True, items=items)
+    except Exception as e:
+        print("schedule:", e)
+        return jsonify(error=str(e)), 500
 
-        else "student"
+@app.post("/api/homework")
+def add_hw():
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    d = request.get_json(silent=True) or {}
+    if not d.get("title") or not d.get("due_at"):
+        return jsonify(error="Title and due date are required"), 400
+    hid = database.add_homework(int(u["telegram_id"]), d["title"], d.get("description",""), d["due_at"], d.get("file_name"))
+    return jsonify(ok=True, id=hid)
 
+@app.post("/api/homework/upload")
+def homework_upload():
+    u = user_required()
+    if not u:
+        return jsonify(error="Unauthorized"), 401
+
+    title = (request.form.get("title") or "").strip()
+    description = (request.form.get("description") or "").strip()
+    due_at = (request.form.get("due_at") or "").strip()
+    f = request.files.get("file")
+
+    if not title or not due_at:
+        return jsonify(error="Title and due date are required"), 400
+
+    file_name = None
+    file_path = None
+
+    if f and f.filename:
+        safe = os.path.basename(f.filename).replace(" ", "_")
+        file_name = safe
+        file_path = os.path.join(
+            UPLOADS,
+            f"hw_{u['telegram_id']}_{os.getpid()}_{safe}"
+        )
+        f.save(file_path)
+
+    hid = database.add_homework(
+        int(u["telegram_id"]),
+        title,
+        description,
+        due_at,
+        file_name,
+        file_path
     )
-
-
-    return jsonify({
-
-        "ok":
-            True,
-
-        "telegram_user":
-            telegram_user,
-
-        "profile":
-            serialize_user(
-                user
-            ),
-
-        "role":
-            role,
-
-        "teacher":
-            serialize_teacher(
-                teacher
-            ),
-
-        "teacher_status":
-            status,
-
-        "is_teacher":
-            status == "approved",
-
-        "is_admin":
-            is_admin_user(
-                telegram_user
-            )
-
-    })
-
-
-# ============================================================
-# TEACHER STATUS
-# ============================================================
-
-@app.get(
-    "/api/teacher/status"
-)
-def teacher_status_api():
-
-    telegram_user = require_user()
-
-
-    if not telegram_user:
-
-        return jsonify({
-
-            "ok":
-                False,
-
-            "error":
-                "Unauthorized"
-
-        }), 401
-
-
-    telegram_id = telegram_user["id"]
-
-
-    teacher = database.get_teacher(
-            telegram_id
-        )
-
-
-    if not teacher:
-
-        return jsonify({
-
-            "ok":
-                True,
-
-            "exists":
-                False,
-
-            "status":
-                None,
-
-            "is_teacher":
-                False
-
-        })
-
-
-    return jsonify({
-
-        "ok":
-            True,
-
-        "exists":
-            True,
-
-        "status":
-            teacher["status"],
-
-        "is_teacher":
-            teacher["status"] ==
-            "approved",
-
-        "teacher":
-            serialize_teacher(
-                teacher
-            )
-
-    })
-
-
-# ============================================================
-# TEACHER REQUEST
-# ============================================================
-
-@app.post(
-    "/api/teacher/request"
-)
-def teacher_request():
-
-    telegram_user = require_user()
-
-
-    if not telegram_user:
-
-        return jsonify({
-
-            "ok":
-                False,
-
-            "error":
-                "Unauthorized"
-
-        }), 401
-
-
-    telegram_id = telegram_user["id"]
-
-
-    first_name = telegram_user.get(
-            "first_name",
-            ""
-        )
-
-
-    last_name = telegram_user.get(
-            "last_name",
-            ""
-        )
-
-
-    full_name = (
-        f"{first_name} {last_name}"
-    ).strip()
-
-
-    if not full_name:
-
-        full_name = telegram_user.get(
-                "username",
-                "Unknown"
-            )
-
-
-    teacher = database.get_teacher(
-            telegram_id
-        )
-
-
-    if teacher:
-
-        if (
-            teacher["status"]
-            ==
-            "approved"
-        ):
-
-            return jsonify({
-
-                "ok":
-                    True,
-
-                "status":
-                    "approved",
-
-                "message":
-                    "Ты уже зарегистрирован как преподаватель."
-
-            })
-
-
-        if (
-            teacher["status"]
-            ==
-            "pending"
-        ):
-
-            return jsonify({
-
-                "ok":
-                    True,
-
-                "status":
-                    "pending",
-
-                "message":
-                    "Заявка уже отправлена и ожидает одобрения."
-
-            })
-
-
-        if (
-            teacher["status"]
-            ==
-            "rejected"
-        ):
-
-            database.add_teacher_request(
-                telegram_id,
-                full_name
-            )
-
-
-            return jsonify({
-
-                "ok":
-                    True,
-
-                "status":
-                    "pending",
-
-                "message":
-                    "Новая заявка отправлена администратору."
-
-            })
-
-
-    database.add_teacher_request(
-        telegram_id,
-        full_name
-    )
-
-
-    return jsonify({
-
-        "ok":
-            True,
-
-        "status":
-            "pending",
-
-        "message":
-            "Заявка отправлена администратору."
-
-    }), 201
-
-
-# ============================================================
-# ADMIN — REQUESTS
-# ============================================================
-
-@app.get(
-    "/api/admin/teacher-requests"
-)
-def admin_teacher_requests():
-
-    telegram_user = require_user()
-
-
-    if not telegram_user:
-
-        return jsonify({
-
-            "ok":
-                False,
-
-            "error":
-                "Unauthorized"
-
-        }), 401
-
-
-    if not is_admin_user(
-        telegram_user
-    ):
-
-        return jsonify({
-
-            "ok":
-                False,
-
-            "error":
-                "Forbidden"
-
-        }), 403
-
-
-    teachers = database.get_pending_teachers()
-
-
-    items = []
-
-
-    for teacher in teachers:
-
-        items.append({
-
-            "telegram_id":
-                teacher["telegram_id"],
-
-            "full_name":
-                teacher["full_name"],
-
-            "status":
-                teacher["status"],
-
-            "created_at":
-                teacher["created_at"]
-
-        })
-
-
-    return jsonify({
-
-        "ok":
-            True,
-
-        "items":
-            items,
-
-        "count":
-            len(items)
-
-    })
-
-
-# ============================================================
-# ADMIN — APPROVE
-# ============================================================
-
-@app.post(
-    "/api/admin/teacher/<int:telegram_id>/approve"
-)
-def admin_approve_teacher(
-    telegram_id
-):
-
-    telegram_user = require_user()
-
-
-    if not telegram_user:
-
-        return jsonify({
-
-            "ok":
-                False,
-
-            "error":
-                "Unauthorized"
-
-        }), 401
-
-
-    if not is_admin_user(
-        telegram_user
-    ):
-
-        return jsonify({
-
-            "ok":
-                False,
-
-            "error":
-                "Forbidden"
-
-        }), 403
-
-
-    teacher = database.get_teacher(
-            telegram_id
-        )
-
-
-    if not teacher:
-
-        return jsonify({
-
-            "ok":
-                False,
-
-            "error":
-                "Teacher request not found"
-
-        }), 404
-
-
-    if (
-        teacher["status"]
-        !=
-        "pending"
-    ):
-
-        return jsonify({
-
-            "ok":
-                True,
-
-            "status":
-                teacher["status"],
-
-            "message":
-                "Request was already processed"
-
-        })
-
-
-    database.approve_teacher(
-        telegram_id
-    )
-
-
-    return jsonify({
-
-        "ok":
-            True,
-
-        "status":
-            "approved",
-
-        "telegram_id":
-            telegram_id
-
-    })
-
-
-# ============================================================
-# ADMIN — REJECT
-# ============================================================
-
-@app.post(
-    "/api/admin/teacher/<int:telegram_id>/reject"
-)
-def admin_reject_teacher(
-    telegram_id
-):
-
-    telegram_user = require_user()
-
-
-    if not telegram_user:
-
-        return jsonify({
-
-            "ok":
-                False,
-
-            "error":
-                "Unauthorized"
-
-        }), 401
-
-
-    if not is_admin_user(
-        telegram_user
-    ):
-
-        return jsonify({
-
-            "ok":
-                False,
-
-            "error":
-                "Forbidden"
-
-        }), 403
-
-
-    teacher = database.get_teacher(
-            telegram_id
-        )
-
-
-    if not teacher:
-
-        return jsonify({
-
-            "ok":
-                False,
-
-            "error":
-                "Teacher request not found"
-
-        }), 404
-
-
-    if (
-        teacher["status"]
-        !=
-        "pending"
-    ):
-
-        return jsonify({
-
-            "ok":
-                True,
-
-            "status":
-                teacher["status"],
-
-            "message":
-                "Request was already processed"
-
-        })
-
-
-    database.reject_teacher(
-        telegram_id
-    )
-
-
-    return jsonify({
-
-        "ok":
-            True,
-
-        "status":
-            "rejected",
-
-        "telegram_id":
-            telegram_id
-
-    })
-
-
-# ============================================================
-# HOMEWORK
-# ============================================================
-
-@app.get(
-    "/api/homework"
-)
-def api_homework():
-
-    telegram_user = require_user()
-
-
-    if not telegram_user:
-
-        return jsonify({
-
-            "ok":
-                False,
-
-            "error":
-                "Unauthorized"
-
-        }), 401
-
-
-    telegram_id = telegram_user["id"]
-
-
-    user = database.get_user(
-            telegram_id
-        )
-
-
-    if not user:
-
-        return jsonify({
-
-            "ok":
-                True,
-
-            "items":
-                []
-
-        })
-
-
-    department = user["department"]
-
-
-    group_name = user["group_name"]
-
-
-    if not department or not group_name:
-
-        return jsonify({
-
-            "ok":
-                True,
-
-            "items":
-                []
-
-        })
-
-
-    rows = database.get_student_homework(
-            department,
-            group_name
-        )
-
-
-    items = []
-
-
-    for row in rows:
-
-        items.append({
-
-            "id":
-                row["id"],
-
-            "teacher_id":
-                row["teacher_id"],
-
-            "department":
-                row["department"],
-
-            "group_name":
-                row["group_name"],
-
-            "subject_name":
-                row["subject_name"],
-
-            "task_text":
-                row["task_text"],
-
-            "homework_date":
-                row["homework_date"],
-
-            "homework_time":
-                row["homework_time"],
-
-            "file_id":
-                row["file_id"],
-
-            "file_type":
-                row["file_type"],
-
-            "created_at":
-                row["created_at"]
-
-        })
-
-
-    return jsonify({
-
-        "ok":
-            True,
-
-        "items":
-            items
-
-    })
-
-
-# ============================================================
-# ANNOUNCEMENTS
-# ============================================================
-
-@app.get(
-    "/api/announcements"
-)
-def api_announcements():
-
-    telegram_user = require_user()
-
-
-    if not telegram_user:
-
-        return jsonify({
-
-            "ok":
-                False,
-
-            "error":
-                "Unauthorized"
-
-        }), 401
-
-
-    telegram_id = telegram_user["id"]
-
-
-    user = database.get_user(
-            telegram_id
-        )
-
-
-    if not user:
-
-        return jsonify({
-
-            "ok":
-                True,
-
-            "items":
-                []
-
-        })
-
-
-    department = user["department"]
-
-
-    group_name = user["group_name"]
-
-
-    if not department or not group_name:
-
-        return jsonify({
-
-            "ok":
-                True,
-
-            "items":
-                []
-
-        })
-
-
-    rows = database.get_student_announcements(
-            department,
-            group_name
-        )
-
-
-    items = []
-
-
-    for row in rows:
-
-        items.append({
-
-            "id":
-                row["id"],
-
-            "teacher_id":
-                row["teacher_id"],
-
-            "department":
-                row["department"],
-
-            "group_name":
-                row["group_name"],
-
-            "title":
-                row["title"],
-
-            "message":
-                row["message"],
-
-            "file_id":
-                row["file_id"],
-
-            "file_type":
-                row["file_type"],
-
-            "created_at":
-                row["created_at"]
-
-        })
-
-
-    return jsonify({
-
-        "ok":
-            True,
-
-        "items":
-            items
-
-    })
-
-
-# ============================================================
-# ERRORS
-# ============================================================
+    return jsonify(ok=True, id=hid, file_name=file_name)
+
+@app.get("/api/homework")
+def hw():
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    return jsonify(items=database.get_homework(int(u["telegram_id"])))
+
+@app.post("/api/homework/<int:hid>/complete")
+def complete(hid):
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    d = request.get_json(silent=True) or {}
+    completed = bool(d.get("completed", True))
+    database.complete_homework(int(u["telegram_id"]), hid, completed)
+    return jsonify(ok=True, completed=completed)
+
+@app.delete("/api/homework/<int:hid>")
+def delete_hw(hid):
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    database.delete_homework(int(u["telegram_id"]), hid)
+    return jsonify(ok=True)
+
+@app.get("/api/reminders")
+def reminders():
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    return jsonify(enabled=bool(u["reminders_enabled"]))
+
+@app.post("/api/reminders")
+def set_reminders():
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    enabled = bool((request.get_json(silent=True) or {}).get("enabled"))
+    row = database.update_profile(int(u["telegram_id"]), reminders_enabled=1 if enabled else 0)
+    return jsonify(ok=True, enabled=bool(row["reminders_enabled"]))
+
+@app.post("/api/ai")
+def ai():
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    d = request.get_json(silent=True) or {}
+    question = str(d.get("message","")).strip()
+    if not question: return jsonify(error="Message required"), 400
+    allowed, used = database.consume_ai(int(u["telegram_id"]))
+    if not allowed:
+        return jsonify(error="Daily AI limit reached", used=used, limit=10), 429
+    try:
+        answer = ask(u, question, database.get_schedule(int(u["telegram_id"])), database.get_homework(int(u["telegram_id"])))
+        return jsonify(ok=True, answer=answer, used=used, limit=None if u["unlimited_ai"] else 10)
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+@app.get("/api/admin/stats")
+def admin_stats():
+    if not admin_required(): return jsonify(error="Forbidden"), 403
+    return jsonify(database.stats())
+
+@app.get("/api/admin/users")
+def admin_users():
+    if not admin_required(): return jsonify(error="Forbidden"), 403
+    return jsonify(items=database.all_users())
+
+@app.post("/api/admin/unlimited")
+def admin_unlimited():
+    if not admin_required(): return jsonify(error="Forbidden"), 403
+    d = request.get_json(silent=True) or {}
+    tid = int(d.get("telegram_id",0))
+    database.set_unlimited(tid, bool(d.get("enabled")))
+    return jsonify(ok=True)
+
+@app.post("/api/admin/add")
+def admin_add():
+    if not admin_required(): return jsonify(error="Forbidden"), 403
+    d = request.get_json(silent=True) or {}
+    tid = int(d.get("telegram_id",0))
+    c = database.conn()
+    c.execute("UPDATE users SET is_admin=1 WHERE telegram_id=?", (tid,))
+    c.commit(); c.close()
+    return jsonify(ok=True)
 
 @app.errorhandler(404)
-def not_found(error):
-
-    return jsonify({
-
-        "ok":
-            False,
-
-        "error":
-            "Endpoint not found"
-
-    }), 404
-
+def nf(e):
+    return jsonify(error="Endpoint not found"), 404
 
 @app.errorhandler(500)
-def internal_error(error):
+def se(e):
+    return jsonify(error="Internal server error"), 500
 
-    print(
-        "Internal server error:",
-        error
+
+@app.get("/api/ai/usage")
+def ai_usage():
+    u = user_required()
+    if not u:
+        return jsonify(error="Unauthorized"), 401
+    return jsonify(
+        used=int(u["ai_used_count"] or 0),
+        limit=None if u["unlimited_ai"] else 10,
+        unlimited=bool(u["unlimited_ai"])
     )
 
+@app.get("/api/notifications")
+def notifications():
+    u = user_required()
+    if not u:
+        return jsonify(error="Unauthorized"), 401
 
-    return jsonify({
+    items = []
+    for x in database.get_homework(int(u["telegram_id"]), include_completed=False)[:5]:
+        items.append({"icon":"📝","title":x["title"],"time":x["due_at"]})
 
-        "ok":
-            False,
+    for x in database.get_schedule(int(u["telegram_id"]))[:5]:
+        items.append({"icon":"🗓️","title":x["subject"],"time":x["start_time"]})
 
-        "error":
-            "Internal server error"
-
-    }), 500
-
-
-# ============================================================
-# RUN
-# ============================================================
-
-if __name__ == "__main__":
-
-    port = int(
-        os.getenv(
-            "PORT",
-            "8000"
-        )
-    )
-
-
-    print(
-        "UniUZ API started"
-    )
-
-
-    print(
-        f"Port: {port}"
-    )
-
-
-    app.run(
-        host="0.0.0.0",
-        port=port
-    )
+    return jsonify(items=items)
