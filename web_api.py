@@ -255,11 +255,13 @@ def homework_file(hid):
     if not file_path or not os.path.isfile(file_path):
         return jsonify(error="Attached file is no longer available on the server"), 404
 
-    return send_file(
+    response = send_file(
         file_path,
         as_attachment=False,
         download_name=file_name or "homework-file"
     )
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
 
 @app.post("/api/homework/<int:hid>/complete")
 def complete(hid):

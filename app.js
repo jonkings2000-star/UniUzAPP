@@ -127,9 +127,17 @@ layout(`
  <div class="section-title">🗓 Сегодня</div>
 
  ${
- schedule.length
- ?
- schedule.slice(0,3).map(x=>`
+ (() => {
+  const tzDay = new Intl.DateTimeFormat("en-US", {
+    weekday:"short",
+    timeZone:"Asia/Tashkent"
+  }).format(new Date());
+  const dayMap = {Mon:0,Tue:1,Wed:2,Thu:3,Fri:4,Sat:5,Sun:6};
+  const today = dayMap[tzDay];
+  const todayItems = schedule
+    .filter(x=>Number(x.day_of_week)===today)
+    .sort((a,b)=>String(a.start_time||"").localeCompare(String(b.start_time||"")));
+  return todayItems.length ? todayItems.slice(0,3).map(x=>`
  <div class="lesson">
    <div class="lesson-time">${esc(x.start_time||"")}</div>
    <div>
@@ -137,9 +145,8 @@ layout(`
     <div class="lesson-room">🏫 ${esc(x.room||"")}</div>
    </div>
  </div>
- `).join("")
- :
- `<div class="empty">🎉 Сегодня пар нет</div>`
+`).join("") : `<div class="empty">🎉 Сегодня пар нет</div>`;
+})()
  }
 
 </div>
@@ -201,7 +208,62 @@ layout(`
 `)
  loadHomeAIUsage();
 }
-async function showSchedule(){try{const d=await api("/schedule");const names=lang==="ru"?["Пн","Вт","Ср","Чт","Пт","Сб","Вс"]:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];layout(`${brand()}<div class="card"><div class="row"><h2>🗓️ ${tr("schedule")}</h2><label class="btn">📎 ${tr("upload")}<input id="sf" type="file" accept=".pdf,image/*" hidden></label></div><div id="sl">${d.items.length?d.items.map(x=>`<div class="list-item"><b>${names[x.day_of_week]} ${esc(x.start_time)} — ${esc(x.subject)}</b><div class="muted small">${esc(x.room||"")}</div></div>`).join(""):`<div class="empty">${tr("noData")}</div>`}</div></div>`,"schedule");document.getElementById("sf").onchange=uploadSchedule}catch(e){toast(e.message)}}
+async function showSchedule(){
+ try{
+  const d=await api("/schedule");
+  const items=Array.isArray(d.items)?d.items.slice():[];
+
+  const names=lang==="ru"
+   ? ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"]
+   : ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+  items.sort((a,b)=>{
+   const dayA=Number(a.day_of_week??0), dayB=Number(b.day_of_week??0);
+   if(dayA!==dayB) return dayA-dayB;
+   return String(a.start_time||"").localeCompare(String(b.start_time||""));
+  });
+
+  const groups=names.map((name,day)=>{
+   const rows=items.filter(x=>Number(x.day_of_week)===day);
+   if(!rows.length) return "";
+   return `
+    <div class="card" style="margin-top:12px">
+     <h3 style="margin:0 0 12px">${name}</h3>
+     ${rows.map(x=>`
+      <div class="list-item">
+       <b>${esc(x.start_time||"")} — ${esc(x.subject||"")}</b>
+       <div class="muted small">
+        ${x.end_time?esc(x.end_time)+" · ":""}${esc(x.room||"")}
+        ${x.teacher?` · ${esc(x.teacher)}`:""}
+       </div>
+      </div>
+     `).join("")}
+    </div>`;
+  }).join("");
+
+  layout(`
+   ${brand()}
+   <div class="card">
+    <div class="row">
+     <h2>🗓️ ${tr("schedule")}</h2>
+     <label class="btn">📎 ${tr("upload")}
+      <input id="sf" type="file" accept=".pdf,image/*" hidden>
+     </label>
+    </div>
+    <div class="row" style="margin-top:10px">
+     <button class="btn" onclick="showSchedule()">🔄 Обновить</button>
+    </div>
+   </div>
+   ${groups || `<div class="card"><div class="empty">${tr("noData")}</div></div>`}
+  `,"schedule");
+
+  const sf=document.getElementById("sf");
+  if(sf) sf.onchange=uploadSchedule;
+ }catch(e){
+  toast(e.message);
+ }
+}
+
 async function uploadSchedule(e){const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append("file",f);try{await api("/schedule/upload",{method:"POST",body:fd});showSchedule()}catch(e){toast(e.message)}}
 async function openHomeworkFile(id){
  try{
@@ -212,13 +274,60 @@ async function openHomeworkFile(id){
    let d={}; try{d=await r.json()}catch{}
    throw new Error(d.error||`API ${r.status}`);
   }
+
   const blob=await r.blob();
   const url=URL.createObjectURL(blob);
-  const w=window.open(url,"_blank");
-  if(!w){
-   toast("Разрешите открытие новой вкладки");
+  const type=(r.headers.get("content-type")||blob.type||"").toLowerCase();
+
+  const old=document.getElementById("hw-file-viewer");
+  if(old) old.remove();
+
+  const modal=document.createElement("div");
+  modal.id="hw-file-viewer";
+  modal.style.cssText="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.82);display:flex;flex-direction:column;padding:12px;box-sizing:border-box";
+
+  const top=document.createElement("div");
+  top.style.cssText="display:flex;justify-content:flex-end;gap:8px;margin-bottom:8px";
+
+  const close=document.createElement("button");
+  close.className="btn";
+  close.textContent="✕";
+  close.onclick=()=>{
+   modal.remove();
+   URL.revokeObjectURL(url);
+  };
+  top.appendChild(close);
+  modal.appendChild(top);
+
+  const body=document.createElement("div");
+  body.style.cssText="flex:1;min-height:0;background:#fff;border-radius:14px;overflow:auto;display:flex;align-items:center;justify-content:center";
+
+  if(type.startsWith("image/")){
+   const img=document.createElement("img");
+   img.src=url;
+   img.style.cssText="max-width:100%;max-height:100%;object-fit:contain";
+   body.appendChild(img);
+  }else if(type.includes("pdf")){
+   const iframe=document.createElement("iframe");
+   iframe.src=url;
+   iframe.style.cssText="width:100%;height:100%;border:0";
+   body.appendChild(iframe);
+  }else{
+   body.style.cssText+=";flex-direction:column;padding:30px;box-sizing:border-box";
+   const text=document.createElement("div");
+   text.textContent="Этот тип файла нельзя просмотреть прямо внутри Telegram.";
+   text.style.cssText="color:#111;text-align:center;margin-bottom:18px;font-size:16px";
+   const a=document.createElement("a");
+   a.href=url;
+   a.download="";
+   a.textContent="⬇️ Скачать файл";
+   a.className="btn primary";
+   body.appendChild(text);
+   body.appendChild(a);
   }
-  setTimeout(()=>URL.revokeObjectURL(url),60000);
+
+  modal.appendChild(body);
+  document.body.appendChild(modal);
  }catch(e){
   toast(e.message||"Не удалось открыть файл");
  }
