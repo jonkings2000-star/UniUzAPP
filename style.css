@@ -302,48 +302,25 @@ margin:14px 0;
  margin-bottom:6px;
 }
 
-
-/* UniUZ AI usage + notifications */
-#aiCounter{
-  margin:12px 0 14px;
-  padding:10px 14px;
-  display:inline-block;
-  border-radius:14px;
-  background:rgba(255,255,255,.10);
-  border:1px solid rgba(255,255,255,.16);
-  color:#eef3ff;
-  font-size:16px;
-  font-weight:800;
-}
-.notify-wrap{position:relative;}
+/* UniUZ notifications + AI counter: additive only */
+.home-top{position:relative;display:flex;justify-content:center;align-items:flex-start}
+.home-top .brand{width:100%;margin-top:18px}
 .notify-btn{
-  position:absolute;
-  right:0;
-  top:0;
-  width:46px;
-  height:46px;
-  border-radius:50%;
-  border:1px solid #3b6598;
-  background:#132b4b;
-  color:#fff;
-  font-size:22px;
-  cursor:pointer;
-  box-shadow:0 8px 22px #0004;
+ position:absolute;right:4px;top:18px;width:46px;height:46px;
+ border-radius:50%;border:1px solid #3d6190;
+ background:linear-gradient(145deg,#18345a,#102541);
+ color:#fff;font-size:20px;cursor:pointer;
+ box-shadow:0 8px 20px #0003;
 }
-.notify-btn:hover{filter:brightness(1.15);transform:translateY(-1px)}
-.notification-count{
-  position:absolute;
-  right:-2px;
-  top:-4px;
-  min-width:18px;
-  height:18px;
-  padding:0 5px;
-  border-radius:999px;
-  background:#ff4d62;
-  color:#fff;
-  font-size:11px;
-  font-weight:800;
-  display:grid;
-  place-items:center;
-  border:2px solid #101f34;
+.ai-counter{
+ margin:12px 0;
+ padding:10px 14px;
+ border-radius:14px;
+ background:rgba(255,255,255,.10);
+ border:1px solid rgba(255,255,255,.18);
+ text-align:center;
+ font-weight:800;
+ color:#fff;
 }
+.notification-card .list-item{margin:10px 0;padding:14px}
+.small{font-size:13px}

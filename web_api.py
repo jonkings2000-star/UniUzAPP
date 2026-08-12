@@ -263,7 +263,6 @@ def ai_usage():
         unlimited=bool(u["unlimited_ai"])
     )
 
-
 @app.get("/api/notifications")
 def notifications():
     u = user_required()
@@ -271,17 +270,10 @@ def notifications():
         return jsonify(error="Unauthorized"), 401
 
     items = []
+    for x in database.get_homework(int(u["telegram_id"]), include_completed=False)[:5]:
+        items.append({"icon":"📝","title":x["title"],"time":x["due_at"]})
 
-    for x in database.get_homework(int(u["telegram_id"]))[:5]:
-        items.append({
-            "icon":"📝",
-            "text": f"{x['title']} • {x['due_at']}"
-        })
-
-    for x in database.get_schedule(int(u["telegram_id"]))[:3]:
-        items.append({
-            "icon":"🗓",
-            "text": f"{x['subject']} • {x['start_time']}"
-        })
+    for x in database.get_schedule(int(u["telegram_id"]))[:5]:
+        items.append({"icon":"🗓️","title":x["subject"],"time":x["start_time"]})
 
     return jsonify(items=items)

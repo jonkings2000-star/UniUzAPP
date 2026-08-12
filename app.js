@@ -50,7 +50,7 @@ function layout(content,active="home"){app.innerHTML=`<div class="wrap">${conten
 <button class="${active==="homework"?"active":""}" onclick="showHomework()">📝<br>${tr("homework")}</button>
 <button class="${active==="ai"?"active":""}" onclick="showAI()">🤖<br>${tr("ai")}</button>
 </div>`}
-function brand(){return `<div class="brand notify-wrap"><button class="notify-btn" onclick="showNotifications()" aria-label="Notifications">🔔</button><div class="logo">🎓</div><h1>UniUZ</h1><div class="muted">${profile?.university||""}</div></div>`}</div></div>`}
+function brand(){return `<div class="brand"><div class="logo">🎓</div><h1>UniUZ</h1><div class="muted">${profile?.university||""}</div></div>`}
 
 async function start(){
  try{const d=await api("/me");profile={...d.profile,is_admin:d.is_admin};lang=profile.language||"ru";if(profile.university&&profile.department&&profile.group_name&&profile.first_name) return home()}
@@ -83,13 +83,27 @@ function chooseGroup(uni,fac){app.innerHTML=`<div class="wrap">${brand()}<div cl
 function chooseName(uni,fac){const g=document.getElementById("grp").value.trim();if(!g)return toast(tr("group"));app.innerHTML=`<div class="wrap">${brand()}<div class="card"><h2>${tr("name")}</h2><input id="nm" class="input" placeholder="Jakhongir Karimov"><button class="btn primary" onclick="finishSetup('${esc(uni)}','${esc(fac)}','${esc(g)}')">${tr("save")}</button></div></div>`}
 async function finishSetup(uni,fac,g){const n=document.getElementById("nm").value.trim();if(!n)return toast(tr("name"));const parts=n.split(/\s+/);try{const d=await api("/setup",{method:"POST",body:{language:lang,university:uni,department:fac,group_name:g,first_name:parts[0],last_name:parts.slice(1).join(" ")}});profile={...d.profile};try{const m=await api("/me");profile={...m.profile,is_admin:m.is_admin}}catch(e){}home()}catch(e){toast(e.message)}}
 
-async function updateAICounter(){
- const el=document.getElementById("aiCounter");
- if(!el)return;
- try{
-  const d=await loadAIUsage();
-  el.innerHTML=d.unlimited ? "∞ Безлимитный AI" : `${d.used}/10 запросов сегодня`;
- }catch(e){el.textContent="0/10 запросов сегодня";}
+
+async function getAIUsage(){
+    try{
+        return await api("/ai/usage");
+    }catch(e){
+        return {used:0,limit:10,unlimited:false};
+    }
+}
+
+async function showNotifications(){
+    try{
+        const d=await api("/notifications");
+        const items=d.items||[];
+        layout(`${brand()}<div class="card notification-card">
+            <h2>🔔 Уведомления</h2>
+            ${items.length
+              ? items.map(x=>`<div class="list-item"><div><b>${x.icon} ${esc(x.title)}</b><div class="muted small">⏰ ${esc(x.time)}</div></div></div>`).join("")
+              : `<div class="empty">Нет новых уведомлений</div>`
+            }
+        </div>`);
+    }catch(e){toast(e.message)}
 }
 
 async function home(){
@@ -109,10 +123,13 @@ try{
 
 
 layout(`
-<div class="brand">
- <div class="logo">🎓</div>
- <h1>UniUZ</h1>
- <div class="muted">${profile?.university||""}</div>
+<div class="home-top">
+ <div class="brand">
+  <div class="logo">🎓</div>
+  <h1>UniUZ</h1>
+  <div class="muted">${profile?.university||""}</div>
+ </div>
+ <button class="notify-btn" onclick="showNotifications()" aria-label="Уведомления">🔔</button>
 </div>
 
 <div class="hero">
@@ -178,10 +195,8 @@ layout(`
 <div class="ai-card">
  <div class="ai-title">🤖 UniUZ AI</div>
  <p>Ваш персональный помощник</p>
- <div id="aiCounter">Загрузка...</div>
- <button class="btn primary" onclick="showAI()">
- Спросить ИИ →
- </button>
+ <div id="aiCounter" class="ai-counter">0/10 запросов сегодня</div>
+ <button class="btn primary" onclick="showAI()">Спросить ИИ →</button>
 </div>
 
 
@@ -204,7 +219,13 @@ layout(`
 </div>
 
 `)
- updateAICounter();
+
+ const usage=await getAIUsage();
+ const counter=document.getElementById("aiCounter");
+ if(counter){
+   counter.textContent=usage.unlimited ? "∞ Безлимитный AI" : `${usage.used}/10 запросов сегодня`;
+ }
+
 }
 async function showSchedule(){try{const d=await api("/schedule");const names=lang==="ru"?["Пн","Вт","Ср","Чт","Пт","Сб","Вс"]:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];layout(`${brand()}<div class="card"><div class="row"><h2>🗓️ ${tr("schedule")}</h2><label class="btn">📎 ${tr("upload")}<input id="sf" type="file" accept=".pdf,image/*" hidden></label></div><div id="sl">${d.items.length?d.items.map(x=>`<div class="list-item"><b>${names[x.day_of_week]} ${esc(x.start_time)} — ${esc(x.subject)}</b><div class="muted small">${esc(x.room||"")}</div></div>`).join(""):`<div class="empty">${tr("noData")}</div>`}</div></div>`,"schedule");document.getElementById("sf").onchange=uploadSchedule}catch(e){toast(e.message)}}
 async function uploadSchedule(e){const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append("file",f);try{await api("/schedule/upload",{method:"POST",body:fd});showSchedule()}catch(e){toast(e.message)}}
@@ -239,26 +260,6 @@ async function showAdmin(){
  }catch(e){toast(e.message)}
 }
 async function grant(id,enabled){try{await api("/admin/unlimited",{method:"POST",body:{telegram_id:id,enabled}});showAdmin()}catch(e){toast(e.message)}}
-
-
-async function loadAIUsage(){
-    try{
-        return await api("/ai/usage");
-    }catch(e){
-        return {used:0,limit:10,unlimited:false};
-    }
-}
-
-async function showNotifications(){
- try{
-  const [n,a,r]=await Promise.all([api("/notifications"),api("/ai/usage"),api("/reminders")]);
-  layout(`${brand()}<div class="card"><h2>🔔 ${tr("reminders")}</h2>
-   <div class="list-item">🤖 ${a.unlimited?"∞ Безлимитный AI":`${a.used}/10 запросов сегодня`}</div>
-   ${n.items.length?n.items.map(x=>`<div class="list-item">${x.icon} ${esc(x.text)}</div>`).join(""): `<div class="empty">Нет новых уведомлений</div>`}
-   <button class="btn primary" onclick="showReminders()">${r.enabled?tr("disabled"):tr("enabled")}</button>
-  </div>`);
- }catch(e){toast(e.message)}
-}
 
 start();
 
