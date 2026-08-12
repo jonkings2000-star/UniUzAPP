@@ -372,6 +372,19 @@ function showAI(){
   </div>
   <div class="card">
    <div id="chat"></div>
+
+   <div style="margin:12px 0">
+    <div class="muted small" style="margin-bottom:8px">Быстрые действия</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+
+     <button class="btn" type="button" onclick="aiQuickPrompt('📚 Реши это задание и объясни решение пошагово.')">📚 Решить задание</button>
+     <button class="btn" type="button" onclick="aiQuickPrompt('📝 Проверь мой текст, исправь ошибки и улучши стиль.')">📝 Проверить текст</button>
+     <button class="btn" type="button" onclick="aiQuickPrompt('📊 Создай структуру презентации: слайды, заголовки и основные пункты.')">📊 Сделать презентацию</button>
+     <button class="btn" type="button" onclick="aiQuickPrompt('📄 Сделай краткий и понятный конспект этого материала.')">📄 Сделать конспект</button>
+     <button class="btn" type="button" onclick="aiQuickPrompt('💡 Объясни эту тему простыми словами с примерами.')">💡 Объяснить тему</button>
+    </div>
+   </div>
+
    <textarea id="q" class="input" placeholder="${tr("question")}"></textarea>
 
    <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
@@ -440,6 +453,13 @@ function showAILimitInChat(){
    <p>Оплата помогает поддерживать работу ИИ и серверов, чтобы UniUZ работал <b>24/7</b>.</p>
    <button class="btn primary" onclick="showPaymentInstructions()">💳 Оплатить 19 900 сум</button>
   </div>`;
+}
+
+function aiQuickPrompt(text){
+ const q=document.getElementById("q");
+ if(!q)return;
+ q.value=text;
+ q.focus();
 }
 
 async function askAI(){
