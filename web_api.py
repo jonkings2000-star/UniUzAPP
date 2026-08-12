@@ -1,859 +1,794 @@
-# ==========================================================
-# UniUZ API
-# Flask Backend
-# ==========================================================
-
-import os
-import json
-
-from urllib.parse import parse_qs
-
-from flask import Flask, request, jsonify, send_file
+import os, json, hmac, hashlib, uuid
+from datetime import datetime, timedelta, timezone
+from urllib.parse import parse_qsl
+from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
-
 import database
+from openai import OpenAI
+from ai_service import ask, extract_schedule_from_image, extract_schedule_from_pdf
 
+BASE = os.path.dirname(os.path.abspath(__file__))
+UPLOADS = os.path.join(BASE, "uploads")
+os.makedirs(UPLOADS, exist_ok=True)
 
-# ==========================================================
-# APP
-# ==========================================================
-
-app = Flask(__name__)
-
+app = Flask(__name__, static_folder=BASE, static_url_path="")
 CORS(app)
-
 database.init_db()
 
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
+openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+AI_FILE_MAX_BYTES = 10 * 1024 * 1024
+AI_FILE_MODEL = os.environ.get("AI_FILE_MODEL", "gpt-5-mini")
 
-# ==========================================================
-# TELEGRAM AUTH
-# ==========================================================
 
-def get_telegram_user():
+# ============================================================
+# AI PAYMENT REQUESTS / SUBSCRIPTIONS
+# ============================================================
+PAYMENTS_DIR = os.path.join(UPLOADS, "ai_payments")
+os.makedirs(PAYMENTS_DIR, exist_ok=True)
 
-    init_data = request.headers.get(
-        "X-Telegram-Init-Data"
-    )
 
-    if not init_data:
+def init_payment_tables():
+    c = database.conn()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS ai_payment_requests(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            telegram_id INTEGER NOT NULL,
+            amount INTEGER NOT NULL DEFAULT 19900,
+            currency TEXT NOT NULL DEFAULT 'UZS',
+            filename TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            telegram_message_id INTEGER,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            reviewed_at TEXT,
+            reviewed_by INTEGER,
+            expires_at TEXT
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS ai_subscriptions(
+            telegram_id INTEGER PRIMARY KEY,
+            expires_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    c.commit()
+    c.close()
+
+
+def sync_ai_subscription(u):
+    """Expire paid AI only; manually granted unlimited_ai without a subscription stays active."""
+    if not u or not bool(u["unlimited_ai"]):
+        return u
+    c = database.conn()
+    row = c.execute(
+        "SELECT expires_at FROM ai_subscriptions WHERE telegram_id=?",
+        (int(u["telegram_id"]),)
+    ).fetchone()
+    c.close()
+    if row and row["expires_at"] <= datetime.now(timezone.utc).isoformat():
+        database.set_unlimited(int(u["telegram_id"]), False)
+        return database.get_user(int(u["telegram_id"]))
+    return u
+
+
+init_payment_tables()
+
+def telegram_user():
+    raw = request.headers.get("X-Telegram-Init-Data", "")
+    if not raw:
+        # Useful only for local browser testing if a TEST_TELEGRAM_ID is configured.
+        tid = os.environ.get("TEST_TELEGRAM_ID")
+        if tid:
+            return {"id": int(tid), "first_name": "Test", "last_name": "User"}
         return None
-
     try:
-        data = parse_qs(init_data)
-
-        user = data.get("user")
-
-        if not user:
+        bot_token = os.environ.get("BOT_TOKEN", "")
+        pairs = dict(parse_qsl(raw, keep_blank_values=True))
+        received = pairs.pop("hash", None)
+        if not received or not bot_token:
             return None
-
-        return json.loads(user[0])
-
+        check = "\n".join(f"{k}={v}" for k,v in sorted(pairs.items()))
+        secret = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+        calc = hmac.new(secret, check.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(calc, received):
+            return None
+        return json.loads(pairs["user"])
     except Exception as e:
-
-        print("Telegram error:", e)
-
+        print("auth:", e)
         return None
 
-
-def require_user():
-
-    user = get_telegram_user()
-
-    if not user:
+def user_required():
+    u = telegram_user()
+    if not u:
         return None
+    row = database.create_or_update_user(u)
+    return sync_ai_subscription(row)
 
-    database.add_user(
-        user_id=user["id"],
-        username=user.get("username"),
-        full_name=(
-            user.get("first_name", "")
-            + " "
-            + user.get("last_name", "")
-        ).strip()
-    )
+def admin_required():
+    u = user_required()
+    if not u:
+        return None
+    admin_id = os.environ.get("ADMIN_ID", "")
+    if str(u["telegram_id"]) != str(admin_id) and not u["is_admin"]:
+        return None
+    return u
 
-    return user
-
-
-# ==========================================================
-# HEALTH
-# ==========================================================
+@app.get("/")
+def index():
+    return send_from_directory(BASE, "index.html")
 
 @app.get("/api/health")
 def health():
-
-    return jsonify({
-        "ok": True,
-        "service": "UniUZ API",
-        "status": "online"
-    })
-
-
-# ==========================================================
-# PROFILE
-# ==========================================================
+    return jsonify(ok=True, service="UniUZ API", status="online", version="4")
 
 @app.get("/api/me")
 def me():
-
-    user = require_user()
-
-    if not user:
-        return jsonify({
-            "error": "Unauthorized"
-        }), 401
-
-    profile = database.get_user(
-        user["id"]
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    admin_id = os.environ.get("ADMIN_ID", "")
+    return jsonify(
+        profile=dict(u),
+        is_admin=(str(u["telegram_id"]) == str(admin_id) or bool(u["is_admin"]))
     )
 
-    teacher = database.get_teacher(
-        user["id"]
-    )
+@app.post("/api/setup")
+def setup():
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    d = request.get_json(silent=True) or {}
+    required = ["language","university","department","group_name","first_name","last_name"]
+    if any(not str(d.get(k,"")).strip() for k in required):
+        return jsonify(error="Fill all fields"), 400
+    row = database.update_profile(int(u["telegram_id"]), **{k:d[k].strip() for k in required})
+    return jsonify(ok=True, profile=dict(row))
 
-    return jsonify({
-        "telegram": user,
-        "telegram_user": user,
-        "profile": dict(profile) if profile else None,
-        "teacher_status": (
-            teacher["status"]
-            if teacher else None
-        ),
-        "teacher": (
-            dict(teacher)
-            if teacher else None
-        ),
-        "is_admin": database.is_admin(
-            user["id"]
+@app.put("/api/profile")
+def profile():
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    d = request.get_json(silent=True) or {}
+    row = database.update_profile(int(u["telegram_id"]), **d)
+    return jsonify(ok=True, profile=dict(row))
+
+@app.get("/api/schedule")
+def schedule():
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    return jsonify(items=database.get_schedule(int(u["telegram_id"])))
+
+@app.post("/api/schedule/upload")
+def schedule_upload():
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    f = request.files.get("file")
+    if not f: return jsonify(error="File required"), 400
+    name = f.filename or "schedule"
+    path = os.path.join(UPLOADS, f"{u['telegram_id']}_{name}")
+    f.save(path)
+    try:
+        if f.mimetype == "application/pdf" or name.lower().endswith(".pdf"):
+            items = extract_schedule_from_pdf(path)
+        elif f.mimetype.startswith("image/"):
+            items = extract_schedule_from_image(path, f.mimetype)
+        else:
+            return jsonify(error="Use PDF, JPG or PNG"), 400
+        database.save_schedule(int(u["telegram_id"]), items)
+        return jsonify(ok=True, items=items)
+    except Exception as e:
+        print("schedule:", e)
+        return jsonify(error=str(e)), 500
+
+@app.post("/api/homework")
+def add_hw():
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    d = request.get_json(silent=True) or {}
+    if not d.get("title") or not d.get("due_at"):
+        return jsonify(error="Title and due date are required"), 400
+    hid = database.add_homework(int(u["telegram_id"]), d["title"], d.get("description",""), d["due_at"], d.get("file_name"))
+    return jsonify(ok=True, id=hid)
+
+@app.post("/api/homework/upload")
+def homework_upload():
+    u = user_required()
+    if not u:
+        return jsonify(error="Unauthorized"), 401
+
+    title = (request.form.get("title") or "").strip()
+    description = (request.form.get("description") or "").strip()
+    due_at = (request.form.get("due_at") or "").strip()
+    f = request.files.get("file")
+
+    if not title or not due_at:
+        return jsonify(error="Title and due date are required"), 400
+
+    file_name = None
+    file_path = None
+
+    if f and f.filename:
+        safe = os.path.basename(f.filename).replace(" ", "_")
+        file_name = safe
+        file_path = os.path.join(
+            UPLOADS,
+            f"hw_{u['telegram_id']}_{os.getpid()}_{safe}"
         )
-    })
+        f.save(file_path)
 
-
-# ==========================================================
-# STUDENT PROFILE SETUP
-# ==========================================================
-
-@app.get("/api/departments")
-def get_departments():
-
-    user = require_user()
-
-    if not user:
-        return jsonify({
-            "error": "Unauthorized"
-        }), 401
-
-    conn = database.get_connection()
-    cur = conn.cursor()
-
-    cur.execute("""
-        SELECT DISTINCT department
-        FROM groups
-        WHERE department IS NOT NULL
-        AND TRIM(department) != ''
-        ORDER BY department
-    """)
-
-    rows = cur.fetchall()
-
-    conn.close()
-
-    return jsonify({
-        "items": [
-            row["department"]
-            for row in rows
-        ]
-    })
-
-
-@app.get("/api/groups")
-def get_groups():
-
-    user = require_user()
-
-    if not user:
-        return jsonify({
-            "error": "Unauthorized"
-        }), 401
-
-    department = (
-        request.args.get(
-            "department",
-            ""
-        ).strip()
+    hid = database.add_homework(
+        int(u["telegram_id"]),
+        title,
+        description,
+        due_at,
+        file_name,
+        file_path
     )
-
-    if not department:
-        return jsonify({
-            "error": "Department is required"
-        }), 400
-
-    groups = database.get_groups(
-        department
-    )
-
-    return jsonify({
-        "items": groups
-    })
-
-
-@app.post("/api/profile")
-def save_profile():
-
-    user = require_user()
-
-    if not user:
-        return jsonify({
-            "error": "Unauthorized"
-        }), 401
-
-    data = request.get_json(
-        silent=True
-    ) or {}
-
-    university = data.get(
-        "university"
-    )
-
-    department = (
-        data.get("department")
-        or ""
-    ).strip()
-
-    group_name = (
-        data.get("group_name")
-        or ""
-    ).strip()
-
-    role = (
-        data.get("role")
-        or "student"
-    ).strip()
-
-    if not department:
-        return jsonify({
-            "error": "Department is required"
-        }), 400
-
-    if not group_name:
-        return jsonify({
-            "error": "Group is required"
-        }), 400
-
-    groups = database.get_groups(
-        department
-    )
-
-    if group_name not in groups:
-        return jsonify({
-            "error": "Group not found"
-        }), 400
-
-    database.update_user(
-        user_id=user["id"],
-        university=university,
-        department=department,
-        group_name=group_name,
-        role=role
-    )
-
-    profile = database.get_user(
-        user["id"]
-    )
-
-    return jsonify({
-        "ok": True,
-        "profile": (
-            dict(profile)
-            if profile else None
-        )
-    })
-
-
-# ==========================================================
-# TEACHER REQUEST
-# ==========================================================
-
-@app.post("/api/teacher/request")
-def teacher_request():
-
-    user = require_user()
-
-    if not user:
-        return jsonify({
-            "error": "Unauthorized"
-        }), 401
-
-    telegram_id = user["id"]
-
-    existing = database.get_teacher(
-        telegram_id
-    )
-
-    if existing:
-
-        # If already approved, do not create a new request.
-        return jsonify({
-            "status": existing["status"]
-        })
-
-    database.add_teacher_request(
-        telegram_id=telegram_id,
-        full_name=(
-            user.get("first_name", "")
-            + " "
-            + user.get("last_name", "")
-        ).strip()
-    )
-
-    return jsonify({
-        "status": "pending"
-    })
-
-
-# ==========================================================
-# TEACHER STATUS
-# ==========================================================
-
-@app.get("/api/teacher/status")
-def teacher_status():
-
-    user = require_user()
-
-    if not user:
-        return jsonify({
-            "error": "Unauthorized"
-        }), 401
-
-    teacher = database.get_teacher(
-        user["id"]
-    )
-
-    if not teacher:
-        return jsonify({
-            "status": "none"
-        })
-
-    return jsonify({
-        "status": teacher["status"]
-    })
-
-
-# ==========================================================
-# ADMIN AUTH
-# ==========================================================
-
-def require_admin():
-
-    user = require_user()
-
-    if not user:
-        return None
-
-    if not database.is_admin(
-        user["id"]
-    ):
-        return None
-
-    return user
-
-
-# ==========================================================
-# ADMIN TEACHER REQUESTS
-# ==========================================================
-
-@app.get("/api/admin/teacher-requests")
-def admin_teacher_requests():
-
-    admin = require_admin()
-
-    if not admin:
-        return jsonify({
-            "error": "Forbidden"
-        }), 403
-
-    teachers = database.get_pending_teachers()
-
-    items = []
-
-    for teacher in teachers:
-
-        items.append({
-            "telegram_id":
-                teacher["telegram_id"],
-
-            "full_name":
-                teacher["full_name"],
-
-            "status":
-                teacher["status"],
-
-            "created_at":
-                teacher["created_at"]
-        })
-
-    return jsonify({
-        "items": items
-    })
-
-
-# ==========================================================
-# APPROVE TEACHER
-# ==========================================================
-
-@app.post(
-    "/api/admin/teacher/<int:telegram_id>/approve"
-)
-def approve_teacher(telegram_id):
-
-    admin = require_admin()
-
-    if not admin:
-        return jsonify({
-            "error": "Forbidden"
-        }), 403
-
-    database.approve_teacher(
-        telegram_id
-    )
-
-    return jsonify({
-        "ok": True
-    })
-
-
-# ==========================================================
-# REJECT TEACHER
-# ==========================================================
-
-@app.post(
-    "/api/admin/teacher/<int:telegram_id>/reject"
-)
-def reject_teacher(telegram_id):
-
-    admin = require_admin()
-
-    if not admin:
-        return jsonify({
-            "error": "Forbidden"
-        }), 403
-
-    database.reject_teacher(
-        telegram_id
-    )
-
-    return jsonify({
-        "ok": True
-    })
-
-
-# ==========================================================
-# STUDENT HOMEWORK
-# ==========================================================
+    return jsonify(ok=True, id=hid, file_name=file_name)
 
 @app.get("/api/homework")
-def homework():
+def hw():
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    return jsonify(items=database.get_homework(int(u["telegram_id"])))
 
-    user = require_user()
+@app.get("/api/homework/<int:hid>/file")
+def homework_file(hid):
+    u = user_required()
+    if not u:
+        return jsonify(error="Unauthorized"), 401
 
-    if not user:
-        return jsonify({
-            "error": "Unauthorized"
-        }), 401
+    c = database.conn()
+    try:
+        row = c.execute(
+            """
+            SELECT h.file_name, h.file_path
+            FROM homework h
+            JOIN users usr ON usr.id = h.user_id
+            WHERE h.id=? AND usr.telegram_id=?
+            """,
+            (hid, int(u["telegram_id"]))
+        ).fetchone()
+    finally:
+        c.close()
 
-    profile = database.get_user(
-        user["id"]
+    if row is None:
+        return jsonify(error="File not found"), 404
+
+    file_path = row["file_path"]
+    file_name = row["file_name"] or os.path.basename(file_path or "")
+
+    if not file_path or not os.path.isfile(file_path):
+        return jsonify(error="Attached file is no longer available on the server"), 404
+
+    response = send_file(
+        file_path,
+        as_attachment=False,
+        download_name=file_name or "homework-file"
+    )
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
+
+@app.post("/api/homework/<int:hid>/complete")
+def complete(hid):
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    d = request.get_json(silent=True) or {}
+    completed = bool(d.get("completed", True))
+    database.complete_homework(int(u["telegram_id"]), hid, completed)
+    return jsonify(ok=True, completed=completed)
+
+@app.delete("/api/homework/<int:hid>")
+def delete_hw(hid):
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    database.delete_homework(int(u["telegram_id"]), hid)
+    return jsonify(ok=True)
+
+@app.get("/api/reminders")
+def reminders():
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    return jsonify(enabled=bool(u["reminders_enabled"]))
+
+@app.post("/api/reminders")
+def set_reminders():
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    enabled = bool((request.get_json(silent=True) or {}).get("enabled"))
+    row = database.update_profile(int(u["telegram_id"]), reminders_enabled=1 if enabled else 0)
+    return jsonify(ok=True, enabled=bool(row["reminders_enabled"]))
+
+@app.get("/api/ai/status")
+def ai_status():
+    u = user_required()
+    if not u:
+        return jsonify(error="Unauthorized"), 401
+    from datetime import date
+    today = date.today().isoformat()
+    used = int(u["ai_used_count"] or 0) if u["ai_used_date"] == today else 0
+    return jsonify(
+        ok=True,
+        used=used,
+        limit=None if u["unlimited_ai"] else 10
     )
 
-    if not profile:
-        return jsonify({
-            "items": []
-        })
 
-    department = (
-        profile["department"]
-        or ""
+@app.get("/api/ai/payment-info")
+def ai_payment_info():
+    u = user_required()
+    if not u:
+        return jsonify(error="Unauthorized"), 401
+
+    card = os.environ.get("AI_PAYMENT_CARD", "").strip()
+    if not card:
+        return jsonify(error="Payment card is not configured by administrator"), 503
+
+    return jsonify(
+        ok=True,
+        price=19900,
+        currency="UZS",
+        card_number=card
     )
 
-    group_name = (
-        profile["group_name"]
-        or ""
-    )
 
-    if not group_name:
-        return jsonify({
-            "items": [],
-            "profile_required": True,
-            "message": (
-                "Choose department and group first"
-            )
-        })
+def _get_payment_admin_chat_id():
+    """Return the Telegram chat id where payment receipts must be sent.
+
+    Priority:
+    1) ADMIN_CHAT_ID
+    2) ADMIN_ID
+    3) first user marked as admin in the UniUZ database
+    """
+    explicit = (
+        os.environ.get("ADMIN_CHAT_ID", "").strip()
+        or os.environ.get("ADMIN_ID", "").strip()
+    )
+    if explicit:
+        return explicit
 
     try:
+        conn = database.conn()
+        row = conn.execute(
+            "SELECT telegram_id FROM users WHERE is_admin=1 ORDER BY telegram_id LIMIT 1"
+        ).fetchone()
+        conn.close()
+        if row:
+            return str(row[0])
+    except Exception as e:
+        print("payment admin lookup error:", e)
 
-        items = database.get_student_homework(
-            department,
-            group_name
+    return ""
+
+
+def _telegram_multipart_request(method, chat_id, file_storage, caption):
+    """Send a receipt to Telegram using the Bot API."""
+    import urllib.request
+    import urllib.error
+
+    bot_token = os.environ.get("BOT_TOKEN", "").strip()
+    if not bot_token:
+        raise RuntimeError("BOT_TOKEN is not configured")
+
+    filename = os.path.basename(file_storage.filename or f"receipt-{uuid.uuid4().hex}.bin")
+    content = file_storage.read()
+    if not content:
+        raise RuntimeError("The uploaded receipt is empty")
+
+    boundary = "----UniUZReceiptBoundary" + uuid.uuid4().hex
+
+    def field(name, value):
+        return (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+            f"{value}\r\n"
+        ).encode("utf-8")
+
+    body = []
+    body.append(field("chat_id", chat_id))
+    body.append(field("caption", caption))
+    body.append(field("parse_mode", "HTML"))
+
+    mime = file_storage.mimetype or "application/octet-stream"
+    body.append(
+        (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{method}"; filename="{filename}"\r\n'
+            f"Content-Type: {mime}\r\n\r\n"
+        ).encode("utf-8")
+    )
+    body.append(content)
+    body.append(f"\r\n--{boundary}--\r\n".encode("utf-8"))
+
+    telegram_method = {
+        "document": "sendDocument",
+        "photo": "sendPhoto",
+        "sendDocument": "sendDocument",
+        "sendPhoto": "sendPhoto",
+    }.get(method, method)
+    url = f"https://api.telegram.org/bot{bot_token}/{telegram_method}"
+    req = urllib.request.Request(
+        url,
+        data=b"".join(body),
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=25) as response:
+            raw = response.read().decode("utf-8")
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Telegram HTTP {e.code}: {raw}") from e
+    except Exception as e:
+        raise RuntimeError(f"Telegram request failed: {e}") from e
+
+    try:
+        result = json.loads(raw)
+    except Exception as e:
+        raise RuntimeError(f"Invalid Telegram response: {raw[:500]}") from e
+
+    if not result.get("ok"):
+        raise RuntimeError(
+            f"Telegram rejected receipt: {result.get('description', 'unknown error')}"
+        )
+
+    return result
+
+
+def _send_receipt_to_admin(file_storage, user):
+    """Send any receipt file to the configured admin as a Telegram document."""
+    from html import escape
+    user = dict(user)
+    admin_chat_id = _get_payment_admin_chat_id()
+    if not admin_chat_id:
+        raise RuntimeError("ADMIN_ID/ADMIN_CHAT_ID is not configured")
+
+    first_name = escape(str(user.get("first_name") or ""))
+    last_name = escape(str(user.get("last_name") or ""))
+    telegram_id = escape(str(user.get("telegram_id") or ""))
+    filename = os.path.basename(file_storage.filename or f"receipt-{uuid.uuid4().hex}.bin")
+
+    caption = (
+        "💳 <b>Новый чек на UniUZ AI</b>\n\n"
+        f"👤 {first_name} {last_name}\n"
+        f"🆔 Telegram ID: <code>{telegram_id}</code>\n"
+        "💰 Сумма: <b>19 900 UZS</b>\n"
+        "📌 Требуется проверка оплаты."
+    )
+
+    # Always use sendDocument. Telegram accepts JPG/PNG/WEBP/PDF as documents,
+    # which avoids different sendPhoto/sendDocument multipart formats.
+    return _telegram_multipart_request(
+        "document",
+        admin_chat_id,
+        file_storage,
+        caption,
+    )
+
+@app.post("/api/ai/payment-receipt")
+def ai_payment_receipt():
+    u = user_required()
+    if not u:
+        return jsonify(error="Unauthorized"), 401
+
+    receipt = request.files.get("receipt")
+    if not receipt:
+        return jsonify(error="Receipt file required"), 400
+
+    filename = os.path.basename(receipt.filename or "receipt")
+    lower = filename.lower()
+    allowed = lower.endswith((".pdf", ".png", ".jpg", ".jpeg", ".webp"))
+    if not allowed:
+        return jsonify(error="Receipt must be PDF, PNG, JPG or WEBP"), 400
+    if request.content_length and request.content_length > 12 * 1024 * 1024:
+        return jsonify(error="Receipt must be no larger than 10 MB"), 400
+
+    c = database.conn()
+    pending = c.execute(
+        "SELECT id FROM ai_payment_requests WHERE telegram_id=? AND status='pending' ORDER BY id DESC LIMIT 1",
+        (int(u["telegram_id"]),)
+    ).fetchone()
+    c.close()
+    if pending:
+        return jsonify(error="У вас уже есть чек на проверке администратором."), 409
+
+    ext = os.path.splitext(filename)[1].lower() or ".bin"
+    stored_name = f"{int(u['telegram_id'])}_{uuid.uuid4().hex}{ext}"
+    path = os.path.join(PAYMENTS_DIR, stored_name)
+    try:
+        receipt.save(path)
+        with open(path, "rb") as fp:
+            class StoredFile:
+                def __init__(self, name, mime, stream):
+                    self.filename = name
+                    self.mimetype = mime
+                    self._stream = stream
+
+                def read(self):
+                    return self._stream.read()
+
+            stored_file = StoredFile(
+                filename,
+                receipt.mimetype or "application/octet-stream",
+                fp,
+            )
+            result = _send_receipt_to_admin(stored_file, u)
+
+        msg_id = ((result or {}).get("result") or {}).get("message_id")
+        c = database.conn()
+        cur = c.execute("""
+            INSERT INTO ai_payment_requests
+            (telegram_id, amount, currency, filename, file_path, status, telegram_message_id)
+            VALUES(?,?,?,?,?,?,?)
+        """, (int(u["telegram_id"]), 19900, "UZS", filename, path, "pending", msg_id))
+        c.commit(); c.close()
+    except Exception as e:
+        try:
+            if os.path.exists(path): os.remove(path)
+        except Exception:
+            pass
+        print("Payment receipt error:", repr(e))
+        return jsonify(error=f"Не удалось отправить чек администратору: {e}"), 500
+
+    return jsonify(
+        ok=True,
+        message="Чек отправлен администратору. После проверки вам включат безлимитный UniUZ AI."
+    )
+
+
+@app.get("/api/ai/history")
+def ai_history():
+    u = user_required()
+    if not u:
+        return jsonify(error="Unauthorized"), 401
+    return jsonify(items=database.get_ai_history(int(u["telegram_id"])))
+
+@app.post("/api/ai/file")
+def ai_file():
+    u = user_required()
+    if not u:
+        return jsonify(error="Unauthorized"), 401
+
+    question = (request.form.get("message") or "").strip()
+    f = request.files.get("file")
+
+    if not question and not f:
+        return jsonify(error="Напишите вопрос или прикрепите файл"), 400
+
+    if f and f.filename:
+        raw = f.read()
+        if len(raw) > AI_FILE_MAX_BYTES:
+            return jsonify(error="Файл слишком большой. Максимум 10 МБ."), 413
+        f.stream.seek(0)
+    else:
+        raw = b""
+
+    allowed, used = database.consume_ai(int(u["telegram_id"]))
+    if not allowed:
+        return jsonify(error="Daily AI limit reached", used=used, limit=10), 429
+
+    if not openai_client:
+        return jsonify(error="OPENAI_API_KEY не настроен на Railway"), 500
+
+    try:
+        prompt = question or (
+            "Проанализируй прикреплённый материал и помоги студенту "
+            "решить задание. Объясни решение понятным языком и по шагам."
+        )
+
+        content = [{
+            "type": "input_text",
+            "text": (
+                "Ты UniUZ AI — помощник студента университета. "
+                "Помогай решать учебные задания, объясняй ход решения, "
+                "проверяй ответы и не выдумывай текст, которого не видно в файле.\n\n"
+                + prompt
+            )
+        }]
+
+        if f and f.filename:
+            import base64, mimetypes
+            mime = (
+                f.mimetype
+                or mimetypes.guess_type(f.filename)[0]
+                or "application/octet-stream"
+            ).lower()
+
+            # Images are sent as data URLs and analyzed visually.
+            if mime.startswith("image/"):
+                encoded = base64.b64encode(raw).decode("ascii")
+                content.append({
+                    "type": "input_image",
+                    "image_url": f"data:{mime};base64,{encoded}",
+                    "detail": "auto"
+                })
+            else:
+                # PDFs and documents must be uploaded first to OpenAI Files API.
+                # Passing raw base64 in file_data causes invalid_value errors.
+                uploaded_file = openai_client.files.create(
+                    file=(
+                        os.path.basename(f.filename),
+                        raw,
+                        mime
+                    ),
+                    purpose="user_data"
+                )
+
+                content.append({
+                    "type": "input_file",
+                    "file_id": uploaded_file.id
+                })
+
+        response = openai_client.responses.create(
+            model=AI_FILE_MODEL,
+            input=[{
+                "role": "user",
+                "content": content
+            }]
+        )
+
+        answer = response.output_text or "ИИ не вернул текстовый ответ."
+        database.save_ai_history(
+            int(u["telegram_id"]),
+            question or "Анализ файла",
+            answer,
+            f.filename if f and f.filename else None
+        )
+
+        return jsonify(
+            ok=True,
+            answer=answer,
+            used=used,
+            limit=None if u["unlimited_ai"] else 10
         )
 
     except Exception as e:
-
-        print(
-            "Homework error:",
-            e
-        )
-
-        items = []
-
-    return jsonify({
-        "items": [
-            dict(item)
-            for item in items
-        ],
-        "profile_required": (
-            not bool(department)
-        )
-    })
+        print("AI file error:", repr(e))
+        return jsonify(error=f"Ошибка анализа файла: {e}"), 500
 
 
-# ==========================================================
-# TEACHER HOMEWORK CREATE
-# ==========================================================
-
-@app.post("/api/teacher/homework/create")
-def create_homework():
-
-    user = require_user()
-
-    if not user:
-        return jsonify({
-            "error": "Unauthorized"
-        }), 401
-
-    teacher = database.get_teacher(
-        user["id"]
-    )
-
-    if (
-        not teacher
-        or teacher["status"] != "approved"
-    ):
-        return jsonify({
-            "error":
-                "Only approved teachers allowed"
-        }), 403
-
-    data = request.get_json(
-        silent=True
-    ) or {}
-
-    title = (
-        data.get("title")
-        or ""
-    ).strip()
-
-    description = (
-        data.get("description")
-        or ""
-    ).strip()
-
-    group_name = (
-        data.get("group_name")
-        or ""
-    ).strip()
-
-    deadline = (
-        data.get("deadline")
-        or ""
-    ).strip()
-
-    if not title:
-        return jsonify({
-            "error":
-                "Title is required"
-        }), 400
-
-    if not group_name:
-        return jsonify({
-            "error":
-                "Group is required"
-        }), 400
-
-    # Check that the selected group exists.
-    profile = database.get_user(
-        user["id"]
-    )
-
-    teacher_department = (
-        profile["department"]
-        if profile
-        else None
-    )
-
-    if teacher_department:
-
-        teacher_groups = database.get_groups(
-            teacher_department
-        )
-
-        if group_name not in teacher_groups:
-
-            return jsonify({
-                "error":
-                    "Group not found"
-            }), 400
-
-    database.add_homework(
-        teacher_id=user["id"],
-        title=title,
-        description=description,
-        group_name=group_name,
-        deadline=deadline
-    )
-
-    return jsonify({
-        "ok": True,
-        "message": "Homework created"
-    })
-
-
-# ==========================================================
-# TEACHER HOMEWORK LIST
-# ==========================================================
-
-@app.get("/api/teacher/homework")
-def teacher_homework():
-
-    user = require_user()
-
-    if not user:
-        return jsonify({
-            "error": "Unauthorized"
-        }), 401
-
-    teacher = database.get_teacher(
-        user["id"]
-    )
-
-    if (
-        not teacher
-        or teacher["status"] != "approved"
-    ):
-        return jsonify({
-            "error":
-                "Only approved teachers allowed"
-        }), 403
-
-    items = database.get_teacher_homework(
-        user["id"]
-    )
-
-    return jsonify({
-        "items": [
-            dict(item)
-            for item in items
-        ]
-    })
-
-
-# ==========================================================
-# ANNOUNCEMENTS
-# ==========================================================
-
-@app.get("/api/announcements")
-def announcements():
-
-    user = require_user()
-
-    if not user:
-        return jsonify({
-            "error": "Unauthorized"
-        }), 401
-
-    profile = database.get_user(
-        user["id"]
-    )
-
-    if not profile:
-        return jsonify({
-            "items": []
-        })
-
-    department = (
-        profile["department"]
-        or ""
-    )
-
-    group_name = (
-        profile["group_name"]
-        or ""
-    )
-
-    if not department or not group_name:
-        return jsonify({
-            "items": [],
-            "profile_required": True,
-            "message": (
-                "Choose department and group first"
-            )
-        })
-
+@app.post("/api/ai")
+def ai():
+    u = user_required()
+    if not u: return jsonify(error="Unauthorized"), 401
+    d = request.get_json(silent=True) or {}
+    question = str(d.get("message","")).strip()
+    if not question: return jsonify(error="Message required"), 400
+    allowed, used = database.consume_ai(int(u["telegram_id"]))
+    if not allowed:
+        return jsonify(error="Daily AI limit reached", used=used, limit=10), 429
     try:
-
-        items = database.get_student_announcements(
-            department,
-            group_name
-        )
-
+        answer = ask(u, question, database.get_schedule(int(u["telegram_id"])), database.get_homework(int(u["telegram_id"])))
+        database.save_ai_history(int(u["telegram_id"]), question, answer)
+        return jsonify(ok=True, answer=answer, used=used, limit=None if u["unlimited_ai"] else 10)
     except Exception as e:
+        return jsonify(error=str(e)), 500
 
-        print(
-            "Announcements error:",
-            e
-        )
-
-        items = []
-
-    return jsonify({
-        "items": [
-            dict(item)
-            for item in items
-        ]
-    })
-
-
-# ==========================================================
-# TEACHER ANNOUNCEMENTS
-# ==========================================================
-
-@app.get("/api/teacher/announcements")
-def teacher_announcements():
-
-    user = require_user()
-
-    if not user:
-        return jsonify({
-            "error": "Unauthorized"
-        }), 401
-
-    teacher = database.get_teacher(
-        user["id"]
-    )
-
-    if (
-        not teacher
-        or teacher["status"] != "approved"
-    ):
-        return jsonify({
-            "error":
-                "Only approved teachers allowed"
-        }), 403
-
-    items = database.get_teacher_announcements(
-        user["id"]
-    )
-
-    return jsonify({
-        "items": [
-            dict(item)
-            for item in items
-        ]
-    })
+@app.get("/api/admin/payments")
+def admin_payments():
+    if not admin_required(): return jsonify(error="Forbidden"), 403
+    c = database.conn()
+    rows = c.execute("""
+        SELECT p.*, u.first_name, u.last_name, u.username, u.department, u.group_name
+        FROM ai_payment_requests p
+        LEFT JOIN users u ON u.telegram_id=p.telegram_id
+        ORDER BY CASE WHEN p.status='pending' THEN 0 ELSE 1 END, p.id DESC
+        LIMIT 100
+    """).fetchall()
+    c.close()
+    items=[]
+    for r in rows:
+        items.append({
+            "id": r["id"], "telegram_id": r["telegram_id"], "amount": r["amount"],
+            "currency": r["currency"], "filename": r["filename"], "status": r["status"],
+            "created_at": r["created_at"], "reviewed_at": r["reviewed_at"],
+            "expires_at": r["expires_at"], "first_name": r["first_name"] or "",
+            "last_name": r["last_name"] or "", "username": r["username"] or "",
+            "department": r["department"] or "", "group_name": r["group_name"] or ""
+        })
+    return jsonify(items=items)
 
 
+@app.get("/api/admin/payments/<int:payment_id>/receipt")
+def admin_payment_receipt(payment_id):
+    if not admin_required(): return jsonify(error="Forbidden"), 403
+    c = database.conn()
+    row = c.execute("SELECT file_path, filename FROM ai_payment_requests WHERE id=?", (payment_id,)).fetchone()
+    c.close()
+    if not row or not os.path.isfile(row["file_path"]):
+        return jsonify(error="Receipt not found"), 404
+    return send_file(row["file_path"], download_name=row["filename"], as_attachment=False)
 
 
-# ==========================================================
-# AI GENERATED FILE DOWNLOAD
-# ==========================================================
-
-@app.get("/api/ai/generated/<int:file_id>")
-def ai_generated_file(file_id):
-
-    user = require_user()
-
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    file = database.get_ai_generated_file(
-        user["id"],
-        file_id
-    )
-
-    if not file:
-        return jsonify({"error": "File not found"}), 404
-
-    if not os.path.exists(file["file_path"]):
-        return jsonify({"error": "File missing"}), 404
-
-    return send_file(
-        file["file_path"],
-        as_attachment=True,
-        download_name=file["filename"]
-    )
+def _notify_user(chat_id, text):
+    import urllib.request
+    import urllib.parse
+    token = os.environ.get("BOT_TOKEN", "").strip()
+    if not token: return
+    data = urllib.parse.urlencode({"chat_id": str(chat_id), "text": text, "parse_mode": "HTML"}).encode()
+    req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage", data=data, method="POST")
+    try:
+        urllib.request.urlopen(req, timeout=10).read()
+    except Exception as e:
+        print("notify user:", e)
 
 
-# ==========================================================
-# 404
-# ==========================================================
+@app.post("/api/admin/payments/<int:payment_id>/approve")
+def admin_payment_approve(payment_id):
+    admin = admin_required()
+    if not admin: return jsonify(error="Forbidden"), 403
+    c = database.conn()
+    row = c.execute("SELECT * FROM ai_payment_requests WHERE id=?", (payment_id,)).fetchone()
+    if not row: c.close(); return jsonify(error="Payment not found"), 404
+    if row["status"] != "pending": c.close(); return jsonify(error="Payment already reviewed"), 409
+    expires = datetime.now(timezone.utc) + timedelta(days=30)
+    exp = expires.isoformat()
+    c.execute("UPDATE ai_payment_requests SET status='approved', reviewed_at=?, reviewed_by=?, expires_at=? WHERE id=?",
+              (datetime.now(timezone.utc).isoformat(), int(admin["telegram_id"]), exp, payment_id))
+    c.execute("INSERT INTO ai_subscriptions(telegram_id, expires_at, updated_at) VALUES(?,?,?) ON CONFLICT(telegram_id) DO UPDATE SET expires_at=excluded.expires_at, updated_at=excluded.updated_at",
+              (int(row["telegram_id"]), exp, datetime.now(timezone.utc).isoformat()))
+    c.commit(); c.close()
+    database.set_unlimited(int(row["telegram_id"]), True)
+    _notify_user(int(row["telegram_id"]), "✅ <b>Оплата подтверждена!</b>\n\nБезлимитный UniUZ AI активирован на 30 дней.\nДата окончания: <b>" + expires.astimezone(timezone.utc).strftime("%d.%m.%Y %H:%M UTC") + "</b>.")
+    return jsonify(ok=True, expires_at=exp)
+
+
+@app.post("/api/admin/payments/<int:payment_id>/reject")
+def admin_payment_reject(payment_id):
+    admin = admin_required()
+    if not admin: return jsonify(error="Forbidden"), 403
+    c = database.conn()
+    row = c.execute("SELECT * FROM ai_payment_requests WHERE id=?", (payment_id,)).fetchone()
+    if not row: c.close(); return jsonify(error="Payment not found"), 404
+    if row["status"] != "pending": c.close(); return jsonify(error="Payment already reviewed"), 409
+    c.execute("UPDATE ai_payment_requests SET status='rejected', reviewed_at=?, reviewed_by=? WHERE id=?",
+              (datetime.now(timezone.utc).isoformat(), int(admin["telegram_id"]), payment_id))
+    c.commit(); c.close()
+    _notify_user(int(row["telegram_id"]), "❌ <b>Чек не подтверждён.</b>\n\nПроверьте сумму и данные оплаты и при необходимости отправьте новый чек.")
+    return jsonify(ok=True)
+
+
+@app.get("/api/admin/stats")
+def admin_stats():
+    if not admin_required(): return jsonify(error="Forbidden"), 403
+    stats = database.stats()
+    c = database.conn()
+    stats["pending_payments"] = c.execute("SELECT COUNT(*) FROM ai_payment_requests WHERE status='pending'").fetchone()[0]
+    stats["approved_payments"] = c.execute("SELECT COUNT(*) FROM ai_payment_requests WHERE status='approved'").fetchone()[0]
+    c.close()
+    return jsonify(stats)
+
+@app.get("/api/admin/users")
+def admin_users():
+    if not admin_required(): return jsonify(error="Forbidden"), 403
+    return jsonify(items=database.all_users())
+
+@app.post("/api/admin/unlimited")
+def admin_unlimited():
+    if not admin_required(): return jsonify(error="Forbidden"), 403
+    d = request.get_json(silent=True) or {}
+    tid = int(d.get("telegram_id",0))
+    enabled = bool(d.get("enabled"))
+    database.set_unlimited(tid, enabled)
+    if not enabled:
+        c = database.conn(); c.execute("DELETE FROM ai_subscriptions WHERE telegram_id=?", (tid,)); c.commit(); c.close()
+    return jsonify(ok=True)
+
+@app.post("/api/admin/add")
+def admin_add():
+    if not admin_required(): return jsonify(error="Forbidden"), 403
+    d = request.get_json(silent=True) or {}
+    tid = int(d.get("telegram_id",0))
+    c = database.conn()
+    c.execute("UPDATE users SET is_admin=1 WHERE telegram_id=?", (tid,))
+    c.commit(); c.close()
+    return jsonify(ok=True)
 
 @app.errorhandler(404)
-def not_found(error):
-
-    return jsonify({
-        "error":
-            "Endpoint not found"
-    }), 404
-
-
-# ==========================================================
-# GENERAL ERROR
-# ==========================================================
+def nf(e):
+    return jsonify(error="Endpoint not found"), 404
 
 @app.errorhandler(500)
-def server_error(error):
-
-    print(
-        "Internal server error:",
-        error
-    )
-
-    return jsonify({
-        "error":
-            "Internal server error"
-    }), 500
-
-
-# ==========================================================
-# START
-# ==========================================================
-
-if __name__ == "__main__":
-
-    port = int(
-        os.environ.get(
-            "PORT",
-            8080
-        )
-    )
-
-    print(
-        "================================"
-    )
-
-    print(
-        "UniUZ API STARTED"
-    )
-
-    print(
-        f"PORT: {port}"
-    )
-
-    print(
-        "================================"
-    )
-
-    app.run(
-        host="0.0.0.0",
-        port=port
-    )
+def se(e):
+    return jsonify(error="Internal server error"), 500
