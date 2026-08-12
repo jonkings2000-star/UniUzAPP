@@ -1,6 +1,4 @@
 import os, json, hmac, hashlib
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
 from urllib.parse import parse_qsl
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -14,8 +12,6 @@ os.makedirs(UPLOADS, exist_ok=True)
 app = Flask(__name__, static_folder=BASE, static_url_path="")
 CORS(app)
 database.init_db()
-
-TASHKENT_TZ = ZoneInfo("Asia/Tashkent")
 
 def telegram_user():
     raw = request.headers.get("X-Telegram-Init-Data", "")
@@ -203,6 +199,38 @@ def set_reminders():
     row = database.update_profile(int(u["telegram_id"]), reminders_enabled=1 if enabled else 0)
     return jsonify(ok=True, enabled=bool(row["reminders_enabled"]))
 
+@app.get("/api/ai/status")
+def ai_status():
+    u = user_required()
+    if not u:
+        return jsonify(error="Unauthorized"), 401
+    from datetime import date
+    today = date.today().isoformat()
+    used = int(u["ai_used_count"] or 0) if u["ai_used_date"] == today else 0
+    return jsonify(
+        ok=True,
+        used=used,
+        limit=None if u["unlimited_ai"] else 10
+    )
+
+@app.post("/api/ai/premium-request")
+def ai_premium_request():
+    u = user_required()
+    if not u:
+        return jsonify(error="Unauthorized"), 401
+
+    return jsonify(
+        ok=True,
+        price=19900,
+        currency="UZS",
+        message=(
+            "Безлимитный UniUZ AI стоит 19 900 сум в месяц. "
+            "Оплата помогает поддерживать работу ИИ и серверов, "
+            "чтобы приложение работало 24/7. "
+            "Для подключения подписки свяжитесь с администратором."
+        )
+    )
+
 @app.post("/api/ai")
 def ai():
     u = user_required()
@@ -246,80 +274,6 @@ def admin_add():
     c.execute("UPDATE users SET is_admin=1 WHERE telegram_id=?", (tid,))
     c.commit(); c.close()
     return jsonify(ok=True)
-
-
-@app.get("/api/notifications")
-def notifications():
-    u = user_required()
-    if not u:
-        return jsonify(error="Unauthorized"), 401
-
-    tid = int(u["telegram_id"])
-    now = datetime.now(TASHKENT_TZ)
-
-    items = []
-
-    # Next classes today/tomorrow, interpreted in Asia/Tashkent.
-    for row in database.get_schedule(tid):
-        try:
-            day = int(row["day_of_week"])
-            start = str(row["start_time"] or "")
-            hh, mm = map(int, start[:5].split(":"))
-        except Exception:
-            continue
-
-        delta_days = (day - now.weekday()) % 7
-        dt = (now + timedelta(days=delta_days)).replace(
-            hour=hh, minute=mm, second=0, microsecond=0
-        )
-        if dt < now:
-            dt += timedelta(days=7)
-
-        minutes = int((dt - now).total_seconds() // 60)
-        if minutes <= 24 * 60:
-            items.append({
-                "type": "schedule",
-                "icon": "🗓️",
-                "title": str(row["subject"]),
-                "text": f"{start} • через {max(0, minutes)} мин.",
-                "room": row.get("room") if isinstance(row, dict) else None,
-                "at": dt.isoformat()
-            })
-
-    # Homework deadlines.
-    for row in database.get_homework(tid, include_completed=False):
-        raw = str(row.get("due_at") or "")
-        dt = None
-        try:
-            parsed = raw.replace("Z", "+00:00")
-            dt = datetime.fromisoformat(parsed)
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=TASHKENT_TZ)
-            else:
-                dt = dt.astimezone(TASHKENT_TZ)
-        except Exception:
-            pass
-
-        if not dt:
-            continue
-
-        minutes = int((dt - now).total_seconds() // 60)
-        if minutes >= 0 and minutes <= 48 * 60:
-            items.append({
-                "type": "homework",
-                "icon": "📝",
-                "title": str(row["title"]),
-                "text": f"дедлайн через {max(0, minutes)} мин.",
-                "at": dt.isoformat()
-            })
-
-    items.sort(key=lambda x: x.get("at", ""))
-    return jsonify(
-        ok=True,
-        timezone="Asia/Tashkent",
-        enabled=bool(u["reminders_enabled"]),
-        items=items[:20]
-    )
 
 @app.errorhandler(404)
 def nf(e):

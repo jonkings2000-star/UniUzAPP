@@ -83,29 +83,6 @@ function chooseGroup(uni,fac){app.innerHTML=`<div class="wrap">${brand()}<div cl
 function chooseName(uni,fac){const g=document.getElementById("grp").value.trim();if(!g)return toast(tr("group"));app.innerHTML=`<div class="wrap">${brand()}<div class="card"><h2>${tr("name")}</h2><input id="nm" class="input" placeholder="Jakhongir Karimov"><button class="btn primary" onclick="finishSetup('${esc(uni)}','${esc(fac)}','${esc(g)}')">${tr("save")}</button></div></div>`}
 async function finishSetup(uni,fac,g){const n=document.getElementById("nm").value.trim();if(!n)return toast(tr("name"));const parts=n.split(/\s+/);try{const d=await api("/setup",{method:"POST",body:{language:lang,university:uni,department:fac,group_name:g,first_name:parts[0],last_name:parts.slice(1).join(" ")}});profile={...d.profile};try{const m=await api("/me");profile={...m.profile,is_admin:m.is_admin}}catch(e){}home()}catch(e){toast(e.message)}}
 
-
-async function getAIUsage(){
-    try{
-        return await api("/ai/usage");
-    }catch(e){
-        return {used:0,limit:10,unlimited:false};
-    }
-}
-
-async function showNotifications(){
-    try{
-        const d=await api("/notifications");
-        const items=d.items||[];
-        layout(`${brand()}<div class="card notification-card">
-            <h2>🔔 Уведомления</h2>
-            ${items.length
-              ? items.map(x=>`<div class="list-item"><div><b>${x.icon} ${esc(x.title)}</b><div class="muted small">⏰ ${esc(x.time)}</div></div></div>`).join("")
-              : `<div class="empty">Нет новых уведомлений</div>`
-            }
-        </div>`);
-    }catch(e){toast(e.message)}
-}
-
 async function home(){
 
 let schedule=[];
@@ -123,13 +100,10 @@ try{
 
 
 layout(`
-<div class="home-top">
- <div class="brand">
-  <div class="logo">🎓</div>
-  <h1>UniUZ</h1>
-  <div class="muted">${profile?.university||""}</div>
- </div>
- <button class="notify-btn" onclick="showNotifications()" aria-label="Уведомления">🔔</button>
+<div class="brand">
+ <div class="logo">🎓</div>
+ <h1>UniUZ</h1>
+ <div class="muted">${profile?.university||""}</div>
 </div>
 
 <div class="hero">
@@ -195,8 +169,10 @@ layout(`
 <div class="ai-card">
  <div class="ai-title">🤖 UniUZ AI</div>
  <p>Ваш персональный помощник</p>
- <div id="aiCounter" class="ai-counter">0/10 запросов сегодня</div>
- <button class="btn primary" onclick="showAI()">Спросить ИИ →</button>
+ <div id="ai-usage" class="ai-usage">Загрузка...</div>
+ <button class="btn primary" onclick="showAI()">
+ Спросить ИИ →
+ </button>
 </div>
 
 
@@ -220,12 +196,7 @@ layout(`
 
 `)
 
- const usage=await getAIUsage();
- const counter=document.getElementById("aiCounter");
- if(counter){
-   counter.textContent=usage.unlimited ? "∞ Безлимитный AI" : `${usage.used}/10 запросов сегодня`;
- }
-
+ loadAIUsage();
 }
 async function showSchedule(){try{const d=await api("/schedule");const names=lang==="ru"?["Пн","Вт","Ср","Чт","Пт","Сб","Вс"]:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];layout(`${brand()}<div class="card"><div class="row"><h2>🗓️ ${tr("schedule")}</h2><label class="btn">📎 ${tr("upload")}<input id="sf" type="file" accept=".pdf,image/*" hidden></label></div><div id="sl">${d.items.length?d.items.map(x=>`<div class="list-item"><b>${names[x.day_of_week]} ${esc(x.start_time)} — ${esc(x.subject)}</b><div class="muted small">${esc(x.room||"")}</div></div>`).join(""):`<div class="empty">${tr("noData")}</div>`}</div></div>`,"schedule");document.getElementById("sf").onchange=uploadSchedule}catch(e){toast(e.message)}}
 async function uploadSchedule(e){const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append("file",f);try{await api("/schedule/upload",{method:"POST",body:fd});showSchedule()}catch(e){toast(e.message)}}
@@ -246,8 +217,60 @@ async function addHW(){
 async function toggleHW(id,completed){try{await api(`/homework/${id}/complete`,{method:"POST",body:{completed:!!completed}});showHomework()}catch(e){toast(e.message)}}
 async function deleteHW(id){try{await api(`/homework/${id}`,{method:"DELETE"});showHomework()}catch(e){toast(e.message)}}
 
+
+function showAILimitOffer(){
+ const old=document.getElementById("ai-limit-modal");
+ if(old) old.remove();
+
+ const modal=document.createElement("div");
+ modal.id="ai-limit-modal";
+ modal.className="ai-limit-modal";
+ modal.innerHTML=`
+  <div class="ai-limit-box">
+   <div class="ai-limit-icon">🤖</div>
+   <h2>Лимит AI на сегодня исчерпан</h2>
+   <p>Вы использовали все <b>10 запросов</b> сегодня.</p>
+   <div class="ai-limit-price">19 900 сум / месяц</div>
+   <div class="ai-limit-sub">Безлимитный UniUZ AI</div>
+   <p>Эта подписка помогает оплачивать работу ИИ и серверов, чтобы UniUZ мог работать <b>24/7</b> и оставаться доступным для студентов.</p>
+   <div class="ai-limit-actions">
+    <button class="btn ai-limit-close" onclick="closeAILimitOffer()">Позже</button>
+    <button class="btn primary" onclick="requestUnlimitedAI()">💳 Купить</button>
+   </div>
+  </div>
+ `;
+ document.body.appendChild(modal);
+}
+
+function closeAILimitOffer(){
+ const modal=document.getElementById("ai-limit-modal");
+ if(modal) modal.remove();
+}
+
+async function requestUnlimitedAI(){
+ try{
+  const d=await api("/ai/premium-request",{method:"POST",body:{}});
+  closeAILimitOffer();
+  toast(d.message || "Заявка на безлимитный AI отправлена.");
+ }catch(e){
+  toast(e.message || "Не удалось оформить заявку.");
+ }
+}
+
+async function loadAIUsage(){
+ try{
+  const d=await api("/ai/status");
+  const el=document.getElementById("ai-usage");
+  if(el) el.textContent=d.limit===null?"∞ Безлимитный AI":`${d.used}/10 запросов сегодня`;
+  return d;
+ }catch(e){
+  const el=document.getElementById("ai-usage");
+  if(el) el.textContent="0/10 запросов сегодня";
+  return null;
+ }
+}
 function showAI(){layout(`${brand()}<div class="card"><h2>🤖 ${tr("ai")}</h2><div id="chat"></div><textarea id="q" class="input" placeholder="${tr("question")}"></textarea><button class="btn primary" onclick="askAI()">${tr("send")}</button></div>`,"ai")}
-async function askAI(){const q=document.getElementById("q").value.trim();if(!q)return;try{const d=await api("/ai",{method:"POST",body:{message:q}});document.getElementById("chat").innerHTML+=`<div class="list-item"><b>${esc(q)}</b><p>${esc(d.answer)}</p><span class="badge">${d.limit===null?"∞":`${d.used}/10`}</span></div>`;document.getElementById("q").value=""}catch(e){toast(e.message)}}
+async function askAI(){const q=document.getElementById("q").value.trim();if(!q)return;try{const d=await api("/ai",{method:"POST",body:{message:q}});document.getElementById("chat").innerHTML+=`<div class="list-item"><b>${esc(q)}</b><p>${esc(d.answer)}</p><span class="badge">${d.limit===null?"∞":`${d.used}/10`}</span></div>`;document.getElementById("q").value="";await loadAIUsage();if(d.limit!==null&&d.used>=10)showAILimitOffer();}catch(e){if(e&&e.status===429){showAILimitOffer();}else{toast(e.message)}}}
 
 async function showReminders(){try{const d=await api("/reminders");layout(`${brand()}<div class="card"><h2>🔔 ${tr("reminders")}</h2><p>${d.enabled?tr("enabled"):tr("disabled")}</p><button class="btn primary" onclick="toggleReminders(${!d.enabled})">${d.enabled?tr("disabled"):tr("enabled")}</button></div>`)}catch(e){toast(e.message)}}
 async function toggleReminders(enabled){try{await api("/reminders",{method:"POST",body:{enabled}});showReminders()}catch(e){toast(e.message)}}
