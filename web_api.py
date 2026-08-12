@@ -579,7 +579,6 @@ def ai_file():
             "решить задание. Объясни решение понятным языком и по шагам."
         )
 
-        context = database.get_ai_context(int(u["telegram_id"]), 10)
         history_text = ""
         if context:
             history_text = "\n\nПредыдущий диалог пользователя:\n" + "\n".join(
@@ -643,8 +642,6 @@ def ai_file():
         )
 
         answer = response.output_text or "ИИ не вернул текстовый ответ."
-        generated_file_id = None
-        generated_filename = None
 
         # Автоматическое создание файла по смыслу запроса
         auto_type, auto_title = detect_ai_output_file(question)
@@ -669,11 +666,9 @@ def ai_file():
                     path,
                     auto_type
                 )
-                generated_file_id = fid
-                generated_filename = filename
 
                 if fid:
-                    answer += f"\n\nГотово ✅\n📎 {filename}"
+                    answer += f"\n\nГотово ✅\n📎 {filename}\n⬇️ Файл создан UniUZ AI"
             except Exception as file_error:
                 print("auto file generation error:", repr(file_error))
         database.save_ai_history(
@@ -687,9 +682,7 @@ def ai_file():
             ok=True,
             answer=answer,
             used=used,
-            limit=None if u["unlimited_ai"] else 10,
-            file_id=generated_file_id,
-            filename=generated_filename
+            limit=None if u["unlimited_ai"] else 10
         )
 
     except Exception as e:
