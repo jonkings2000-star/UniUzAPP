@@ -192,6 +192,10 @@ layout(`
  <button class="quick-v2" onclick="showProfile()">
   <span>👤</span>${tr("profile")}
  </button>
+ ${profile?.is_admin ? `
+ <button class="quick-v2 admin-v2" onclick="showAdmin()">
+  <span>🔐</span>${tr("admin")}
+ </button>` : ""}
 </div>
 
 `)
