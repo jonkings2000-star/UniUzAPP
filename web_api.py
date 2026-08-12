@@ -318,7 +318,7 @@ def _get_payment_admin_chat_id():
     return ""
 
 
-def _telegram_multipart_request(api_method, file_field, chat_id, file_storage, caption):
+def _telegram_multipart_request(method, chat_id, file_storage, caption):
     """Send a receipt to Telegram using the Bot API."""
     import uuid
     import urllib.request
@@ -351,14 +351,14 @@ def _telegram_multipart_request(api_method, file_field, chat_id, file_storage, c
     body.append(
         (
             f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="{file_field}"; filename="{filename}"\r\n'
+            f'Content-Disposition: form-data; name="{method}"; filename="{filename}"\r\n'
             f"Content-Type: {mime}\r\n\r\n"
         ).encode("utf-8")
     )
     body.append(content)
     body.append(f"\r\n--{boundary}--\r\n".encode("utf-8"))
 
-    url = f"https://api.telegram.org/bot{bot_token}/{api_method}"
+    url = f"https://api.telegram.org/bot{bot_token}/{method}"
     req = urllib.request.Request(
         url,
         data=b"".join(body),
@@ -389,31 +389,28 @@ def _telegram_multipart_request(api_method, file_field, chat_id, file_storage, c
 
 
 def _send_receipt_to_admin(file_storage, user):
+    # sqlite3.Row does not implement .get(); normalize it to a dict first.
+    user = dict(user)
     admin_chat_id = _get_payment_admin_chat_id()
     if not admin_chat_id:
         raise RuntimeError(
             "Admin chat is not configured. Set ADMIN_ID or ADMIN_CHAT_ID in Railway Variables."
         )
 
-    def value(name, default=""):
-        try:
-            return user[name]
-        except (KeyError, IndexError, TypeError):
-            return default
-
     caption = (
         "💳 <b>Новый чек на UniUZ AI</b>\n\n"
-        f"👤 {value('first_name')} {value('last_name')}\n"
-        f"🆔 Telegram ID: <code>{value('telegram_id')}</code>\n"
+        f"👤 {user.get('first_name', '')} {user.get('last_name', '')}\n"
+        f"🆔 Telegram ID: <code>{user.get('telegram_id')}</code>\n"
         f"💰 Сумма: <b>19 900 UZS</b>\n"
         "📌 Требуется проверка оплаты."
     )
 
-    # Use sendDocument for every receipt. It accepts PDF and image files and avoids
-    # Telegram sendPhoto restrictions on image formats/resolution.
+    filename = (file_storage.filename or "").lower()
+    method = "sendDocument" if filename.endswith(".pdf") else "sendPhoto"
+
+    # Telegram's sendPhoto expects the field name `photo`, while sendDocument expects `document`.
     return _telegram_multipart_request(
-        "sendDocument",
-        "document",
+        "photo" if method == "sendPhoto" else "document",
         admin_chat_id,
         file_storage,
         caption,
@@ -452,21 +449,22 @@ def ai_payment_receipt():
     path = os.path.join(PAYMENTS_DIR, stored_name)
     try:
         receipt.save(path)
-        caption = (
-            "💳 <b>Новый чек на UniUZ AI</b>\n\n"
-            f"👤 {u['first_name'] or ''} {u['last_name'] or ''}\n"
-            f"🆔 Telegram ID: <code>{u['telegram_id']}</code>\n"
-            f"💰 Сумма: <b>19 900 UZS</b>\n"
-            "📌 Проверьте чек в админ-панели и примите решение."
-        )
-        # Re-open because Telegram sender consumes the stream.
         with open(path, "rb") as fp:
             class StoredFile:
-                filename = filename
-                mimetype = receipt.mimetype or "application/octet-stream"
+                def __init__(self, name, mime, stream):
+                    self.filename = name
+                    self.mimetype = mime
+                    self._stream = stream
+
                 def read(self):
-                    return fp.read()
-            result = _send_receipt_to_admin(StoredFile(), u)
+                    return self._stream.read()
+
+            stored_file = StoredFile(
+                filename,
+                receipt.mimetype or "application/octet-stream",
+                fp,
+            )
+            result = _send_receipt_to_admin(stored_file, u)
 
         msg_id = ((result or {}).get("result") or {}).get("message_id")
         c = database.conn()
@@ -481,8 +479,8 @@ def ai_payment_receipt():
             if os.path.exists(path): os.remove(path)
         except Exception:
             pass
-        print("Payment receipt error:", repr(e))
-        return jsonify(error=f"Не удалось отправить чек администратору: {e}"), 500
+        print("Payment receipt error:", e)
+        return jsonify(error="Не удалось отправить чек администратору"), 500
 
     return jsonify(
         ok=True,
