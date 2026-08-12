@@ -1,6 +1,5 @@
 
 // UniUZ Home v6 FINAL
-// FIX: Home 'Сегодня' filters schedule by Tashkent weekday
 // UniUZ Home Dashboard v5 - schedule and homework cards
 // UniUZ Home Dashboard v4
 // UniUZ Home Dashboard v3
@@ -20,7 +19,7 @@ profile:"Профиль",save:"Сохранить",upload:"Загрузить р
 enabled:"Напоминания включены",disabled:"Напоминания выключены",logout:"Сменить профиль",
 admin:"Админ-панель",stats:"Статистика",users:"Пользователи",unlimited:"Безлимитный ИИ",payments:"Платежи",pendingPayments:"Ожидают проверки",approve:"Одобрить",reject:"Отклонить",openReceipt:"Открыть чек",approved:"Одобрено",rejected:"Отклонено",pending:"На проверке",
 question:"Напишите вопрос...",send:"Отправить",title:"Название",description:"Описание",
-due:"Дата и время сдачи",done:"Выполнено",delete:"Удалить",noData:"Пока ничего нет",
+due:"Дата и время сдачи",done:"Выполнено",delete:"Удалить",openFile:"Открыть файл",noData:"Пока ничего нет",
 back:"Назад",language:"Язык",facultyPlaceholder:"Например: AI Software"
 },
 en:{
@@ -91,25 +90,8 @@ let homework=[];
 
 try{
  const s=await api("/schedule");
- const allSchedule=Array.isArray(s.items)?s.items:[];
-
- // UniUZ uses day_of_week: 0=Monday ... 6=Sunday.
- // Use Tashkent time so the "Сегодня" card always matches Uzbekistan time.
- const todayIndex = ({
-  Mon:0, Tue:1, Wed:2, Thu:3, Fri:4, Sat:5, Sun:6
- })[
-  new Intl.DateTimeFormat("en-US", {
-   timeZone:"Asia/Tashkent",
-   weekday:"short"
-  }).format(new Date())
- ];
-
- schedule=allSchedule.filter(
-  x => Number(x.day_of_week) === todayIndex
- );
-}catch(e){
- schedule=[];
-}
+ schedule=s.items||[];
+}catch(e){}
 
 try{
  const h=await api("/homework");
@@ -221,7 +203,28 @@ layout(`
 }
 async function showSchedule(){try{const d=await api("/schedule");const names=lang==="ru"?["Пн","Вт","Ср","Чт","Пт","Сб","Вс"]:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];layout(`${brand()}<div class="card"><div class="row"><h2>🗓️ ${tr("schedule")}</h2><label class="btn">📎 ${tr("upload")}<input id="sf" type="file" accept=".pdf,image/*" hidden></label></div><div id="sl">${d.items.length?d.items.map(x=>`<div class="list-item"><b>${names[x.day_of_week]} ${esc(x.start_time)} — ${esc(x.subject)}</b><div class="muted small">${esc(x.room||"")}</div></div>`).join(""):`<div class="empty">${tr("noData")}</div>`}</div></div>`,"schedule");document.getElementById("sf").onchange=uploadSchedule}catch(e){toast(e.message)}}
 async function uploadSchedule(e){const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append("file",f);try{await api("/schedule/upload",{method:"POST",body:fd});showSchedule()}catch(e){toast(e.message)}}
-async function showHomework(){try{const d=await api("/homework");layout(`${brand()}<div class="card"><h2>📝 ${tr("homework")}</h2><input id="ht" class="input" placeholder="${tr("title")}"><textarea id="hd" placeholder="${tr("description")}"></textarea><input id="hdate" class="input" type="datetime-local"><input id="hfile" class="input" type="file" accept=".pdf,image/*,.doc,.docx"><button class="btn primary" onclick="addHW()">${tr("add")}</button></div><div class="card">${d.items.length?d.items.map(x=>`<div class="list-item" style="${x.completed?"border:1px solid #3ccf7a;background:#10291d;border-radius:14px;padding:14px":""}"><div class="row"><b>${x.completed?"✅ ":""}${esc(x.title)}</b><span class="badge">${esc(x.due_at)}</span></div><p class="muted">${esc(x.description||"")}</p><div class="row"><button class="btn" onclick="toggleHW(${x.id},${x.completed?0:1})">${x.completed?"↩️ "+tr("done"):"✅ "+tr("done")}</button><button class="btn danger" onclick="deleteHW(${x.id})">${tr("delete")}</button></div></div>`).join(""):`<div class="empty">${tr("noData")}</div>`}</div>`,"homework")}catch(e){toast(e.message)}}
+async function openHomeworkFile(id){
+ try{
+  const r=await fetch(`${API}/homework/${id}/file`,{
+   headers:{"X-Telegram-Init-Data":tg?.initData||""}
+  });
+  if(!r.ok){
+   let d={}; try{d=await r.json()}catch{}
+   throw new Error(d.error||`API ${r.status}`);
+  }
+  const blob=await r.blob();
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,"_blank");
+  if(!w){
+   toast("Разрешите открытие новой вкладки");
+  }
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+ }catch(e){
+  toast(e.message||"Не удалось открыть файл");
+ }
+}
+
+async function showHomework(){try{const d=await api("/homework");layout(`${brand()}<div class="card"><h2>📝 ${tr("homework")}</h2><input id="ht" class="input" placeholder="${tr("title")}"><textarea id="hd" placeholder="${tr("description")}"></textarea><input id="hdate" class="input" type="datetime-local"><input id="hfile" class="input" type="file" accept=".pdf,image/*,.doc,.docx"><button class="btn primary" onclick="addHW()">${tr("add")}</button></div><div class="card">${d.items.length?d.items.map(x=>`<div class="list-item" style="${x.completed?"border:1px solid #3ccf7a;background:#10291d;border-radius:14px;padding:14px":""}"><div class="row"><b>${x.completed?"✅ ":""}${esc(x.title)}</b><span class="badge">${esc(x.due_at)}</span></div><p class="muted">${esc(x.description||"")}</p>${(x.file_name||x.file_path)?`<div class="row"><button class="btn" onclick="openHomeworkFile(${x.id})">📎 ${tr("openFile")} · ${esc(x.file_name||"файл")}</button></div>`:""}<div class="row"><button class="btn" onclick="toggleHW(${x.id},${x.completed?0:1})">${x.completed?"↩️ "+tr("done"):"✅ "+tr("done")}</button><button class="btn danger" onclick="deleteHW(${x.id})">${tr("delete")}</button></div></div>`).join(""):`<div class="empty">${tr("noData")}</div>`}</div>`,"homework")}catch(e){toast(e.message)}}
 async function addHW(){
  const title=document.getElementById("ht").value.trim(),description=document.getElementById("hd").value.trim(),due=document.getElementById("hdate").value,file=document.getElementById("hfile").files[0];
  if(!title||!due)return;

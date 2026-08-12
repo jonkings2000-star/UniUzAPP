@@ -226,6 +226,41 @@ def hw():
     if not u: return jsonify(error="Unauthorized"), 401
     return jsonify(items=database.get_homework(int(u["telegram_id"])))
 
+@app.get("/api/homework/<int:hid>/file")
+def homework_file(hid):
+    u = user_required()
+    if not u:
+        return jsonify(error="Unauthorized"), 401
+
+    c = database.conn()
+    try:
+        row = c.execute(
+            """
+            SELECT h.file_name, h.file_path
+            FROM homework h
+            JOIN users usr ON usr.id = h.user_id
+            WHERE h.id=? AND usr.telegram_id=?
+            """,
+            (hid, int(u["telegram_id"]))
+        ).fetchone()
+    finally:
+        c.close()
+
+    if row is None:
+        return jsonify(error="File not found"), 404
+
+    file_path = row["file_path"]
+    file_name = row["file_name"] or os.path.basename(file_path or "")
+
+    if not file_path or not os.path.isfile(file_path):
+        return jsonify(error="Attached file is no longer available on the server"), 404
+
+    return send_file(
+        file_path,
+        as_attachment=False,
+        download_name=file_name or "homework-file"
+    )
+
 @app.post("/api/homework/<int:hid>/complete")
 def complete(hid):
     u = user_required()
