@@ -537,6 +537,13 @@ def ai_payment_receipt():
     )
 
 
+@app.get("/api/ai/history")
+def ai_history():
+    u = user_required()
+    if not u:
+        return jsonify(error="Unauthorized"), 401
+    return jsonify(items=database.get_ai_history(int(u["telegram_id"])))
+
 @app.post("/api/ai/file")
 def ai_file():
     u = user_required()
@@ -622,6 +629,12 @@ def ai_file():
         )
 
         answer = response.output_text or "ИИ не вернул текстовый ответ."
+        database.save_ai_history(
+            int(u["telegram_id"]),
+            question or "Анализ файла",
+            answer,
+            f.filename if f and f.filename else None
+        )
 
         return jsonify(
             ok=True,
@@ -647,6 +660,7 @@ def ai():
         return jsonify(error="Daily AI limit reached", used=used, limit=10), 429
     try:
         answer = ask(u, question, database.get_schedule(int(u["telegram_id"])), database.get_homework(int(u["telegram_id"])))
+        database.save_ai_history(int(u["telegram_id"]), question, answer)
         return jsonify(ok=True, answer=answer, used=used, limit=None if u["unlimited_ai"] else 10)
     except Exception as e:
         return jsonify(error=str(e)), 500

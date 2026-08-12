@@ -74,6 +74,18 @@ def init_db():
     )
     """)
 
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS ai_history(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        question TEXT,
+        answer TEXT NOT NULL,
+        file_name TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id)
+    )
+    """)
+
     # Safe migration for existing databases.
     try:
         cur.execute("ALTER TABLE homework ADD COLUMN file_path TEXT")
@@ -305,3 +317,31 @@ def claim_schedule_reminder(telegram_id, day_of_week, subject, start_time, remin
         claimed = False
     c.close()
     return claimed
+
+
+def save_ai_history(telegram_id, question, answer, file_name=None):
+    c = conn()
+    user = c.execute("SELECT id FROM users WHERE telegram_id=?", (telegram_id,)).fetchone()
+    if not user:
+        c.close()
+        return
+    c.execute("""
+        INSERT INTO ai_history(user_id, question, answer, file_name)
+        VALUES(?,?,?,?)
+    """, (user["id"], question, answer, file_name))
+    c.commit()
+    c.close()
+
+
+def get_ai_history(telegram_id, limit=30):
+    c = conn()
+    rows = c.execute("""
+        SELECT h.id,h.question,h.answer,h.file_name,h.created_at
+        FROM ai_history h
+        JOIN users u ON u.id=h.user_id
+        WHERE u.telegram_id=?
+        ORDER BY h.id DESC
+        LIMIT ?
+    """, (telegram_id, limit)).fetchall()
+    c.close()
+    return [dict(r) for r in rows]
