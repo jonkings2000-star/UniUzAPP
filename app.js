@@ -50,7 +50,7 @@ function layout(content,active="home"){app.innerHTML=`<div class="wrap">${conten
 <button class="${active==="homework"?"active":""}" onclick="showHomework()">📝<br>${tr("homework")}</button>
 <button class="${active==="ai"?"active":""}" onclick="showAI()">🤖<br>${tr("ai")}</button>
 </div>`}
-function brand(){return `<div class="brand"><div class="brand-top"><div><div class="logo">🎓</div></div><button class="notify-btn" onclick="showNotifications()">🔔</button></div><h1>UniUZ</h1><div class="muted">${profile?.university||""}</div></div>`}
+function brand(){return `<div class="brand notify-wrap"><button class="notify-btn" onclick="showNotifications()" aria-label="Notifications">🔔</button><div class="logo">🎓</div><h1>UniUZ</h1><div class="muted">${profile?.university||""}</div></div>`}</div></div>`}
 
 async function start(){
  try{const d=await api("/me");profile={...d.profile,is_admin:d.is_admin};lang=profile.language||"ru";if(profile.university&&profile.department&&profile.group_name&&profile.first_name) return home()}
@@ -250,20 +250,14 @@ async function loadAIUsage(){
 }
 
 async function showNotifications(){
-    try{
-        const d = await api("/notifications");
-        layout(`${brand()}
-        <div class="card">
-            <h2>🔔 Уведомления</h2>
-            ${
-              d.items.length
-              ? d.items.map(x=>`<div class="list-item">${x.icon} ${esc(x.text)}</div>`).join("")
-              : `<div class="empty">Нет уведомлений</div>`
-            }
-        </div>`);
-    }catch(e){
-        toast(e.message);
-    }
+ try{
+  const [n,a,r]=await Promise.all([api("/notifications"),api("/ai/usage"),api("/reminders")]);
+  layout(`${brand()}<div class="card"><h2>🔔 ${tr("reminders")}</h2>
+   <div class="list-item">🤖 ${a.unlimited?"∞ Безлимитный AI":`${a.used}/10 запросов сегодня`}</div>
+   ${n.items.length?n.items.map(x=>`<div class="list-item">${x.icon} ${esc(x.text)}</div>`).join(""): `<div class="empty">Нет новых уведомлений</div>`}
+   <button class="btn primary" onclick="showReminders()">${r.enabled?tr("disabled"):tr("enabled")}</button>
+  </div>`);
+ }catch(e){toast(e.message)}
 }
 
 start();
