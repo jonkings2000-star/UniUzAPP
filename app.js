@@ -539,6 +539,7 @@ async function askAI(){
     <b>${esc(question)}</b>
     ${fileLine}
     <p>${esc(d.answer)}</p>
+    ${d.file_info && d.file_info.url ? `<button class="btn" type="button" onclick="downloadAIFile('${d.file_info.url}','${esc(d.file_info.filename||'UniUZ_AI_File')}')">⬇️ Скачать файл</button>` : ""}
     <span class="badge">${d.limit===null?"∞":`${d.used}/10`}</span>
    </div>`;
 
@@ -630,4 +631,18 @@ async function addAdmin(){
  const id=document.getElementById("adminId").value.trim();
  if(!id)return;
  try{await api("/admin/add",{method:"POST",body:{telegram_id:id}});toast("Admin added");showAdmin()}catch(e){toast(e.message)}
+}
+
+
+async function downloadAIFile(url, filename){
+ try{
+  const r=await fetch(`${API}${url}`,{headers:{"X-Telegram-Init-Data":tg.initData}});
+  if(!r.ok) throw new Error("download");
+  const blob=await r.blob();
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+ }catch(e){toast("Не удалось скачать файл")}
 }

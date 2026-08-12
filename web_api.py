@@ -697,6 +697,7 @@ def ai_file():
         return jsonify(
             ok=True,
             answer=answer,
+            file_info=file_info,
             used=used,
             limit=None if u["unlimited_ai"] else 10,
             file=file_info
