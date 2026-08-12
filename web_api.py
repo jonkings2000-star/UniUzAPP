@@ -644,6 +644,8 @@ def ai_file():
 
         answer = response.output_text or "ИИ не вернул текстовый ответ."
 
+        generated_file = None
+
         # Автоматическое создание файла по смыслу запроса
         auto_type, auto_title = detect_ai_output_file(question)
         if auto_type:
@@ -669,7 +671,8 @@ def ai_file():
                 )
 
                 if fid:
-                    answer += f"\n\nГотово ✅\n📎 {filename}\n⬇️ Файл создан UniUZ AI"
+                    generated_file = {"id": fid, "filename": filename}
+                    answer += f"\n\nГотово ✅\n📎 {filename}"
             except Exception as file_error:
                 print("auto file generation error:", repr(file_error))
         database.save_ai_history(
@@ -682,6 +685,7 @@ def ai_file():
         return jsonify(
             ok=True,
             answer=answer,
+            generated_file=generated_file,
             used=used,
             limit=None if u["unlimited_ai"] else 10
         )
