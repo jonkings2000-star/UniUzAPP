@@ -578,17 +578,8 @@ def ai_file():
             "Проанализируй прикреплённый материал и помоги студенту "
             "решить задание. Объясни решение понятным языком и по шагам."
         )
-
         history_text = ""
-        if context:
-            history_text = "\n\nПредыдущий диалог пользователя:\n" + "\n".join(
-                [
-                    f"Пользователь: {x.get('question','')}\nUniUZ AI: {x.get('answer','')}"
-                    for x in context
-                ]
-            )
-
-        content = [{
+content = [{
             "type": "input_text",
             "text": (
                 "Ты UniUZ AI — помощник студента университета. "
