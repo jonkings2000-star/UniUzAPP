@@ -564,31 +564,6 @@ async function askAI(){
 }
 
 
-async function createAIFile(type,answerId){
- const card=document.getElementById(answerId);
- if(!card)return;
- const p=card.querySelector("p");
- if(!p||!p.textContent.trim())return toast("Нет текста для создания файла");
- const titles={docx:"UniUZ AI — документ",pdf:"UniUZ AI — конспект",pptx:"UniUZ AI — презентация"};
- const buttons=card.querySelectorAll("button");
- buttons.forEach(b=>b.disabled=true);
- toast("⏳ Создаю файл...");
- try{
-  const d=await api("/ai/create-file",{method:"POST",body:{
-   type,
-   title:titles[type]||"UniUZ AI",
-   content:p.textContent
-  }});
-  const row=document.createElement("div");
-  row.style.cssText="margin-top:10px;padding:10px;border-radius:12px;background:rgba(255,255,255,.06)";
-  row.innerHTML=`📎 <b>${esc(d.filename)}</b><br>
-   <a class="btn primary" href="${API}/ai/generated/${d.id}" target="_blank" rel="noopener">⬇️ Скачать / открыть</a>`;
-  card.appendChild(row);
-  toast("✅ Файл готов");
- }catch(e){toast(e.message||"Не удалось создать файл")}
- finally{buttons.forEach(b=>b.disabled=false)}
-}
-
 
 async function showReminders(){try{const d=await api("/reminders");layout(`${brand()}<div class="card"><h2>🔔 ${tr("reminders")}</h2><p>${d.enabled?tr("enabled"):tr("disabled")}</p><button class="btn primary" onclick="toggleReminders(${!d.enabled})">${d.enabled?tr("disabled"):tr("enabled")}</button></div>`)}catch(e){toast(e.message)}}
 async function toggleReminders(enabled){try{await api("/reminders",{method:"POST",body:{enabled}});showReminders()}catch(e){toast(e.message)}}

@@ -643,6 +643,42 @@ def ai_file():
         )
 
         answer = response.output_text or "ИИ не вернул текстовый ответ."
+
+        # Automatic file creation when user requests it
+        auto_type, auto_title = detect_ai_output_file(question)
+        generated_file = None
+        if auto_type:
+            try:
+                safe_title = _safe_generated_title(auto_title)
+                filename = safe_title + "." + auto_type
+                path = os.path.join(
+                    AI_GENERATED_DIR,
+                    f"{int(u['telegram_id'])}_{uuid.uuid4().hex}.{auto_type}"
+                )
+
+                if auto_type == "docx":
+                    _create_docx_file(path, auto_title, answer)
+                elif auto_type == "pdf":
+                    _create_pdf_file(path, auto_title, answer)
+                else:
+                    _create_pptx_file(path, auto_title, answer)
+
+                fid = database.save_ai_generated_file(
+                    int(u["telegram_id"]),
+                    filename,
+                    path,
+                    auto_type
+                )
+
+                if fid:
+                    generated_file = {
+                        "id": fid,
+                        "filename": filename
+                    }
+
+                    answer += f"\n\nГотово ✅\n📎 {filename}"
+            except Exception as file_error:
+                print("auto file generation:", repr(file_error))
         database.save_ai_history(
             int(u["telegram_id"]),
             question or "Анализ файла",
