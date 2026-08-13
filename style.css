@@ -600,3 +600,41 @@ margin:14px 0;
         font-size:14px;
     }
 }
+.ai-message-user{
+    max-width:70%;
+    margin:8px 0 4px auto;
+    padding:10px 14px;
+}
+
+
+.ai-message-bot{
+    max-width:78%;
+    margin:4px auto 8px 0;
+    padding:12px 14px;
+}
+
+
+/* убираем лишние пустоты */
+#chat{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+}
+
+
+/* текст */
+.ai-message-bot p{
+    margin:5px 0;
+}
+
+
+/* имя AI */
+.ai-message-bot b{
+    font-size:14px;
+}
+
+
+/* пользователь */
+.ai-message-user{
+    font-size:14px;
+}
