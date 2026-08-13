@@ -404,44 +404,51 @@ margin:14px 0;
 }
 
 
-/* AI input safe fix - CSS ONLY */
-.ai-input-box{
-    align-items:center;
-}
-
-.ai-input{
-    min-width:0;
-    height:46px;
-    min-height:46px;
-    max-height:100px;
+/* UniUZ AI chat messages style */
+.ai-chat-area{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    padding:8px 0;
     overflow-y:auto;
-    resize:none;
-    flex:1;
 }
 
-.ai-icon-btn,
-.ai-send-btn{
-    flex:0 0 44px;
+.ai-message-user{
+    align-self:flex-end;
+    max-width:85%;
+    background:linear-gradient(135deg,#557cff,#8155ff);
+    color:white;
+    border-radius:18px 18px 4px 18px;
+    padding:12px 14px;
 }
 
-.ai-send-btn{
-    width:44px;
-    min-width:44px;
-    height:44px;
-    padding:0;
+.ai-message-bot{
+    align-self:flex-start;
+    max-width:85%;
+    background:#102541;
+    border:1px solid #294f82;
+    color:white;
+    border-radius:18px 18px 18px 4px;
+    padding:12px 14px;
+}
+
+.ai-message-time{
+    display:block;
+    margin-top:6px;
+    font-size:11px;
+    color:#9db0ca;
+}
+
+.ai-typing{
     display:flex;
     align-items:center;
-    justify-content:center;
-    overflow:hidden;
-    white-space:nowrap;
+    gap:5px;
+    color:#b7c9e8;
 }
 
-.ai-icon-btn{
-    width:42px;
-    min-width:42px;
-    height:42px;
-}
-
-.ai-chat-box .list-item{
-    word-break:break-word;
+.ai-dot{
+    width:6px;
+    height:6px;
+    border-radius:50%;
+    background:#b7c9e8;
 }
