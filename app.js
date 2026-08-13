@@ -373,34 +373,20 @@ function showAI(){
   </div>
   <div class="card">
    <div id="chat"></div>
+    <div id="ai-file-name" class="muted small" style="display:none;margin:8px 0"></div>
 
-   <div style="margin:12px 0">
-    <div class="muted small" style="margin-bottom:8px">Быстрые действия</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <div class="ai-input-box">
+      <textarea id="q" class="ai-input" placeholder="${tr("question")}"></textarea>
 
-     <button class="btn" type="button" onclick="aiQuickPrompt('📚 Реши это задание и объясни решение пошагово.')">📚 Решить задание</button>
-     <button class="btn" type="button" onclick="aiQuickPrompt('📝 Проверь мой текст, исправь ошибки и улучши стиль.')">📝 Проверить текст</button>
-     <button class="btn" type="button" onclick="aiQuickPrompt('📊 Создай структуру презентации: слайды, заголовки и основные пункты.')">📊 Сделать презентацию</button>
-     <button class="btn" type="button" onclick="aiQuickPrompt('📄 Сделай краткий и понятный конспект этого материала.')">📄 Сделать конспект</button>
-     <button class="btn" type="button" onclick="aiQuickPrompt('💡 Объясни эту тему простыми словами с примерами.')">💡 Объяснить тему</button>
+      <label class="ai-icon-btn" title="Прикрепить файл">
+        📎
+        <input id="ai-file" type="file"
+          accept="image/*,.pdf,.txt,.md,.csv,.docx,.pptx,.xlsx"
+          hidden onchange="aiFileSelected()">
+      </label>
+
+      <button class="ai-send-btn" type="button" onclick="askAI()">➤</button>
     </div>
-   </div>
-
-   <textarea id="q" class="input" placeholder="${tr("question")}"></textarea>
-
-   <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
-    <label class="btn" style="flex:1;text-align:center;cursor:pointer">
-     📎 Прикрепить файл
-     <input id="ai-file" type="file"
-       accept="image/*,.pdf,.txt,.md,.csv,.docx,.pptx,.xlsx"
-       hidden onchange="aiFileSelected()">
-    </label>
-    <button class="btn" type="button" onclick="clearAIFile()">✕</button>
-   </div>
-
-   <div id="ai-file-name" class="muted small" style="display:none;margin:8px 0"></div>
-
-   <button class="btn primary" onclick="askAI()">Спросить ИИ →</button>
   </div>`,"ai");
 
  loadAIStatusInChat();

@@ -324,3 +324,53 @@ margin:14px 0;
 }
 .notification-card .list-item{margin:10px 0;padding:14px}
 .small{font-size:13px}
+
+
+/* UniUZ AI chat input */
+.ai-input-box{
+ display:flex;
+ align-items:flex-end;
+ gap:8px;
+ margin-top:12px;
+ background:#0b1728;
+ border:1px solid #34547d;
+ border-radius:18px;
+ padding:8px;
+}
+
+.ai-input{
+ flex:1;
+ min-height:46px;
+ max-height:120px;
+ resize:none;
+ background:transparent;
+ border:0;
+ margin:0;
+ padding:10px;
+ color:white;
+ outline:none;
+}
+
+.ai-icon-btn{
+ width:42px;
+ height:42px;
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ border-radius:50%;
+ background:#132b4b;
+ border:1px solid #38689e;
+ cursor:pointer;
+ font-size:20px;
+}
+
+.ai-send-btn{
+ width:44px;
+ height:44px;
+ border-radius:50%;
+ border:0;
+ background:linear-gradient(135deg,#557cff,#8155ff);
+ color:white;
+ font-size:22px;
+ cursor:pointer;
+}
