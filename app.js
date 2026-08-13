@@ -505,15 +505,24 @@ async function askAI(){
  const chat=document.getElementById("chat");
  const loadingId="ai-loading-"+Date.now();
 
- if(chat && file){
-  chat.innerHTML+=`
-   <div class="list-item" id="${loadingId}">
-    <b>🤖 ИИ анализирует файл...</b>
-    <p>⏳ Загружаю документ<br>
-    ⏳ Читаю материал<br>
-    ⏳ Готовлю ответ</p>
-   </div>`;
- }
+ if(chat){
+ chat.innerHTML+=`
+ <div class="ai-message-bot ai-typing-box" id="${loadingId}">
+   <b>🤖 UniUZ AI</b>
+
+   <div class="typing">
+     <span></span>
+     <span></span>
+     <span></span>
+   </div>
+
+   <div class="ai-status">
+     ${file ? "📎 Анализирую файл..." : "Печатает..."}
+   </div>
+ </div>`;
+
+ chat.scrollTop=chat.scrollHeight;
+}
 
  try{
   const fd=new FormData();
