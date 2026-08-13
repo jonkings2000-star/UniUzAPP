@@ -714,3 +714,30 @@ margin:14px 0;
 .ai-message-user{
     box-sizing:border-box;
 }
+/* ===== FIX CHAT POSITION ===== */
+
+#chat,
+.ai-chat-area,
+.chat-container{
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-start;
+    align-items:stretch;
+    gap:6px;
+    padding-top:0 !important;
+    margin-top:0 !important;
+}
+
+
+/* убрать лишний верхний воздух */
+.ai-message-user:first-child,
+.ai-message-bot:first-child{
+    margin-top:0 !important;
+}
+
+
+/* нормальное расстояние между сообщениями */
+.ai-message-user,
+.ai-message-bot{
+    flex-shrink:0;
+}
