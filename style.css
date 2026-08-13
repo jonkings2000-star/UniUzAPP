@@ -1,820 +1,566 @@
-*{box-sizing:border-box}body{margin:0;background:#07111f;color:#f7f9ff;font-family:Inter,Arial,sans-serif;min-height:100vh}.wrap{max-width:720px;margin:auto;padding:20px 16px 90px}.brand{text-align:center;margin:18px 0 26px}.logo{width:72px;height:72px;margin:auto;border-radius:24px;background:#1b3357;display:grid;place-items:center;font-size:38px}.brand h1{margin:12px 0 4px;font-size:34px}.muted{color:#9db0ca}.card{background:#101f34;border:1px solid #29486f;border-radius:22px;padding:18px;margin:12px 0;box-shadow:0 10px 30px #0002}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.btn{width:100%;border:1px solid #41699c;background:#192e4c;color:white;border-radius:16px;padding:15px 14px;font-size:16px;font-weight:700;cursor:pointer}.btn:hover{filter:brightness(1.12)}.btn.primary{background:linear-gradient(135deg,#4b77ff,#7655ff);border:0}.btn.danger{background:#492235}.input,textarea,select{width:100%;background:#0b1728;color:white;border:1px solid #34547d;border-radius:14px;padding:13px;margin:7px 0;font-size:15px}.input::placeholder,textarea::placeholder{color:#7f94b0}.nav{position:fixed;bottom:0;left:0;right:0;background:#101c2d;border-top:1px solid #29405e;padding:9px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;z-index:5}.nav button{background:none;border:0;color:#9db0ca;font-size:12px;padding:5px}.nav button.active{color:white}.row{display:flex;justify-content:space-between;align-items:center;gap:12px}.badge{display:inline-block;padding:5px 9px;border-radius:999px;background:#233e65;color:#bcd1f5;font-size:12px}.empty{text-align:center;padding:30px;color:#8da1bb}.toast{position:fixed;top:14px;left:16px;right:16px;z-index:20;background:#b52d4b;padding:12px;border-radius:12px}.lang{display:grid;gap:12px;margin-top:30px}.lang .btn{padding:18px}.list-item{padding:14px 0;border-bottom:1px solid #243b59}.list-item:last-child{border-bottom:0}.small{font-size:13px}.success{color:#65df9b}.check{display:flex;align-items:center;gap:8px}.check input{width:18px;height:18px}@media(max-width:520px){.grid{grid-template-columns:1fr 1fr}.wrap{padding-left:12px;padding-right:12px}.brand h1{font-size:30px}}
+* {
+    box-sizing: border-box;
+}
 
-.hero{
-background:linear-gradient(135deg,#101f3d,#08152b);
-border:1px solid #29486f;
-border-radius:26px;
-padding:22px;
-margin-bottom:14px;
+html,
+body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100%;
+    background: #080f1d;
+    color: #ffffff;
+    font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
+        Arial,
+        sans-serif;
 }
-.hero-row{display:flex;justify-content:space-between;align-items:center}
-.hello{color:#9db0ca;font-size:16px}
-.hero h1{font-size:34px;margin:8px 0}
-.avatar{
-width:75px;height:75px;border-radius:50%;
-background:linear-gradient(145deg,#586cff,#7b4dff);
-display:grid;place-items:center;font-size:32px;
-}
-.dashboard-card .section-title{
-font-size:20px;font-weight:800;margin-bottom:12px
-}
-.ai-card{
-background:linear-gradient(135deg,#29105f,#3450e8);
-border-radius:24px;
-padding:20px;
-margin:14px 0;
-}
-.ai-title{font-size:24px;font-weight:800}
 
+body {
+    min-height: 100vh;
+    overflow-x: hidden;
+}
 
-/* UniUZ Home Dashboard v2 */
-.student-card{
- background:linear-gradient(145deg,#101f3d,#08172c);
- border:1px solid #315886;
- border-radius:26px;
- padding:22px;
- margin-bottom:14px;
- box-shadow:0 18px 45px #0005;
-}
-.student-top{
- display:flex;
- justify-content:space-between;
- align-items:center;
-}
-.student-name{
- font-size:30px;
- font-weight:800;
- line-height:1.1;
-}
-.student-name span{color:#6388ff}
-.student-info{
- margin-top:16px;
- display:flex;
- gap:8px;
- flex-wrap:wrap;
-}
-.info-pill{
- background:#102746;
- border:1px solid #294d7d;
- padding:8px 12px;
- border-radius:20px;
- color:#b7c9e8;
- font-size:12px;
-}
-.today-card{
- background:linear-gradient(145deg,#0c1d36,#09172b);
- border:1px solid #24466f;
- border-radius:22px;
- padding:16px;
- margin-bottom:14px;
-}
-.lesson{
- display:flex;
- align-items:center;
- gap:12px;
- background:#0d2342;
- border:1px solid #1d416c;
- border-radius:16px;
- padding:12px;
- margin-top:8px;
-}
-.lesson-time{
- color:#3fa8ff;
- font-size:18px;
- font-weight:800;
- width:65px;
-}
-.lesson-title{font-size:16px;font-weight:700}
-.lesson-room{color:#94a9c8;font-size:12px}
-.quick-grid-v2{
- display:grid;
- grid-template-columns:repeat(2,1fr);
- gap:10px;
-}
-.quick-v2{
- background:#102541;
- border:1px solid #315886;
- border-radius:18px;
- padding:15px;
- color:white;
-}
-.quick-v2 span{
- display:block;
- font-size:25px;
- margin-bottom:8px;
-}
-@media(max-width:560px){
- .student-name{font-size:25px}
+button {
+    font-family: inherit;
 }
 
 
-/* UniUZ Home v3 refinements */
-.profile-pill{
- display:flex;
- gap:8px;
- flex-wrap:wrap;
- margin-top:14px;
+/* =========================
+   LANGUAGE
+========================= */
+
+.language-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
 }
-.profile-pill span{
- background:#102746;
- border:1px solid #315886;
- border-radius:20px;
- padding:8px 12px;
- color:#b8c9e7;
- font-size:12px;
+
+.language-card {
+    width: 100%;
+    max-width: 410px;
+    padding: 30px 24px;
+    border-radius: 28px;
+    background: #121c2d;
+    border: 1px solid #2b405f;
+    text-align: center;
+    box-shadow:
+        0 20px 60px rgba(0, 0, 0, .35);
 }
-.today-empty{
- text-align:center;
- padding:28px;
- color:#91a6c5;
+
+.language-card .logo {
+    width: 76px;
+    height: 76px;
+    margin: 0 auto 18px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 22px;
+    background: #1d3151;
+
+    font-size: 38px;
+}
+
+.language-card h1 {
+    margin: 0 0 10px;
+    font-size: 32px;
+}
+
+.language-card p {
+    margin: 0 0 24px;
+    color: #9eacc1;
+}
+
+.language-btn {
+    width: 100%;
+    margin-top: 12px;
+    padding: 17px;
+
+    border: 1px solid #3c5780;
+    border-radius: 16px;
+
+    background: #1a2941;
+    color: #ffffff;
+
+    font-size: 17px;
+    font-weight: 700;
+
+    cursor: pointer;
+
+    transition:
+        transform .15s,
+        background .15s;
+}
+
+.language-btn:hover {
+    background: #263d62;
+}
+
+.language-btn:active {
+    transform: scale(.98);
 }
 
 
-/* UniUZ Home v5 real data cards */
-.real-data-card{
- background:linear-gradient(145deg,#0d2342,#09172b);
- border:1px solid #284d7d;
- border-radius:18px;
- padding:14px;
- margin-top:10px;
+/* =========================
+   MAIN
+========================= */
+
+#screen {
+    width: 100%;
+    min-height: calc(100vh - 90px);
+    padding-bottom: 80px;
 }
-.real-row{
- display:flex;
- align-items:center;
- gap:12px;
- padding:10px;
- border-radius:14px;
- background:#102541;
- margin-top:8px;
-}
-.real-time{
- color:#42a5ff;
- font-weight:800;
- min-width:65px;
-}
-.real-title{
- font-weight:700;
-}
-.real-sub{
- color:#91a6c5;
- font-size:12px;
-}
-.profile-badge{
- display:inline-flex;
- background:#102746;
- border:1px solid #315886;
- color:#c0d2ef;
- padding:7px 12px;
- border-radius:20px;
- font-size:12px;
- margin:4px;
+
+.page,
+.home-page {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 20px 16px 100px;
 }
 
 
-/* UniUZ Profile v1 styles */
-.profile-hero{
- background:linear-gradient(145deg,#101f3d,#08172b);
- border:1px solid #315886;
- border-radius:26px;
- padding:22px;
- text-align:center;
- box-shadow:0 18px 45px #0005;
-}
-.profile-avatar{
- width:90px;
- height:90px;
- border-radius:50%;
- margin:0 auto 15px;
- display:flex;
- align-items:center;
- justify-content:center;
- font-size:40px;
- background:linear-gradient(145deg,#385cff,#7654ff);
- border:2px solid #7890ff;
-}
-.profile-name{
- font-size:26px;
- font-weight:800;
-}
-.profile-tag{
- color:#9db2d1;
- margin-top:6px;
-}
-.profile-item{
- display:flex;
- align-items:center;
- gap:12px;
- background:#102541;
- border:1px solid #294d7d;
- border-radius:17px;
- padding:14px;
- margin-top:10px;
-}
-.profile-item-icon{
- font-size:22px;
-}
-.profile-item small{
- display:block;
- color:#91a6c5;
+/* =========================
+   HEADER
+========================= */
+
+.page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    margin-bottom: 22px;
 }
 
-/* UniUZ Schedule v1 */
-.schedule-page{background:linear-gradient(145deg,#0b1a31,#071529);border:1px solid #274a78;border-radius:24px;padding:15px}
-.schedule-days{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:14px}
-.schedule-day{background:#0d203a;border:1px solid #23476f;border-radius:13px;padding:8px 3px;text-align:center;color:#8fa6c6;font-size:10px}
-.schedule-day strong{display:block;color:#fff;font-size:14px;margin-top:3px}
-.schedule-day.active{background:linear-gradient(145deg,#4730ce,#704dff);border-color:#806aff;color:#fff}
-.schedule-lesson{display:flex;align-items:center;gap:11px;background:linear-gradient(100deg,#0e2544,#0b1b31);border:1px solid #21466f;border-radius:17px;padding:13px;margin-top:8px}
-.schedule-time{min-width:62px;color:#45a8ff;font-size:16px;font-weight:800}
-.schedule-divider{width:3px;height:48px;border-radius:4px;background:linear-gradient(#38a8ff,#7650ff)}
-.schedule-info{flex:1;min-width:0}
-.schedule-info strong{display:block;font-size:15px}
-.schedule-info small{display:block;color:#91a6c5;margin-top:4px}
-.schedule-room{background:#132e50;border:1px solid #28517e;color:#a9c5e8;border-radius:9px;padding:6px 8px;font-size:10px}
-.schedule-empty{text-align:center;color:#8da3c1;padding:30px 10px}
-
-
-/* UniUZ v11 visual upgrade - safe override */
-
-.hero{
- background:linear-gradient(145deg,#101f3d,#08172b);
- border:1px solid #315886;
- border-radius:26px;
- padding:22px;
- box-shadow:0 18px 45px rgba(0,0,0,.25);
+.page-header h1 {
+    margin: 0;
+    font-size: 25px;
 }
 
-.hero h1{
- font-weight:800;
- letter-spacing:.3px;
+.page-header p {
+    margin: 5px 0 0;
+    color: #8fa0ba;
 }
 
-.avatar{
- background:linear-gradient(145deg,#5b56ff,#7650ff);
- box-shadow:0 8px 25px rgba(100,80,255,.35);
-}
+.avatar {
+    width: 52px;
+    height: 52px;
 
-.card,
-.dashboard-card,
-.today-card{
- background:linear-gradient(145deg,#102541,#09172d);
- border:1px solid #294f82;
- border-radius:24px;
- box-shadow:0 10px 30px rgba(0,0,0,.18);
-}
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
-.section-title{
- font-size:21px;
- font-weight:800;
-}
+    border-radius: 50%;
 
-.list-item{
- background:#0d2342;
- border:1px solid #274d7c;
- border-radius:16px;
- padding:14px;
- margin-top:10px;
-}
+    background: #1c2e4b;
+    border: 1px solid #405b82;
 
-.ai-card{
- background:linear-gradient(135deg,#3320b7,#354be0);
- border-radius:26px;
- box-shadow:0 12px 35px rgba(50,60,220,.25);
-}
-
-.btn{
- background:#132b4b;
- border:1px solid #38689e;
- border-radius:18px;
-}
-
-.btn.primary{
- background:linear-gradient(90deg,#557cff,#8155ff);
-}
-
-.quick-v2{
- background:#132b4b;
- border:1px solid #38689e;
- border-radius:18px;
-}
-
-.quick-v2 span{
- margin-bottom:6px;
-}
-
-/* UniUZ notifications + AI counter: additive only */
-.home-top{position:relative;display:flex;justify-content:center;align-items:flex-start}
-.home-top .brand{width:100%;margin-top:18px}
-.notify-btn{
- position:absolute;right:4px;top:18px;width:46px;height:46px;
- border-radius:50%;border:1px solid #3d6190;
- background:linear-gradient(145deg,#18345a,#102541);
- color:#fff;font-size:20px;cursor:pointer;
- box-shadow:0 8px 20px #0003;
-}
-.ai-counter{
- margin:12px 0;
- padding:10px 14px;
- border-radius:14px;
- background:rgba(255,255,255,.10);
- border:1px solid rgba(255,255,255,.18);
- text-align:center;
- font-weight:800;
- color:#fff;
-}
-.notification-card .list-item{margin:10px 0;padding:14px}
-.small{font-size:13px}
-
-
-/* UniUZ AI chat input */
-.ai-input-box{
- display:flex;
- align-items:flex-end;
- gap:8px;
- margin-top:12px;
- background:#0b1728;
- border:1px solid #34547d;
- border-radius:18px;
- padding:8px;
-}
-
-.ai-input{
- flex:1;
- min-height:46px;
- max-height:120px;
- resize:none;
- background:transparent;
- border:0;
- margin:0;
- padding:10px;
- color:white;
- outline:none;
-}
-
-.ai-icon-btn{
- width:42px;
- height:42px;
- display:flex;
- align-items:center;
- justify-content:center;
- border-radius:50%;
- background:#132b4b;
- border:1px solid #38689e;
- cursor:pointer;
- font-size:20px;
-}
-
-.ai-send-btn{
- width:44px;
- height:44px;
- border-radius:50%;
- border:0;
- background:linear-gradient(135deg,#557cff,#8155ff);
- color:white;
- font-size:22px;
- cursor:pointer;
+    font-size: 22px;
+    font-weight: 700;
 }
 
 
-.ai-chat-box{
- display:flex;
- flex-direction:column;
- min-height:520px;
+/* =========================
+   CARDS
+========================= */
+
+.profile-card,
+.next-card,
+.quick-card,
+.info-card {
+    margin-bottom: 15px;
+    padding: 22px;
+
+    border-radius: 22px;
+
+    background: #121d30;
+    border: 1px solid #2b405f;
 }
 
-.ai-chat-area{
- flex:1;
- min-height:360px;
- overflow:auto;
+.profile-card h2 {
+    margin: 8px 0;
+    font-size: 27px;
 }
 
-.ai-empty{
- height:100%;
- display:flex;
- flex-direction:column;
- align-items:center;
- justify-content:center;
- text-align:center;
- color:#9db0ca;
+.profile-card p {
+    margin: 0;
+    color: #91a2bb;
 }
 
-.ai-empty h3{
- color:white;
- margin:12px 0 6px;
+.eyebrow,
+.card-label {
+    color: #8da9d2;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.next-time {
+    margin-top: 12px;
+    font-size: 34px;
+    font-weight: 800;
+}
+
+.next-card h3 {
+    margin-bottom: 0;
 }
 
 
-/* ============================================================
-   UNIUZ AI CHAT — FINAL VISUAL LAYER
-   Only visual rules. Does not change AI/API logic.
-============================================================ */
+/* =========================
+   DASHBOARD
+========================= */
 
-/* Chat itself must be one vertical column */
-.ai-chat-box{
-    display:flex;
-    flex-direction:column;
-    min-height:520px;
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 15px;
 }
 
-.ai-chat-area{
-    display:flex;
-    flex-direction:column;
-    align-items:stretch;
-    gap:8px;
-    flex:1;
-    min-height:360px;
-    overflow-y:auto;
-    overflow-x:hidden;
-    padding:4px 2px 10px;
+.dashboard-card {
+    min-height: 120px;
+    padding: 18px;
+
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+
+    border-radius: 20px;
+
+    background: #121d30;
+    border: 1px solid #2b405f;
+
+    color: #fff;
+    text-align: left;
+
+    cursor: pointer;
 }
 
-/* User message — right */
-.ai-message-user{
-    align-self:flex-end;
-    width:fit-content;
-    max-width:72%;
-    margin:0 0 2px auto;
-    padding:10px 14px;
-    background:linear-gradient(135deg,#557cff,#8155ff);
-    color:#fff;
-    border-radius:18px 18px 5px 18px;
-    font-size:14px;
-    line-height:1.4;
-    text-align:right;
-    overflow-wrap:anywhere;
+.dashboard-card span {
+    font-size: 27px;
 }
 
-/* AI message — left */
-.ai-message-bot{
-    align-self:flex-start;
-    width:fit-content;
-    max-width:86%;
-    margin:0 auto 2px 0;
-    padding:12px 14px;
-    background:#102541;
-    border:1px solid #294f82;
-    color:#fff;
-    border-radius:18px 18px 18px 5px;
-    font-size:14px;
-    line-height:1.45;
-    text-align:left;
-    overflow-wrap:anywhere;
+.dashboard-card strong {
+    font-size: 16px;
 }
 
-/* Message header */
+.dashboard-card small {
+    color: #8799b3;
+}
+
+
+/* =========================
+   QUICK ACTIONS
+========================= */
+
+.quick-card h3 {
+    margin-top: 0;
+}
+
+.quick-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+}
+
+.quick-grid button {
+    padding: 13px;
+
+    border-radius: 12px;
+    border: 1px solid #2c4161;
+
+    background: #1b2a42;
+    color: #fff;
+
+    cursor: pointer;
+}
+
+
+/* =========================
+   PAGE TITLE
+========================= */
+
+.page-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.page-title span {
+    font-size: 30px;
+}
+
+.page-title h1 {
+    margin: 0;
+}
+
+
+/* =========================
+   BOTTOM NAV
+========================= */
+
+.bottom-nav {
+    position: fixed;
+    z-index: 100;
+
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    height: 72px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+
+    background: #111c2b;
+    border-top: 1px solid #263851;
+}
+
+.nav-item {
+    flex: 1;
+    height: 100%;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    gap: 4px;
+
+    border: 0;
+    background: transparent;
+
+    color: #718097;
+
+    cursor: pointer;
+}
+
+.nav-item span {
+    font-size: 22px;
+}
+
+.nav-item small {
+    font-size: 11px;
+}
+
+.nav-item.active {
+    color: #ffffff;
+}
+
+
+/* =========================
+   FOOTER
+========================= */
+
+.app-footer {
+    position: fixed;
+    z-index: 101;
+
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    height: 0;
+
+    display: none;
+
+    text-align: center;
+}
+
+
+/* =========================
+   LOADING
+========================= */
+
+#loading {
+    position: fixed;
+    z-index: 1000;
+
+    inset: 0;
+
+    display: none;
+
+    align-items: center;
+    justify-content: center;
+
+    background: rgba(8, 15, 29, .85);
+}
+
+.loading-spinner {
+    width: 42px;
+    height: 42px;
+
+    border: 4px solid #334867;
+    border-top-color: #ffffff;
+
+    border-radius: 50%;
+
+    animation:
+        spin .8s linear infinite;
+}
+
+@keyframes spin {
+
+    to {
+        transform: rotate(360deg);
+    }
+
+}
+
+
+/* =========================
+   MOBILE
+========================= */
+
+@media (max-width: 420px) {
+
+    .page,
+    .home-page {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    .dashboard-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .profile-card h2 {
+        font-size: 24px;
+    }
+
+}
+
+
+/* UniUZ AI avatars */
 .ai-avatar-line,
 .user-avatar-line{
     display:flex;
     align-items:center;
-    gap:7px;
+    gap:8px;
     margin-bottom:6px;
+}
+
+.ai-avatar,
+.user-avatar{
+    width:28px;
+    height:28px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:#1b3558;
+    font-size:16px;
 }
 
 .user-avatar-line{
     justify-content:flex-end;
 }
 
-/* Avatars */
-.ai-avatar,
-.user-avatar{
-    width:27px;
-    height:27px;
-    min-width:27px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    border-radius:50%;
-    font-size:14px;
-}
-
-.ai-avatar{
-    background:#1b3558;
-}
-
 .user-avatar{
     background:#7255ff;
 }
 
-/* Message text */
-.ai-message-bot p,
-.ai-message-user p{
-    margin:5px 0;
-    font-size:14px;
-    line-height:1.45;
-}
-
-/* Time */
-.ai-message-time{
-    display:block;
-    margin-top:6px;
-    font-size:10px;
-    line-height:1.2;
-    color:#b7c7df;
-    opacity:.75;
-}
-
-/* Request counter */
-.ai-message-bot .badge{
-    display:inline-block;
-    margin-top:7px;
-    padding:4px 8px;
-    font-size:11px;
-}
-
-/* AI typing */
-.ai-typing-box{
-    align-self:flex-start;
-    width:fit-content;
-    max-width:86%;
-    margin:0 auto 2px 0;
-    animation:aiFadeIn .18s ease;
-}
-
-.typing{
-    display:flex;
-    gap:5px;
-    margin:9px 0 5px;
-}
-
-.typing span{
-    width:7px;
-    height:7px;
-    border-radius:50%;
-    background:#9db4d8;
-    animation:aiTyping 1.2s infinite;
-}
-
-.typing span:nth-child(2){
-    animation-delay:.2s;
-}
-
-.typing span:nth-child(3){
-    animation-delay:.4s;
-}
-
-.ai-status{
-    color:#9db4d8;
-    font-size:12px;
-}
-
-@keyframes aiTyping{
-    0%,100%{
-        opacity:.3;
-        transform:translateY(0);
-    }
-    50%{
-        opacity:1;
-        transform:translateY(-4px);
-    }
-}
-
-@keyframes aiFadeIn{
-    from{
-        opacity:0;
-        transform:translateY(6px);
-    }
-    to{
-        opacity:1;
-        transform:translateY(0);
-    }
-}
-
-/* Input stays at the bottom */
-.ai-input-box{
-    flex-shrink:0;
-}
-
-/* Mobile */
-@media(max-width:520px){
-    .ai-message-user{
-        max-width:78%;
-    }
-
-    .ai-message-bot,
-    .ai-typing-box{
-        max-width:88%;
-    }
-
-    .ai-message-user,
-    .ai-message-bot{
-        font-size:14px;
-    }
-}
 .ai-message-user{
-    max-width:70%;
-    margin:8px 0 4px auto;
-    padding:10px 14px;
-}
-
-
-.ai-message-bot{
-    max-width:78%;
-    margin:4px auto 8px 0;
-    padding:12px 14px;
-}
-
-
-/* убираем лишние пустоты */
-#chat{
-    display:flex;
-    flex-direction:column;
-    gap:4px;
-}
-
-
-/* текст */
-.ai-message-bot p{
-    margin:5px 0;
-}
-
-
-/* имя AI */
-.ai-message-bot b{
-    font-size:14px;
-}
-
-
-/* пользователь */
-.ai-message-user{
-    font-size:14px;
-}
-/* ===== CHAT FINAL ALIGN ===== */
-
-/* убираем лишнее место сверху */
-#chat{
-    padding-top:10px;
-    margin-top:0;
-}
-
-
-/* пользователь */
-.ai-message-user{
-    max-width:65%;
-    margin:0 0 8px auto;
-    padding:10px 14px;
-    border-radius:18px 18px 5px 18px;
-}
-
-
-/* AI */
-.ai-message-bot{
-    max-width:88%;
-    margin:0 auto 8px 0;
-    padding:12px 14px;
-}
-
-
-/* текст AI */
-.ai-message-bot p{
-    font-size:14px;
-    line-height:1.4;
-}
-
-
-/* убираем лишние отступы внутри */
-.ai-message-bot,
-.ai-message-user{
-    box-sizing:border-box;
-}
-/* ===== CHAT FINAL ALIGN ===== */
-
-/* убираем лишнее место сверху */
-#chat{
-    padding-top:10px;
-    margin-top:0;
-}
-
-
-/* пользователь */
-.ai-message-user{
-    max-width:65%;
-    margin:0 0 8px auto;
-    padding:10px 14px;
-    border-radius:18px 18px 5px 18px;
-}
-
-
-/* AI */
-.ai-message-bot{
-    max-width:88%;
-    margin:0 auto 8px 0;
-    padding:12px 14px;
-}
-
-
-/* текст AI */
-.ai-message-bot p{
-    font-size:14px;
-    line-height:1.4;
-}
-
-
-/* убираем лишние отступы внутри */
-.ai-message-bot,
-.ai-message-user{
-    box-sizing:border-box;
-}
-/* ===== FIX CHAT POSITION ===== */
-
-#chat,
-.ai-chat-area,
-.chat-container{
-    display:flex;
-    flex-direction:column;
-    justify-content:flex-start;
-    align-items:stretch;
-    gap:6px;
-    padding-top:0 !important;
-    margin-top:0 !important;
-}
-
-
-/* убрать лишний верхний воздух */
-.ai-message-user:first-child,
-.ai-message-bot:first-child{
-    margin-top:0 !important;
-}
-
-
-/* нормальное расстояние между сообщениями */
-.ai-message-user,
-.ai-message-bot{
-    flex-shrink:0;
-}
-/* ===== AI MESSAGE SIZE FIX ===== */
-
-.ai-message-bot{
-    max-width:75%;
-}
-
-.ai-message-bot p{
-    max-height:260px;
-    overflow-y:auto;
-    padding-right:5px;
-}
-
-
-/* первый ответ AI компактнее */
-.ai-message-bot:first-child{
-    margin-top:0;
-}
-
-
-/* пользователь компактнее */
-.ai-message-user{
-    max-width:55%;
-}
-/* ===== USER MESSAGE FIX ===== */
-
-.ai-message-user{
-    display:flex;
-    flex-direction:column;
-    align-items:flex-end;
-
-    max-width:65%;
-    margin-left:auto;
-
-    padding:10px 14px;
-
-    border-radius:18px 18px 5px 18px;
-
     text-align:right;
 }
 
+.ai-message-bot{
+    text-align:left;
+}
 
-/* аватар + имя в одну строку */
-
-.user-avatar-line{
-    display:flex;
-    flex-direction:row-reverse;
-    align-items:center;
-    justify-content:flex-start;
-
-    gap:7px;
-
-    margin-bottom:5px;
+.ai-message-user p,
+.ai-message-bot p{
+    margin:6px 0;
+    font-size:15px;
+    line-height:1.45;
 }
 
 
-/* сам аватар */
+/* ============================================================
+   USER MESSAGE HEADER — FIX
+   Current app.js uses .user-head, not .user-avatar-line.
+============================================================ */
 
-.user-avatar{
-    width:26px;
-    height:26px;
-
-    display:flex;
-    align-items:center;
-    justify-content:center;
-
-    border-radius:50%;
-
-    font-size:14px;
+.ai-message-user{
+    align-self:flex-end !important;
+    width:fit-content !important;
+    max-width:70% !important;
+    margin:0 0 8px auto !important;
+    padding:10px 14px !important;
+    border-radius:18px 18px 5px 18px !important;
+    text-align:right !important;
+    box-sizing:border-box;
+    overflow-wrap:anywhere;
 }
 
+/* Avatar + "Вы" MUST be one horizontal row */
+.ai-message-user .user-head{
+    display:flex !important;
+    flex-direction:row !important;
+    align-items:center !important;
+    justify-content:flex-end !important;
+    gap:7px !important;
+    width:100% !important;
+    margin:0 0 5px 0 !important;
+}
 
-/* текст сообщения */
+/* Avatar must not become a separate line */
+.ai-message-user .user-avatar{
+    width:26px !important;
+    height:26px !important;
+    min-width:26px !important;
+    flex:0 0 26px !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    border-radius:50% !important;
+    background:#7255ff !important;
+    font-size:14px !important;
+}
 
-.ai-message-user div{
-    margin-top:3px;
-    font-size:14px;
+/* Name stays beside avatar */
+.ai-message-user .user-name{
+    display:block !important;
+    flex:0 0 auto !important;
+    white-space:nowrap !important;
+    font-size:14px !important;
+    line-height:1.2 !important;
+}
+
+/* User text stays below the header */
+.ai-message-user > div:not(.user-head){
+    display:block !important;
+    width:auto !important;
+    margin-top:3px !important;
+    font-size:14px !important;
+    line-height:1.4 !important;
+}
+
+/* AI header also stays on one row */
+.ai-message-bot .ai-head{
+    display:flex !important;
+    align-items:center !important;
+    gap:7px !important;
+    margin:0 0 6px 0 !important;
+}
+
+.ai-message-bot .ai-avatar{
+    width:26px !important;
+    height:26px !important;
+    min-width:26px !important;
+    flex:0 0 26px !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    border-radius:50% !important;
 }
