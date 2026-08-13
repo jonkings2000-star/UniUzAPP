@@ -529,49 +529,16 @@ async function askAI(){
   if(loading) loading.remove();
 
    const answerId="ai-answer-"+Date.now();
-
-document.getElementById("chat").innerHTML+=`
-
-<div class="ai-message-user" id="${answerId}-user">
-  <b>${esc(question)}</b>
-  ${fileLine}
-  <span class="ai-message-time">
-    ${new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})} ✓✓
-  </span>
-</div>
-
-<div class="ai-message-bot" id="${answerId}">
-  <b>🤖 UniUZ AI</b>
-
-  <p>${esc(d.answer)}</p>
-
-  <span class="badge">
-    ${d.limit===null?"∞":`${d.used}/10`}
-  </span>
-
-  <span class="ai-message-time">
-    ${new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}
-  </span>
-
-  ${
-    d.file_id 
-    ? `
-    <div style="margin-top:10px">
-      <button class="btn primary" type="button"
-      onclick="downloadAIFile(${d.file_id}, '${esc(d.filename||"UniUZ_AI_File")}')">
-      ⬇️ Скачать файл
-      </button>
-    </div>
-    `
-    : ""
-  }
-
-</div>`;
-
-const chatBox=document.getElementById("chat");
-if(chatBox){
-    chatBox.scrollTop=chatBox.scrollHeight;
-}
+   document.getElementById("chat").innerHTML+=`
+   <div class="list-item" id="${answerId}">
+    <b>${esc(question)}</b>
+    ${fileLine}
+    <p>${esc(d.answer)}</p>
+    <span class="badge">${d.limit===null?"∞":`${d.used}/10`}</span>
+    ${d.file_id ? `<div style="margin-top:10px">
+       <button class="btn primary" type="button" onclick="downloadAIFile(${d.file_id}, '${esc(d.filename||"UniUZ_AI_File")}')">⬇️ Скачать файл</button>
+      </div>` : ""}
+   </div>`;
 
   document.getElementById("q").value="";
   clearAIFile();
