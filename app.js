@@ -508,7 +508,7 @@ async function askAI(){
  if(chat){
   chat.innerHTML+=`
    <div class="ai-message-bot ai-typing-box" id="${loadingId}">
-    <div class="ai-name">🤖 UniUZ AI</div>
+    <div class="ai-head"><span class="ai-avatar">🤖</span><span class="ai-name">UniUZ AI</span></div>
     <div class="typing">
       <span></span><span></span><span></span>
     </div>
@@ -533,13 +533,13 @@ async function askAI(){
    const answerId="ai-answer-"+Date.now();
    document.getElementById("chat").innerHTML+=`
    <div class="ai-message-user">
-    <div class="user-name">👤 Вы</div>
+    <div class="user-head"><span class="user-avatar">👤</span><span class="user-name">Вы</span></div>
     <div>${esc(question)}</div>
     ${fileLine}
    </div>
 
    <div class="ai-message-bot" id="${answerId}">
-    <div class="ai-name">🤖 UniUZ AI</div>
+    <div class="ai-head"><span class="ai-avatar">🤖</span><span class="ai-name">UniUZ AI</span></div>
     <p>${esc(d.answer)}</p>
     <span class="badge">${d.limit===null?"∞":`${d.used}/10`}</span>
     ${d.file_id ? `<div style="margin-top:10px">

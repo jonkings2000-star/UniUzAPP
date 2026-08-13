@@ -515,3 +515,38 @@ margin:14px 0;
  font-size:13px;
  color:#9db4d8;
 }
+
+
+/* Avatar update - safe */
+.ai-head,
+.user-head{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:6px;
+}
+
+.ai-avatar,
+.user-avatar{
+    width:26px;
+    height:26px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:#1b3558;
+    font-size:15px;
+}
+
+.user-head{
+    justify-content:flex-end;
+}
+
+.user-avatar{
+    background:#7255ff;
+}
+
+.ai-name,
+.user-name{
+    margin-bottom:0;
+}
