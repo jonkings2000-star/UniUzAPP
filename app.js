@@ -505,14 +505,16 @@ async function askAI(){
  const chat=document.getElementById("chat");
  const loadingId="ai-loading-"+Date.now();
 
- if(chat && file){
+ if(chat){
   chat.innerHTML+=`
-   <div class="list-item" id="${loadingId}">
-    <b>🤖 ИИ анализирует файл...</b>
-    <p>⏳ Загружаю документ<br>
-    ⏳ Читаю материал<br>
-    ⏳ Готовлю ответ</p>
+   <div class="ai-message-bot ai-typing-box" id="${loadingId}">
+    <div class="ai-name">🤖 UniUZ AI</div>
+    <div class="typing">
+      <span></span><span></span><span></span>
+    </div>
+    <div class="ai-status">${file ? "📎 Анализирую файл..." : "Печатает..."}</div>
    </div>`;
+  chat.scrollTop=chat.scrollHeight;
  }
 
  try{
@@ -530,15 +532,22 @@ async function askAI(){
 
    const answerId="ai-answer-"+Date.now();
    document.getElementById("chat").innerHTML+=`
-   <div class="list-item" id="${answerId}">
-    <b>${esc(question)}</b>
+   <div class="ai-message-user">
+    <div class="user-name">👤 Вы</div>
+    <div>${esc(question)}</div>
     ${fileLine}
+   </div>
+
+   <div class="ai-message-bot" id="${answerId}">
+    <div class="ai-name">🤖 UniUZ AI</div>
     <p>${esc(d.answer)}</p>
     <span class="badge">${d.limit===null?"∞":`${d.used}/10`}</span>
     ${d.file_id ? `<div style="margin-top:10px">
        <button class="btn primary" type="button" onclick="downloadAIFile(${d.file_id}, '${esc(d.filename||"UniUZ_AI_File")}')">⬇️ Скачать файл</button>
       </div>` : ""}
    </div>`;
+   const chatBox=document.getElementById("chat");
+   if(chatBox) chatBox.scrollTop=chatBox.scrollHeight;
 
   document.getElementById("q").value="";
   clearAIFile();

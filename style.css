@@ -457,3 +457,61 @@ margin:14px 0;
         transform:translateY(0);
     }
 }
+
+
+/* AI chat safe design */
+.ai-message-user,
+.ai-message-bot{
+ max-width:85%;
+ padding:12px 15px;
+ margin:8px 0;
+ border-radius:18px;
+ font-size:15px;
+ line-height:1.45;
+}
+
+.ai-message-user{
+ margin-left:auto;
+ background:#5b6cff;
+ border-radius:18px 18px 5px 18px;
+ text-align:right;
+}
+
+.ai-message-bot{
+ margin-right:auto;
+ background:#102541;
+ border:1px solid #294f82;
+ border-radius:18px 18px 18px 5px;
+}
+
+.ai-name,.user-name{
+ font-weight:700;
+ margin-bottom:6px;
+}
+
+.typing{
+ display:flex;
+ gap:5px;
+ margin:8px 0;
+}
+
+.typing span{
+ width:7px;
+ height:7px;
+ border-radius:50%;
+ background:#9db4d8;
+ animation:typing 1.2s infinite;
+}
+
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+
+@keyframes typing{
+ 0%,100%{opacity:.3;transform:translateY(0)}
+ 50%{opacity:1;transform:translateY(-4px)}
+}
+
+.ai-status{
+ font-size:13px;
+ color:#9db4d8;
+}
