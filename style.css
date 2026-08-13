@@ -741,3 +741,26 @@ margin:14px 0;
 .ai-message-bot{
     flex-shrink:0;
 }
+/* ===== AI MESSAGE SIZE FIX ===== */
+
+.ai-message-bot{
+    max-width:75%;
+}
+
+.ai-message-bot p{
+    max-height:260px;
+    overflow-y:auto;
+    padding-right:5px;
+}
+
+
+/* первый ответ AI компактнее */
+.ai-message-bot:first-child{
+    margin-top:0;
+}
+
+
+/* пользователь компактнее */
+.ai-message-user{
+    max-width:55%;
+}
