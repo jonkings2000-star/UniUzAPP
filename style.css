@@ -637,3 +637,81 @@ margin:14px 0;
     display:inline-block;
     font-size:12px;
 }
+/* ===== AI CHAT COMPACT STYLE ===== */
+
+.ai-message-user{
+    max-width:70%;
+    padding:10px 14px;
+    border-radius:18px 18px 5px 18px;
+    margin-bottom:8px;
+    font-size:14px;
+}
+
+
+.ai-message-bot{
+    max-width:82%;
+    padding:12px 14px;
+    border-radius:18px 18px 18px 5px;
+    margin-bottom:8px;
+    font-size:14px;
+    line-height:1.4;
+}
+
+
+/* аватар + имя */
+
+.ai-avatar-line,
+.user-avatar-line{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    margin-bottom:5px;
+}
+
+
+.ai-avatar,
+.user-avatar{
+    width:26px;
+    height:26px;
+    font-size:14px;
+}
+
+
+/* текст ответа */
+
+.ai-message-bot p{
+    margin:6px 0;
+    font-size:14px;
+    line-height:1.45;
+}
+
+
+.ai-message-user div{
+    font-size:14px;
+}
+
+
+/* время сообщений */
+
+.ai-message-time{
+    display:block;
+    margin-top:5px;
+    font-size:10px;
+    opacity:.65;
+}
+
+
+/* счётчик запросов */
+
+.ai-message-bot .badge{
+    padding:4px 9px;
+    border-radius:12px;
+    font-size:11px;
+}
+
+
+/* меньше расстояния между сообщениями */
+
+#chat{
+    gap:6px;
+}
