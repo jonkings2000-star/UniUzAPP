@@ -363,6 +363,57 @@ async function loadHomeAIUsage(){
  }
 }
 
+/* ============================================================
+   AI CHAT LOCAL PERSISTENCE
+   Keeps the current AI conversation after closing/reopening Mini App.
+   Stored only in this browser/device; no API or bot.py changes needed.
+   ============================================================ */
+const AI_CHAT_STORAGE_PREFIX = "uniuz_ai_chat_v1_";
+
+function getAIChatStorageKey(){
+ try{
+  const raw = new URLSearchParams(initData || "").get("user");
+  if(raw){
+   const user = JSON.parse(raw);
+   if(user?.id) return AI_CHAT_STORAGE_PREFIX + String(user.id);
+  }
+ }catch(e){}
+ return AI_CHAT_STORAGE_PREFIX + "local";
+}
+
+function saveAIChat(){
+ try{
+  const chat=document.getElementById("chat");
+  if(!chat) return;
+  const messages=[...chat.querySelectorAll(".ai-message-user, .ai-message-bot")]
+   .filter(el=>!el.classList.contains("ai-typing-box") && el.id!=="ai-limit-message");
+  localStorage.setItem(getAIChatStorageKey(), JSON.stringify(messages.map(el=>({html:el.outerHTML}))));
+ }catch(e){
+  console.warn("AI chat save failed:",e);
+ }
+}
+
+function restoreAIChat(){
+ try{
+  const chat=document.getElementById("chat");
+  if(!chat) return false;
+  const raw=localStorage.getItem(getAIChatStorageKey());
+  if(!raw) return false;
+  const messages=JSON.parse(raw);
+  if(!Array.isArray(messages) || !messages.length) return false;
+  chat.innerHTML=messages.map(x=>x?.html||"").join("");
+  chat.scrollTop=chat.scrollHeight;
+  return true;
+ }catch(e){
+  console.warn("AI chat restore failed:",e);
+  return false;
+ }
+}
+
+function clearSavedAIChat(){
+ try{ localStorage.removeItem(getAIChatStorageKey()); }catch(e){}
+}
+
 function showAI(){
  layout(`${brand()}
   <div class="ai-card">
@@ -397,6 +448,7 @@ function showAI(){
     </div>
   </div>`,"ai");
 
+ restoreAIChat();
  loadAIStatusInChat();
 }
 
@@ -548,6 +600,7 @@ async function askAI(){
    </div>`;
    const chatBox=document.getElementById("chat");
    if(chatBox) chatBox.scrollTop=chatBox.scrollHeight;
+   saveAIChat();
 
   document.getElementById("q").value="";
   clearAIFile();
