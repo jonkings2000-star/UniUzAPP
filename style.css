@@ -438,3 +438,72 @@ margin:14px 0;
     padding:0!important;
     overflow:hidden;
 }
+/* ===== AI CHAT DESIGN ===== */
+
+.ai-chat-area{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    padding:10px;
+    overflow-y:auto;
+}
+
+/* пользователь справа */
+.ai-message-user{
+    align-self:flex-end;
+    max-width:80%;
+    background:linear-gradient(135deg,#596cff,#8b4dff);
+    color:white;
+    padding:12px 16px;
+    border-radius:20px 20px 5px 20px;
+    margin-left:auto;
+    font-size:15px;
+    line-height:1.45;
+    box-shadow:0 4px 12px rgba(0,0,0,.2);
+}
+
+
+/* AI слева */
+.ai-message-bot{
+    align-self:flex-start;
+    max-width:85%;
+    background:#102541;
+    border:1px solid #294f82;
+    color:#fff;
+    padding:14px 16px;
+    border-radius:20px 20px 20px 5px;
+    margin-right:auto;
+    font-size:15px;
+    line-height:1.5;
+    box-shadow:0 4px 12px rgba(0,0,0,.15);
+}
+
+
+/* время */
+.ai-message-time{
+    display:block;
+    margin-top:6px;
+    font-size:11px;
+    color:#9db4d8;
+}
+
+
+/* название AI */
+.ai-message-bot b{
+    color:#a78bff;
+    font-size:16px;
+}
+
+
+/* счётчик */
+.ai-message-bot .badge{
+    display:inline-block;
+    margin-top:8px;
+}
+
+
+/* меньше расстояние между сообщениями */
+.ai-message-user,
+.ai-message-bot{
+    margin-bottom:4px;
+}
