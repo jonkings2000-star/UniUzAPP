@@ -895,6 +895,8 @@ function openPage(page) {
 
     if (page === "home") {
         renderHomeScreen();
+    } else if (page === "ai") {
+        renderAIPage();
     } else {
         renderSimplePage(page);
     }
@@ -913,6 +915,52 @@ function bindBottomNavigation() {
         button.onclick = () => openPage(button.dataset.page);
     });
 }
+
+
+function renderAIPage() {
+    const screen = document.querySelector("#screen");
+    if (!screen) return;
+
+    screen.innerHTML = `
+    <section class="page ai-page">
+        <div class="ai-header-card">
+            <h1>🤖 UniUZ AI</h1>
+            <p>Ваш персональный помощник</p>
+
+            <button class="btn ai-history-btn">
+                📚 История AI
+            </button>
+
+            <div class="ai-counter">
+                0/10 запросов сегодня
+            </div>
+        </div>
+
+        <div class="ai-chat-window">
+            <div class="ai-chat-area">
+                <div class="ai-empty">
+                    🤖
+                    <h3>Привет!</h3>
+                    <p>Задайте любой вопрос<br>вашему AI-помощнику.</p>
+                </div>
+            </div>
+
+            <div class="ai-input-box">
+                <textarea id="q" class="ai-input" placeholder="Write a question..."></textarea>
+
+                <label class="ai-icon-btn">
+                    📎
+                    <input id="ai-file" type="file" hidden>
+                </label>
+
+                <button class="ai-send-btn">
+                    ➤
+                </button>
+            </div>
+        </div>
+    </section>`;
+}
+
 
 // ============================================================
 // INITIALIZE
