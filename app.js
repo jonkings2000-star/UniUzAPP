@@ -1,640 +1,1046 @@
+const API_URL = "https://uniuz-production.up.railway.app";
 
-// UniUZ Home v6 FINAL
-// UniUZ Home Dashboard v5 - schedule and homework cards
-// UniUZ Home Dashboard v4
-// UniUZ Home Dashboard v3
-// UniUZ Home Dashboard v2
-const tg=window.Telegram?.WebApp||null;
-if(tg){try{tg.ready();tg.expand();}catch(e){}}
-const API="/api";
-const app=document.getElementById("app");
-let profile=null, lang="ru";
+const tg = window.Telegram?.WebApp;
 
-const T={
-ru:{
-chooseLanguage:"Выберите язык",university:"Выберите университет",faculty:"Выберите факультет",
-group:"Введите вашу группу",name:"Имя и фамилия",continue:"Продолжить",home:"Главная",
-schedule:"Расписание",homework:"Мои домашние задания",ai:"ИИ",reminders:"Напоминания",
-profile:"Профиль",save:"Сохранить",upload:"Загрузить расписание",add:"Добавить",
-enabled:"Напоминания включены",disabled:"Напоминания выключены",logout:"Сменить профиль",
-admin:"Админ-панель",stats:"Статистика",users:"Пользователи",unlimited:"Безлимитный ИИ",payments:"Платежи",pendingPayments:"Ожидают проверки",approve:"Одобрить",reject:"Отклонить",openReceipt:"Открыть чек",approved:"Одобрено",rejected:"Отклонено",pending:"На проверке",
-question:"Напишите вопрос...",send:"Отправить",title:"Название",description:"Описание",
-due:"Дата и время сдачи",done:"Выполнено",delete:"Удалить",openFile:"Открыть файл",noData:"Пока ничего нет",
-back:"Назад",language:"Язык",facultyPlaceholder:"Например: AI Software"
-},
-en:{
-chooseLanguage:"Choose language",university:"Choose university",faculty:"Choose faculty",
-group:"Enter your group",name:"First and last name",continue:"Continue",home:"Home",
-schedule:"Schedule",homework:"My homework",ai:"AI",reminders:"Reminders",profile:"Profile",
-save:"Save",upload:"Upload schedule",add:"Add",enabled:"Reminders enabled",disabled:"Reminders disabled",
-logout:"Change profile",admin:"Admin panel",stats:"Statistics",users:"Users",unlimited:"Unlimited AI",payments:"Payments",pendingPayments:"Pending review",approve:"Approve",reject:"Reject",openReceipt:"Open receipt",approved:"Approved",rejected:"Rejected",pending:"Pending",
-question:"Write a question...",send:"Send",title:"Title",description:"Description",
-due:"Due date and time",done:"Completed",delete:"Delete",noData:"Nothing yet",back:"Back",
-language:"Language",facultyPlaceholder:"For example: AI Software"
-}};
-const tr=k=>T[lang][k]||T.ru[k]||k;
-
-async function api(path,opts={}){
- const headers={"X-Telegram-Init-Data":tg?.initData||""};
- if(opts.body && !(opts.body instanceof FormData)) {headers["Content-Type"]="application/json";opts.body=JSON.stringify(opts.body)}
- const r=await fetch(API+path,{...opts,headers});
- let d={};try{d=await r.json()}catch{}
- if(!r.ok){const err=new Error(d.error||`API ${r.status}`);err.status=r.status;err.data=d;throw err;}
- return d;
-}
-function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
-function toast(m){const x=document.createElement("div");x.className="toast";x.textContent=m;document.body.appendChild(x);setTimeout(()=>x.remove(),3000)}
-function layout(content,active="home"){app.innerHTML=`<div class="wrap">${content}</div><div class="nav">
-<button class="${active==="home"?"active":""}" onclick="home()">🏠<br>${tr("home")}</button>
-<button class="${active==="schedule"?"active":""}" onclick="showSchedule()">🗓️<br>${tr("schedule")}</button>
-<button class="${active==="homework"?"active":""}" onclick="showHomework()">📝<br>${tr("homework")}</button>
-<button class="${active==="ai"?"active":""}" onclick="showAI()">🤖<br>${tr("ai")}</button>
-</div>`}
-function brand(){return `<div class="brand"><div class="logo">🎓</div><h1>UniUZ</h1><div class="muted">${profile?.university||""}</div></div>`}
-
-async function start(){
- try{const d=await api("/me");profile={...d.profile,is_admin:d.is_admin};lang=profile.language||"ru";if(profile.university&&profile.department&&profile.group_name&&profile.first_name) return home()}
- catch(e){}
- chooseLanguage();
-}
-function chooseLanguage(){app.innerHTML=`<div class="wrap"><div class="brand"><div class="logo">🎓</div><h1>UniUZ</h1></div><div class="card"><h2>${tr("chooseLanguage")}</h2><div class="lang">
-<button class="btn" onclick="setLang('ru')">🇷🇺 Русский</button><button class="btn" onclick="setLang('en')">🇬🇧 English</button>
-</div></div></div>`}
-async function setLang(x){
- lang=x;
- if(profile){
-  try{const d=await api("/profile",{method:"PUT",body:{language:x}});profile=d.profile}catch(e){}
- }
- chooseUniversity();
-}
-function chooseUniversity(){app.innerHTML=`<div class="wrap">${brand()}<div class="card"><h2>${tr("university")}</h2><button class="btn primary" onclick="chooseFaculty('Ajou University in Tashkent')">🎓 Ajou University in Tashkent</button></div></div>`}
-function chooseFaculty(uni){
- const faculties=[
-  ["Architecture","🏛️"],["Interior Design","🏠"],["Business Administration","📊"],
-  ["IT Business","💼"],["AI Software","🤖"],["Software","💻"],
-  ["Civil Systems Engineering","🏗️"],["Electrical and Computer Engineering","⚡"],
-  ["English Philology & Management","🇬🇧"],["Korean Philology & Management","🇰🇷"]
- ];
- app.innerHTML=`<div class="wrap">${brand()}<div class="card"><h2>${tr("faculty")}</h2><div class="lang">
- ${faculties.map(([name,icon])=>`<button class="btn" onclick="chooseGroup('${esc(uni)}','${esc(name)}')">${icon} ${esc(name)}</button>`).join("")}
- </div></div></div>`;
-}
-function chooseGroup(uni,fac){app.innerHTML=`<div class="wrap">${brand()}<div class="card"><h2>${tr("group")}</h2><input id="grp" class="input" placeholder="AI-101"><button class="btn primary" onclick="chooseName('${esc(uni)}','${esc(fac)}')">${tr("continue")}</button></div></div>`}
-function chooseName(uni,fac){const g=document.getElementById("grp").value.trim();if(!g)return toast(tr("group"));app.innerHTML=`<div class="wrap">${brand()}<div class="card"><h2>${tr("name")}</h2><input id="nm" class="input" placeholder="Jakhongir Karimov"><button class="btn primary" onclick="finishSetup('${esc(uni)}','${esc(fac)}','${esc(g)}')">${tr("save")}</button></div></div>`}
-async function finishSetup(uni,fac,g){const n=document.getElementById("nm").value.trim();if(!n)return toast(tr("name"));const parts=n.split(/\s+/);try{const d=await api("/setup",{method:"POST",body:{language:lang,university:uni,department:fac,group_name:g,first_name:parts[0],last_name:parts.slice(1).join(" ")}});profile={...d.profile};try{const m=await api("/me");profile={...m.profile,is_admin:m.is_admin}}catch(e){}home()}catch(e){toast(e.message)}}
-
-async function home(){
-
-let schedule=[];
-let homework=[];
-
-try{
- const s=await api("/schedule");
- schedule=s.items||[];
-}catch(e){}
-
-try{
- const h=await api("/homework");
- homework=h.items||[];
-}catch(e){}
-
-
-layout(`
-<div class="brand">
- <div class="logo">🎓</div>
- <h1>UniUZ</h1>
- <div class="muted">${profile?.university||""}</div>
-</div>
-
-<div class="hero">
- <div class="hero-row">
-  <div>
-   <div class="hello">Добрый день 👋</div>
-   <h1>${esc(profile?.first_name||"Student")}</h1>
-   <div class="profile-badge">
-    🏛 ${esc(profile?.department||"")}
-   </div>
-   <div class="profile-badge">
-    👥 ${esc(profile?.group_name||"")}
-   </div>
-  </div>
-  <div class="avatar">🎓</div>
- </div>
-</div>
-
-
-<div class="today-card">
- <div class="section-title">🗓 Сегодня</div>
-
- ${
- (() => {
-  const tzDay = new Intl.DateTimeFormat("en-US", {
-    weekday:"short",
-    timeZone:"Asia/Tashkent"
-  }).format(new Date());
-  const dayMap = {Mon:0,Tue:1,Wed:2,Thu:3,Fri:4,Sat:5,Sun:6};
-  const today = dayMap[tzDay];
-  const todayItems = schedule
-    .filter(x=>Number(x.day_of_week)===today)
-    .sort((a,b)=>String(a.start_time||"").localeCompare(String(b.start_time||"")));
-  return todayItems.length ? todayItems.slice(0,3).map(x=>`
- <div class="lesson">
-   <div class="lesson-time">${esc(x.start_time||"")}</div>
-   <div>
-    <div class="lesson-title">${esc(x.subject||"")}</div>
-    <div class="lesson-room">🏫 ${esc(x.room||"")}</div>
-   </div>
- </div>
-`).join("") : `<div class="empty">🎉 Сегодня пар нет</div>`;
-})()
- }
-
-</div>
-
-
-<div class="today-card">
- <div class="section-title">📝 Ближайшие задания</div>
-
- ${
- homework.length
- ?
- homework.slice(0,3).map(x=>`
- <div class="lesson">
-   <div>
-    <div class="lesson-title">📄 ${esc(x.title||"")}</div>
-    <div class="lesson-room">⏰ ${esc(x.due_at||"")}</div>
-   </div>
- </div>
- `).join("")
- :
- `<div class="empty">Нет активных заданий</div>`
- }
-
-</div>
-
-
-<div class="ai-card">
- <div class="ai-title">🤖 UniUZ AI</div>
- <p>Ваш персональный помощник</p>
- <div id="home-ai-usage" class="ai-usage">Загрузка...</div>
- <button class="btn primary" onclick="showAI()">
- Спросить ИИ →
- </button>
-</div>
-
-
-<div class="quick-grid-v2">
- <button class="quick-v2" onclick="showSchedule()">
-  <span>🗓</span>${tr("schedule")}
- </button>
-
- <button class="quick-v2" onclick="showHomework()">
-  <span>📝</span>${tr("homework")}
- </button>
-
- <button class="quick-v2" onclick="showAI()">
-  <span>🤖</span>${tr("ai")}
- </button>
-
- <button class="quick-v2" onclick="showProfile()">
-  <span>👤</span>${tr("profile")}
- </button>
- ${profile?.is_admin ? `
- <button class="quick-v2 admin-v2" onclick="showAdmin()">
-  <span>🔐</span>${tr("admin")}
- </button>` : ""}
-</div>
-
-`)
- loadHomeAIUsage();
-}
-async function showSchedule(){
- try{
-  const d=await api("/schedule");
-  const items=Array.isArray(d.items)?d.items.slice():[];
-
-  const names=lang==="ru"
-   ? ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"]
-   : ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
-
-  items.sort((a,b)=>{
-   const dayA=Number(a.day_of_week??0), dayB=Number(b.day_of_week??0);
-   if(dayA!==dayB) return dayA-dayB;
-   return String(a.start_time||"").localeCompare(String(b.start_time||""));
-  });
-
-  const groups=names.map((name,day)=>{
-   const rows=items.filter(x=>Number(x.day_of_week)===day);
-   if(!rows.length) return "";
-   return `
-    <div class="card" style="margin-top:12px">
-     <h3 style="margin:0 0 12px">${name}</h3>
-     ${rows.map(x=>`
-      <div class="list-item">
-       <b>${esc(x.start_time||"")} — ${esc(x.subject||"")}</b>
-       <div class="muted small">
-        ${x.end_time?esc(x.end_time)+" · ":""}${esc(x.room||"")}
-        ${x.teacher?` · ${esc(x.teacher)}`:""}
-       </div>
-      </div>
-     `).join("")}
-    </div>`;
-  }).join("");
-
-  layout(`
-   ${brand()}
-   <div class="card">
-    <div class="row">
-     <h2>🗓️ ${tr("schedule")}</h2>
-     <label class="btn">📎 ${tr("upload")}
-      <input id="sf" type="file" accept=".pdf,image/*" hidden>
-     </label>
-    </div>
-    <div class="row" style="margin-top:10px">
-     <button class="btn" onclick="showSchedule()">🔄 Обновить</button>
-    </div>
-   </div>
-   ${groups || `<div class="card"><div class="empty">${tr("noData")}</div></div>`}
-  `,"schedule");
-
-  const sf=document.getElementById("sf");
-  if(sf) sf.onchange=uploadSchedule;
- }catch(e){
-  toast(e.message);
- }
+if (tg) {
+    tg.ready();
+    tg.expand();
 }
 
-async function uploadSchedule(e){const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append("file",f);try{await api("/schedule/upload",{method:"POST",body:fd});showSchedule()}catch(e){toast(e.message)}}
-async function openHomeworkFile(id){
- try{
-  const r=await fetch(`${API}/homework/${id}/file`,{
-   headers:{"X-Telegram-Init-Data":tg?.initData||""}
-  });
-  if(!r.ok){
-   let d={}; try{d=await r.json()}catch{}
-   throw new Error(d.error||`API ${r.status}`);
-  }
+const initData = tg?.initData || "";
 
-  const blob=await r.blob();
-  const url=URL.createObjectURL(blob);
-  const type=(r.headers.get("content-type")||blob.type||"").toLowerCase();
 
-  const old=document.getElementById("hw-file-viewer");
-  if(old) old.remove();
+// ============================================================
+// LANGUAGE
+// ============================================================
 
-  const modal=document.createElement("div");
-  modal.id="hw-file-viewer";
-  modal.style.cssText="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.82);display:flex;flex-direction:column;padding:12px;box-sizing:border-box";
+const translations = {
+    ru: {
+        loading: "Загрузка...",
+        error: "⚠️ Не удалось загрузить данные UniUZ.",
+        noHomework: "📚 Нет заданий",
+        noAnnouncements: "📢 Нет объявлений"
+    },
 
-  const top=document.createElement("div");
-  top.style.cssText="display:flex;justify-content:flex-end;gap:8px;margin-bottom:8px";
+    en: {
+        loading: "Loading...",
+        error: "⚠️ Failed to load UniUZ data.",
+        noHomework: "📚 No homework",
+        noAnnouncements: "📢 No announcements"
+    },
 
-  const close=document.createElement("button");
-  close.className="btn";
-  close.textContent="✕";
-  close.onclick=()=>{
-   modal.remove();
-   URL.revokeObjectURL(url);
-  };
-  top.appendChild(close);
-  modal.appendChild(top);
+    ko: {
+        loading: "로딩 중...",
+        error: "⚠️ UniUZ 데이터를 불러오지 못했습니다.",
+        noHomework: "📚 과제가 없습니다",
+        noAnnouncements: "📢 공지가 없습니다"
+    }
+};
 
-  const body=document.createElement("div");
-  body.style.cssText="flex:1;min-height:0;background:#fff;border-radius:14px;overflow:auto;display:flex;align-items:center;justify-content:center";
 
-  if(type.startsWith("image/")){
-   const img=document.createElement("img");
-   img.src=url;
-   img.style.cssText="max-width:100%;max-height:100%;object-fit:contain";
-   body.appendChild(img);
-  }else if(type.includes("pdf")){
-   const iframe=document.createElement("iframe");
-   iframe.src=url;
-   iframe.style.cssText="width:100%;height:100%;border:0";
-   body.appendChild(iframe);
-  }else{
-   body.style.cssText+=";flex-direction:column;padding:30px;box-sizing:border-box";
-   const text=document.createElement("div");
-   text.textContent="Этот тип файла нельзя просмотреть прямо внутри Telegram.";
-   text.style.cssText="color:#111;text-align:center;margin-bottom:18px;font-size:16px";
-   const a=document.createElement("a");
-   a.href=url;
-   a.download="";
-   a.textContent="⬇️ Скачать файл";
-   a.className="btn primary";
-   body.appendChild(text);
-   body.appendChild(a);
-  }
+let currentLanguage =
+    localStorage.getItem("uniuz_language") || null;
 
-  modal.appendChild(body);
-  document.body.appendChild(modal);
- }catch(e){
-  toast(e.message||"Не удалось открыть файл");
- }
-}
 
-async function showHomework(){try{const d=await api("/homework");layout(`${brand()}<div class="card"><h2>📝 ${tr("homework")}</h2><input id="ht" class="input" placeholder="${tr("title")}"><textarea id="hd" placeholder="${tr("description")}"></textarea><input id="hdate" class="input" type="datetime-local"><input id="hfile" class="input" type="file" accept=".pdf,image/*,.doc,.docx"><button class="btn primary" onclick="addHW()">${tr("add")}</button></div><div class="card">${d.items.length?d.items.map(x=>`<div class="list-item" style="${x.completed?"border:1px solid #3ccf7a;background:#10291d;border-radius:14px;padding:14px":""}"><div class="row"><b>${x.completed?"✅ ":""}${esc(x.title)}</b><span class="badge">${esc(x.due_at)}</span></div><p class="muted">${esc(x.description||"")}</p>${(x.file_name||x.file_path)?`<div class="row"><button class="btn" onclick="openHomeworkFile(${x.id})">📎 ${tr("openFile")} · ${esc(x.file_name||"файл")}</button></div>`:""}<div class="row"><button class="btn" onclick="toggleHW(${x.id},${x.completed?0:1})">${x.completed?"↩️ "+tr("done"):"✅ "+tr("done")}</button><button class="btn danger" onclick="deleteHW(${x.id})">${tr("delete")}</button></div></div>`).join(""):`<div class="empty">${tr("noData")}</div>`}</div>`,"homework")}catch(e){toast(e.message)}}
-async function addHW(){
- const title=document.getElementById("ht").value.trim(),description=document.getElementById("hd").value.trim(),due=document.getElementById("hdate").value,file=document.getElementById("hfile").files[0];
- if(!title||!due)return;
- try{
-  if(file){
-   const fd=new FormData();fd.append("title",title);fd.append("description",description);fd.append("due_at",new Date(due).toISOString());fd.append("file",file);
-   await api("/homework/upload",{method:"POST",body:fd});
-  }else{
-   await api("/homework",{method:"POST",body:{title,description,due_at:new Date(due).toISOString()}});
-  }
-  showHomework();
- }catch(e){toast(e.message)}
-}
-async function toggleHW(id,completed){try{await api(`/homework/${id}/complete`,{method:"POST",body:{completed:!!completed}});showHomework()}catch(e){toast(e.message)}}
-async function deleteHW(id){try{await api(`/homework/${id}`,{method:"DELETE"});showHomework()}catch(e){toast(e.message)}}
-
-async function loadHomeAIUsage(){
- try{
-  const d=await api("/ai/status");
-  const el=document.getElementById("home-ai-usage");
-  if(el){
-   el.textContent=d.limit===null ? "∞ Безлимитный AI" : `${d.used}/10 запросов сегодня`;
-  }
- }catch(e){
-  const el=document.getElementById("home-ai-usage");
-  if(el) el.textContent="0/10 запросов сегодня";
- }
-}
-
-function showAI(){
- layout(`${brand()}
-  <div class="ai-card">
-   <div class="ai-title">🤖 UniUZ AI</div>
-   <p>Ваш персональный помощник</p>
-   <button class="btn" onclick="showAIHistory()">📚 История AI</button>
-   <div id="ai-usage" class="badge" style="display:block;text-align:center;margin:12px 0">Загрузка...</div>
-  </div>
-  <div class="card">
-   <div id="chat"></div>
-    <div id="ai-file-name" class="muted small" style="display:none;margin:8px 0"></div>
-
-    <div class="ai-input-box">
-      <textarea id="q" class="ai-input" placeholder="${tr("question")}"></textarea>
-
-      <label class="ai-icon-btn" title="Прикрепить файл">
-        📎
-        <input id="ai-file" type="file"
-          accept="image/*,.pdf,.txt,.md,.csv,.docx,.pptx,.xlsx"
-          hidden onchange="aiFileSelected()">
-      </label>
-
-      <button class="ai-send-btn" type="button" onclick="askAI()">➤</button>
-    </div>
-  </div>`,"ai");
-
- loadAIStatusInChat();
-}
-
-async function loadAIStatusInChat(){
- try{
-  const d=await api("/ai/status");
-  const el=document.getElementById("ai-usage");
-  if(el){
-   el.textContent=d.limit===null ? "∞ Безлимитный AI" : `${d.used}/10 запросов сегодня`;
-  }
-  if(d.limit!==null && d.used>=10) showAILimitInChat();
- }catch(e){}
-}
-
-function aiFileSelected(){
- const input=document.getElementById("ai-file");
- const out=document.getElementById("ai-file-name");
- if(!input||!out)return;
- const file=input.files?.[0];
- if(file){
-  out.style.display="block";
-  out.textContent=`📎 ${file.name} · ${Math.ceil(file.size/1024)} KB`;
- }else{
-  out.style.display="none";
-  out.textContent="";
- }
-}
-
-function clearAIFile(){
- const input=document.getElementById("ai-file");
- const out=document.getElementById("ai-file-name");
- if(input)input.value="";
- if(out){
-  out.style.display="none";
-  out.textContent="";
- }
-}
-
-async function showAIHistory(){
- try{
-  const d=await api("/ai/history");
-  const items=d.items||[];
-
-  layout(`${brand()}
-   <div class="card">
-    <div class="row">
-     <h2>📚 История AI</h2>
-     <button class="btn" onclick="showAI()">← AI</button>
-    </div>
-   </div>
-
-   <div class="card">
-    ${items.length ? items.map(x=>`
-      <div class="list-item">
-       <b>${x.file_name?"📎 "+esc(x.file_name):"💬 AI запрос"}</b>
-       <p>👤 ${esc(x.question||"")}</p>
-       <p>🤖 ${esc(x.answer||"")}</p>
-       <button class="btn" onclick="continueAI(${x.id})">↩️ Продолжить</button>
-      </div>
-    `).join("") : `<div class="empty">История пока пустая</div>`}
-   </div>`,"ai");
- }catch(e){toast(e.message)}
-}
-
-function continueAI(id){
- showAI();
-}
-
-function showAILimitInChat(){
- const chat=document.getElementById("chat");
- if(!chat)return;
- if(document.getElementById("ai-limit-message"))return;
- chat.innerHTML+=`
-  <div class="list-item" id="ai-limit-message">
-   <b>🤖 UniUZ AI</b>
-   <p><b>Лимит AI на сегодня исчерпан.</b></p>
-   <p>Вы использовали все <b>10 запросов</b> сегодня.</p>
-   <p><b>Безлимитный UniUZ AI — 19 900 сум / месяц.</b></p>
-   <p>Оплата помогает поддерживать работу ИИ и серверов, чтобы UniUZ работал <b>24/7</b>.</p>
-   <button class="btn primary" onclick="showPaymentInstructions()">💳 Оплатить 19 900 сум</button>
-  </div>`;
-}
-
-function aiQuickPrompt(text){
- const q=document.getElementById("q");
- if(!q)return;
- q.value=text;
- q.focus();
-}
-
-async function askAI(){
- const q=document.getElementById("q").value.trim();
- const file=document.getElementById("ai-file")?.files?.[0];
-
- if(!q&&!file){
-  toast("Напишите вопрос или прикрепите файл");
-  return;
- }
-
- const button=document.querySelector('.card button[onclick="askAI()"]');
- if(button){
-  button.disabled=true;
-  button.textContent="⏳ Анализирую...";
- }
-
- const chat=document.getElementById("chat");
- const loadingId="ai-loading-"+Date.now();
-
- if(chat && file){
-  chat.innerHTML+=`
-   <div class="list-item" id="${loadingId}">
-    <b>🤖 ИИ анализирует файл...</b>
-    <p>⏳ Загружаю документ<br>
-    ⏳ Читаю материал<br>
-    ⏳ Готовлю ответ</p>
-   </div>`;
- }
-
- try{
-  const fd=new FormData();
-  fd.append("message",q);
-  if(file)fd.append("file",file);
-
-  const d=await api("/ai/file",{method:"POST",body:fd});
-
-  const question=q||"Проанализируй прикреплённый материал";
-  const fileLine=file?`<div class="muted">📎 ${esc(file.name)}</div>`:"";
-
-  const loading=document.getElementById(loadingId);
-  if(loading) loading.remove();
-
-   const answerId="ai-answer-"+Date.now();
-   document.getElementById("chat").innerHTML+=`
-   <div class="list-item" id="${answerId}">
-    <b>${esc(question)}</b>
-    ${fileLine}
-    <p>${esc(d.answer)}</p>
-    <span class="badge">${d.limit===null?"∞":`${d.used}/10`}</span>
-    ${d.file_id ? `<div style="margin-top:10px">
-       <button class="btn primary" type="button" onclick="downloadAIFile(${d.file_id}, '${esc(d.filename||"UniUZ_AI_File")}')">⬇️ Скачать файл</button>
-      </div>` : ""}
-   </div>`;
-
-  document.getElementById("q").value="";
-  clearAIFile();
-  loadHomeAIUsage();
-  loadAIStatusInChat();
-
- }catch(e){
-  toast(e.message||"Не удалось получить ответ ИИ");
- }finally{
-  if(button){
-   button.disabled=false;
-   button.textContent="Спросить ИИ →";
-  }
- }
+function getLanguage() {
+    return currentLanguage || "ru";
 }
 
 
+// ============================================================
+// LANGUAGE SELECTION
+// ============================================================
 
-async function downloadAIFile(id,name){
- try{
-  const r=await fetch(`${API}/ai/generated/${id}`,{
-   headers:{"X-Telegram-Init-Data":tg?.initData||""}
-  });
-  if(!r.ok) throw new Error("Файл не найден");
-  const blob=await r.blob();
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url;
-  a.download=name;
-  a.click();
-  URL.revokeObjectURL(url);
- }catch(e){toast(e.message||"Не удалось скачать файл")}
+function findLanguageScreen() {
+
+    const selectors = [
+        "#language-screen",
+        ".language-screen",
+        "#language-selection",
+        ".language-selection",
+        "#language-container",
+        ".language-container"
+    ];
+
+    for (const selector of selectors) {
+        const element = document.querySelector(selector);
+
+        if (element) {
+            return element;
+        }
+    }
+
+    // Fallback:
+    // Find the container that contains the three language buttons.
+    const buttons = [...document.querySelectorAll("button")];
+
+    const languageButtons = buttons.filter(button => {
+        const text = (
+            button.textContent || ""
+        ).toLowerCase();
+
+        return (
+            text.includes("рус") ||
+            text.includes("english") ||
+            text.includes("한국") ||
+            text.includes("korean")
+        );
+    });
+
+    if (languageButtons.length >= 3) {
+
+        let parent = languageButtons[0].parentElement;
+
+        for (let i = 0; i < 6 && parent; i++) {
+
+            const count =
+                parent.querySelectorAll("button").length;
+
+            if (count >= 3) {
+                return parent;
+            }
+
+            parent = parent.parentElement;
+        }
+    }
+
+    return null;
 }
 
-async function showReminders(){try{const d=await api("/reminders");layout(`${brand()}<div class="card"><h2>🔔 ${tr("reminders")}</h2><p>${d.enabled?tr("enabled"):tr("disabled")}</p><button class="btn primary" onclick="toggleReminders(${!d.enabled})">${d.enabled?tr("disabled"):tr("enabled")}</button></div>`)}catch(e){toast(e.message)}}
-async function toggleReminders(enabled){try{await api("/reminders",{method:"POST",body:{enabled}});showReminders()}catch(e){toast(e.message)}}
 
-function showProfile(){layout(`${brand()}<div class="card"><h2>👤 ${tr("profile")}</h2><p><b>${esc(profile.first_name)} ${esc(profile.last_name)}</b></p><p>${esc(profile.university)}</p><p>${esc(profile.department)}</p><p>${esc(profile.group_name)}</p><button class="btn" onclick="chooseLanguage()">${tr("language")}</button><button class="btn danger" onclick="chooseUniversity()">${tr("logout")}</button></div>`)}
-async function showAdmin(){
- try{
-  const [st,u,p]=await Promise.all([api("/admin/stats"),api("/admin/users"),api("/admin/payments")]);
-  const pending=(p.items||[]).filter(x=>x.status==="pending");
-  const statusLabel=x=>x.status==="approved"?"✅ Одобрено":x.status==="rejected"?"❌ Отклонено":"⏳ На проверке";
-  layout(`${brand()}
-   <div class="card">
-    <h2>🔐 ${tr("admin")}</h2>
-    <div class="list-item"><b>👥 ${tr("users")}</b><span class="badge">${st.total_users||0}</span></div>
-    <div class="list-item"><b>🤖 AI сегодня</b><span class="badge">${st.ai_requests_today||0}</span></div>
-    <div class="list-item"><b>♾️ ${tr("unlimited")}</b><span class="badge">${st.unlimited_ai||0}</span></div>
-    <div class="list-item"><b>💳 ${tr("pendingPayments")}</b><span class="badge">${pending.length}</span></div>
-   </div>
+function hideLanguageScreen() {
 
-   <div class="card">
-    <h3>💳 ${tr("payments")}</h3>
-    ${pending.length ? pending.map(x=>`
-      <div class="list-item">
-       <div>
-        <b>${esc(x.first_name)} ${esc(x.last_name)}</b>
-        <div class="muted">ID: ${x.telegram_id} · ${esc(x.group_name||"")}</div>
-        <div class="muted">19 900 UZS · ${esc(x.created_at||"")}</div>
-        <div class="muted">${esc(x.filename)}</div>
-       </div>
-       <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:10px">
-        <button class="btn" onclick="openPaymentReceipt(${x.id})">📄 ${tr("openReceipt")}</button>
-        <button class="btn primary" onclick="approvePayment(${x.id})">✅ ${tr("approve")}</button>
-        <button class="btn danger" onclick="rejectPayment(${x.id})">❌ ${tr("reject")}</button>
-       </div>
-      </div>`).join(""):`<div class="empty">Нет платежей на проверке</div>`}
-   </div>
+    const screen = findLanguageScreen();
 
-   <div class="card">
-    <h3>👥 ${tr("users")}</h3>
-    <input id="adminId" class="input" placeholder="Telegram ID">
-    <button class="btn primary" onclick="addAdmin()">${tr("add")} admin</button>
-    ${(u.items||[]).map(x=>`<div class="list-item"><div><b>${esc(x.first_name)} ${esc(x.last_name)}</b><div class="muted">${x.telegram_id} · ${esc(x.group_name||"")}</div></div><button class="btn" onclick="grant(${x.telegram_id},${!x.unlimited_ai})">${x.unlimited_ai?"∞":"+"}</button></div>`).join("")}
-   </div>`,"home");
- }catch(e){toast(e.message)}
+    if (screen) {
+        screen.style.display = "none";
+    }
 }
 
-async function openPaymentReceipt(id){
- try{
-  const r=await fetch(`${API}/admin/payments/${id}/receipt`,{headers:{"X-Telegram-Init-Data":tg?.initData||""}});
-  if(!r.ok){let d={};try{d=await r.json()}catch{};throw new Error(d.error||`API ${r.status}`)}
-  const blob=await r.blob();
-  const url=URL.createObjectURL(blob);
-  window.open(url,"_blank");
-  setTimeout(()=>URL.revokeObjectURL(url),60000);
- }catch(e){toast(e.message||"Не удалось открыть чек")}
-}
-async function approvePayment(id){
- if(!confirm("Подтвердить оплату и включить безлимитный AI на 30 дней?")) return;
- try{await api(`/admin/payments/${id}/approve`,{method:"POST",body:{}});toast("Оплата подтверждена. AI без ограничений активирован на 30 дней.");showAdmin()}catch(e){toast(e.message)}
-}
-async function rejectPayment(id){
- if(!confirm("Отклонить этот чек?")) return;
- try{await api(`/admin/payments/${id}/reject`,{method:"POST",body:{}});toast("Чек отклонён.");showAdmin()}catch(e){toast(e.message)}
+
+function showMainApplication() {
+    const screen = document.querySelector("#screen");
+    const nav = document.querySelector(".bottom-nav");
+
+    if (screen) screen.style.display = "";
+    if (nav) nav.style.display = "";
 }
 
-async function grant(id,enabled){try{await api("/admin/unlimited",{method:"POST",body:{telegram_id:id,enabled}});showAdmin()}catch(e){toast(e.message)}}
 
-start();
+async function selectLanguage(language) {
 
-async function addAdmin(){
- const id=document.getElementById("adminId").value.trim();
- if(!id)return;
- try{await api("/admin/add",{method:"POST",body:{telegram_id:id}});toast("Admin added");showAdmin()}catch(e){toast(e.message)}
+    if (!["ru", "en", "ko"].includes(language)) {
+        return;
+    }
+
+    currentLanguage = language;
+
+    localStorage.setItem(
+        "uniuz_language",
+        language
+    );
+
+    console.log(
+        "UniUZ language:",
+        language
+    );
+
+    hideLanguageScreen();
+    showMainApplication();
+
+    openPage("home");
+
+    await initializeUniUZ();
+}
+
+
+// Make available to HTML onclick=""
+window.selectLanguage = selectLanguage;
+
+
+// ============================================================
+// EXACT LANGUAGE BUTTONS
+// ============================================================
+
+document.addEventListener("click", (event) => {
+    const button = event.target.closest(".language-btn");
+
+    if (!button) return;
+
+    const language = button.dataset.lang;
+
+    if (["ru", "en", "ko"].includes(language)) {
+        event.preventDefault();
+        event.stopPropagation();
+        selectLanguage(language);
+    }
+}, true);
+
+
+// ============================================================
+// AUTOMATIC LANGUAGE BUTTON DETECTION
+// ============================================================
+
+document.addEventListener(
+    "click",
+    function(event) {
+
+        const button =
+            event.target.closest("button");
+
+        if (!button) {
+            return;
+        }
+
+        const text =
+            (button.textContent || "")
+                .trim()
+                .toLowerCase();
+
+        if (
+            text.includes("русский") ||
+            text === "ru"
+        ) {
+            selectLanguage("ru");
+            return;
+        }
+
+        if (
+            text.includes("english") ||
+            text === "en"
+        ) {
+            selectLanguage("en");
+            return;
+        }
+
+        if (
+            text.includes("한국어") ||
+            text.includes("korean") ||
+            text === "ko"
+        ) {
+            selectLanguage("ko");
+            return;
+        }
+    }
+);
+
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+function escapeHtml(value) {
+
+    if (
+        value === null ||
+        value === undefined
+    ) {
+        return "";
+    }
+
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+
+function setText(selector, value) {
+
+    const element =
+        document.querySelector(selector);
+
+    if (element) {
+        element.textContent =
+            value ?? "";
+    }
+}
+
+
+// ============================================================
+// API
+// ============================================================
+
+async function apiRequest(path) {
+
+    const response = await fetch(
+        `${API_URL}${path}`,
+        {
+            method: "GET",
+
+            headers: {
+                "X-Telegram-Init-Data":
+                    initData
+            }
+        }
+    );
+
+    const data =
+        await response.json();
+
+    if (!response.ok) {
+
+        throw new Error(
+            data.error || "API error"
+        );
+    }
+
+    return data;
+}
+
+
+// ============================================================
+// PROFILE
+// ============================================================
+
+async function loadProfile() {
+
+    const data =
+        await apiRequest("/api/me");
+
+    cachedProfile = {
+        telegramUser: data.telegram_user,
+        profile: data.profile
+    };
+
+    console.log(
+        "UniUZ profile:",
+        data
+    );
+
+    if (!data.ok) {
+        throw new Error(
+            "Profile loading failed"
+        );
+    }
+
+    const telegramUser =
+        data.telegram_user;
+
+    const profile =
+        data.profile;
+
+
+    if (telegramUser) {
+
+        const name =
+            telegramUser.first_name ||
+            telegramUser.username ||
+            "Student";
+
+        setText(
+            "#user-name",
+            name
+        );
+
+        const avatar =
+            document.querySelector(
+                "#user-avatar"
+            );
+
+        if (avatar) {
+
+            avatar.textContent =
+                (
+                    name[0] || "U"
+                ).toUpperCase();
+        }
+    }
+
+
+    if (profile) {
+
+        setText(
+            "#profile-name",
+            profile.full_name ||
+            "UniUZ"
+        );
+
+        setText(
+            "#profile-username",
+            profile.username
+                ? `@${profile.username}`
+                : ""
+        );
+
+        setText(
+            "#profile-university",
+            profile.university ||
+            "Ajou University in Tashkent"
+        );
+
+        setText(
+            "#profile-department",
+            profile.department ||
+            "Not selected"
+        );
+
+        setText(
+            "#profile-group",
+            profile.group_name ||
+            "Not selected"
+        );
+
+        setText(
+            "#department",
+            profile.department ||
+            "—"
+        );
+
+        setText(
+            "#group",
+            profile.group_name ||
+            "—"
+        );
+
+    } else {
+
+        setText(
+            "#profile-name",
+            telegramUser?.first_name ||
+            "Student"
+        );
+
+        setText(
+            "#profile-university",
+            "Ajou University in Tashkent"
+        );
+
+        setText(
+            "#profile-department",
+            "Not selected"
+        );
+
+        setText(
+            "#profile-group",
+            "Not selected"
+        );
+    }
+
+    return {
+        telegramUser,
+        profile
+    };
+}
+
+
+// ============================================================
+// HOMEWORK
+// ============================================================
+
+async function loadHomework() {
+
+    const data =
+        await apiRequest(
+            "/api/homework"
+        );
+
+    cachedHomework = data.items || [];
+
+    console.log(
+        "UniUZ homework:",
+        data
+    );
+
+    const container =
+        document.querySelector(
+            "#homework-list"
+        );
+
+    if (!container) {
+        return;
+    }
+
+    container.innerHTML = "";
+
+    if (
+        !data.items ||
+        data.items.length === 0
+    ) {
+
+        const text =
+            getLanguage() === "ko"
+                ? translations.ko.noHomework
+                : getLanguage() === "en"
+                    ? translations.en.noHomework
+                    : translations.ru.noHomework;
+
+        container.innerHTML = `
+            <div class="empty-state">
+                ${text}
+            </div>
+        `;
+
+        setText(
+            "#homework-count",
+            "0"
+        );
+
+        return;
+    }
+
+    setText(
+        "#homework-count",
+        String(data.items.length)
+    );
+
+
+    data.items.forEach(item => {
+
+        const card =
+            document.createElement("div");
+
+        card.className =
+            "homework-card";
+
+        card.innerHTML = `
+            <div class="homework-title">
+                📚 ${escapeHtml(
+                    item.subject_name
+                )}
+            </div>
+
+            <div class="homework-task">
+                ${escapeHtml(
+                    item.task_text
+                )}
+            </div>
+
+            <div class="homework-date">
+                📅 ${escapeHtml(
+                    item.homework_date
+                )}
+                &nbsp;
+                ⏰ ${escapeHtml(
+                    item.homework_time
+                )}
+            </div>
+        `;
+
+        container.appendChild(card);
+    });
+}
+
+
+// ============================================================
+// ANNOUNCEMENTS
+// ============================================================
+
+async function loadAnnouncements() {
+
+    const data =
+        await apiRequest(
+            "/api/announcements"
+        );
+
+    cachedAnnouncements = data.items || [];
+
+    console.log(
+        "UniUZ announcements:",
+        data
+    );
+
+    const container =
+        document.querySelector(
+            "#announcement-list"
+        );
+
+    if (!container) {
+        return;
+    }
+
+    container.innerHTML = "";
+
+
+    if (
+        !data.items ||
+        data.items.length === 0
+    ) {
+
+        const text =
+            getLanguage() === "ko"
+                ? translations.ko.noAnnouncements
+                : getLanguage() === "en"
+                    ? translations.en.noAnnouncements
+                    : translations.ru.noAnnouncements;
+
+        container.innerHTML = `
+            <div class="empty-state">
+                ${text}
+            </div>
+        `;
+
+        setText(
+            "#announcement-count",
+            "0"
+        );
+
+        return;
+    }
+
+
+    setText(
+        "#announcement-count",
+        String(data.items.length)
+    );
+
+
+    data.items.forEach(item => {
+
+        const card =
+            document.createElement("div");
+
+        card.className =
+            "announcement-card";
+
+        card.innerHTML = `
+            <div class="announcement-title">
+                📢 ${escapeHtml(
+                    item.title
+                )}
+            </div>
+
+            <div class="announcement-message">
+                ${escapeHtml(
+                    item.message
+                )}
+            </div>
+        `;
+
+        container.appendChild(card);
+    });
+}
+
+
+// ============================================================
+// API HEALTH
+// ============================================================
+
+async function checkApi() {
+
+    try {
+
+        const response =
+            await fetch(
+                `${API_URL}/api/health`
+            );
+
+        const data =
+            await response.json();
+
+        console.log(
+            "UniUZ API:",
+            data
+        );
+
+        return data.ok === true;
+
+    } catch (error) {
+
+        console.error(
+            "UniUZ API unavailable:",
+            error
+        );
+
+        return false;
+    }
+}
+
+
+// ============================================================
+// LOADING
+// ============================================================
+
+function showLoading() {
+
+    const loading =
+        document.querySelector(
+            "#loading"
+        );
+
+    if (loading) {
+        loading.style.display =
+            "flex";
+    }
+}
+
+
+function hideLoading() {
+
+    const loading =
+        document.querySelector(
+            "#loading"
+        );
+
+    if (loading) {
+        loading.style.display =
+            "none";
+    }
+}
+
+
+// ============================================================
+// ERROR
+// ============================================================
+
+function showError(message) {
+
+    console.error(message);
+
+    const errorElement =
+        document.querySelector(
+            "#error"
+        );
+
+    if (errorElement) {
+
+        errorElement.textContent =
+            message;
+
+        errorElement.style.display =
+            "block";
+    }
+}
+
+
+// ============================================================
+// ACTUAL MINI APP SCREEN
+// ============================================================
+
+const appText = {
+    ru: {
+        welcome: "Добро пожаловать 👋",
+        student: "СТУДЕНТ",
+        profileDb: "Профиль будет загружен из базы UniUZ",
+        next: "📅 Следующая пара",
+        scheduleConnect: "Расписание подключится к базе",
+        schedule: "Расписание",
+        today: "На сегодня",
+        homework: "Задания",
+        announcements: "Объявления",
+        ai: "AI Assistant",
+        quick: "⚡ Быстрые действия",
+        deadlines: "Дедлайны",
+        news: "Новости",
+        profile: "Профиль"
+    },
+    en: {
+        welcome: "Welcome 👋",
+        student: "STUDENT",
+        profileDb: "Profile will be loaded from UniUZ database",
+        next: "📅 Next class",
+        scheduleConnect: "Schedule will be connected to the database",
+        schedule: "Schedule",
+        today: "Today",
+        homework: "Homework",
+        announcements: "Announcements",
+        ai: "AI Assistant",
+        quick: "⚡ Quick actions",
+        deadlines: "Deadlines",
+        news: "News",
+        profile: "Profile"
+    },
+    ko: {
+        welcome: "환영합니다 👋",
+        student: "학생",
+        profileDb: "프로필은 UniUZ 데이터베이스에서 불러옵니다",
+        next: "📅 다음 수업",
+        scheduleConnect: "시간표가 데이터베이스에 연결됩니다",
+        schedule: "시간표",
+        today: "오늘",
+        homework: "과제",
+        announcements: "공지사항",
+        ai: "AI Assistant",
+        quick: "⚡ 빠른 실행",
+        deadlines: "마감일",
+        news: "뉴스",
+        profile: "프로필"
+    }
+};
+
+function U(key) {
+    return (appText[getLanguage()] || appText.ru)[key];
+}
+
+let cachedProfile = null;
+let cachedHomework = [];
+let cachedAnnouncements = [];
+
+function renderHomeScreen() {
+    const screen = document.querySelector("#screen");
+    if (!screen) return;
+
+    const user = cachedProfile?.telegramUser;
+    const profile = cachedProfile?.profile;
+
+    const name =
+        user?.first_name ||
+        user?.username ||
+        profile?.full_name ||
+        "UniUZ";
+
+    screen.innerHTML = `
+        <section class="home-page">
+            <div class="page-header">
+                <div>
+                    <h1>🎓 UniUZ</h1>
+                    <p>${escapeHtml(U("welcome"))}</p>
+                </div>
+                <div class="avatar" id="user-avatar">
+                    ${escapeHtml((name[0] || "U").toUpperCase())}
+                </div>
+            </div>
+
+            <div class="profile-card">
+                <div class="eyebrow">${escapeHtml(U("student"))}</div>
+                <h2 id="profile-name">${escapeHtml(name)}</h2>
+                <p>
+                    ${
+                        profile
+                        ? `${escapeHtml(profile.department || "—")} · ${escapeHtml(profile.group_name || "—")}`
+                        : escapeHtml(U("profileDb"))
+                    }
+                </p>
+            </div>
+
+            <div class="next-card">
+                <div class="card-label">${escapeHtml(U("next"))}</div>
+                <div class="next-time">09:00</div>
+                <h3>${escapeHtml(U("scheduleConnect"))}</h3>
+                <p>🏫 —</p>
+            </div>
+
+            <div class="dashboard-grid">
+                <button class="dashboard-card" data-page="schedule">
+                    <span>📅</span>
+                    <strong>${escapeHtml(U("schedule"))}</strong>
+                    <small>${escapeHtml(U("today"))}</small>
+                </button>
+
+                <button class="dashboard-card" data-page="homework">
+                    <span>📝</span>
+                    <strong>${escapeHtml(U("homework"))}</strong>
+                    <small>${cachedHomework.length}</small>
+                </button>
+
+                <button class="dashboard-card" data-page="announcements">
+                    <span>📢</span>
+                    <strong>${escapeHtml(U("announcements"))}</strong>
+                    <small>${cachedAnnouncements.length}</small>
+                </button>
+
+                <button class="dashboard-card" data-page="ai">
+                    <span>🤖</span>
+                    <strong>${escapeHtml(U("ai"))}</strong>
+                    <small>7 / day</small>
+                </button>
+            </div>
+
+            <div class="quick-card">
+                <h3>${escapeHtml(U("quick"))}</h3>
+                <div class="quick-grid">
+                    <button data-page="schedule">${escapeHtml(U("today"))}</button>
+                    <button data-page="homework">${escapeHtml(U("deadlines"))}</button>
+                    <button data-page="announcements">${escapeHtml(U("news"))}</button>
+                    <button data-page="profile">${escapeHtml(U("profile"))}</button>
+                </div>
+            </div>
+        </section>
+    `;
+
+    bindScreenButtons();
+}
+
+function renderSimplePage(page) {
+    const screen = document.querySelector("#screen");
+    if (!screen) return;
+
+    const data = {
+        schedule: ["📅", U("schedule"), "Расписание подключится к базе"],
+        homework: ["📝", U("homework"), `${cachedHomework.length} заданий`],
+        announcements: ["📢", U("announcements"), `${cachedAnnouncements.length} новых`],
+        ai: ["🤖", U("ai"), "7 запросов/день"],
+        profile: ["👤", U("profile"),
+            cachedProfile?.profile
+                ? `${cachedProfile.profile.department || "—"} · ${cachedProfile.profile.group_name || "—"}`
+                : U("profileDb")]
+    };
+
+    const item = data[page] || data.homework;
+
+    screen.innerHTML = `
+        <section class="page">
+            <div class="page-title">
+                <span>${item[0]}</span>
+                <h1>${escapeHtml(item[1])}</h1>
+            </div>
+
+            <div class="info-card">
+                <h3>${escapeHtml(item[2])}</h3>
+            </div>
+        </section>
+    `;
+}
+
+function setActivePage(page) {
+    document.querySelectorAll(".nav-item").forEach(item => {
+        item.classList.toggle("active", item.dataset.page === page);
+    });
+}
+
+function openPage(page) {
+    setActivePage(page);
+
+    if (page === "home") {
+        renderHomeScreen();
+    } else {
+        renderSimplePage(page);
+    }
+}
+
+function bindScreenButtons() {
+    document.querySelectorAll("#screen [data-page]").forEach(button => {
+        button.addEventListener("click", () => {
+            openPage(button.dataset.page);
+        });
+    });
+}
+
+function bindBottomNavigation() {
+    document.querySelectorAll(".bottom-nav .nav-item").forEach(button => {
+        button.onclick = () => openPage(button.dataset.page);
+    });
+}
+
+// ============================================================
+// INITIALIZE
+// ============================================================
+
+async function initializeUniUZ() {
+
+    showLoading();
+
+    try {
+
+        const apiOnline =
+            await checkApi();
+
+        if (!apiOnline) {
+
+            throw new Error(
+                "UniUZ API is unavailable."
+            );
+        }
+
+
+        if (!initData) {
+
+            console.warn(
+                "Telegram initData is empty."
+            );
+        }
+
+
+        await loadProfile();
+
+        await loadHomework();
+
+        await loadAnnouncements();
+
+        openPage("home");
+
+        console.log(
+            "UniUZ Mini App initialized successfully."
+        );
+
+    } catch (error) {
+
+        console.error(
+            "UniUZ initialization error:",
+            error
+        );
+
+        showError(
+            translations[
+                getLanguage()
+            ].error
+        );
+
+    } finally {
+
+        hideLoading();
+    }
+}
+
+
+// ============================================================
+// REFRESH
+// ============================================================
+
+async function refreshUniUZ() {
+
+    try {
+
+        await loadProfile();
+
+        await loadHomework();
+
+        await loadAnnouncements();
+
+    } catch (error) {
+
+        console.error(
+            "Refresh error:",
+            error
+        );
+    }
+}
+
+
+// ============================================================
+// START
+// ============================================================
+
+document.addEventListener(
+    "DOMContentLoaded",
+    () => {
+
+        // If language was already selected,
+        // skip the language screen.
+
+        if (currentLanguage) {
+
+            hideLanguageScreen();
+
+            showMainApplication();
+
+            bindBottomNavigation();
+            openPage("home");
+            initializeUniUZ();
+
+        } else {
+
+            console.log(
+                "Waiting for language selection..."
+            );
+        }
+    }
+);
+
+
+// ============================================================
+// TELEGRAM MAIN BUTTON
+// ============================================================
+
+if (tg) {
+
+    tg.MainButton.setText(
+        "Обновить"
+    );
+
+    tg.MainButton.onClick(
+        refreshUniUZ
+    );
 }
