@@ -499,7 +499,7 @@ async function askAI(){
  const button=document.querySelector('.card button[onclick="askAI()"]');
  if(button){
   button.disabled=true;
-  button.textContent="⏳ Анализирую...";
+  button.innerHTML="⏳";
  }
 
  const chat=document.getElementById("chat");
@@ -550,7 +550,7 @@ async function askAI(){
  }finally{
   if(button){
    button.disabled=false;
-   button.textContent="Спросить ИИ →";
+   button.innerHTML="➤";
   }
  }
 }
