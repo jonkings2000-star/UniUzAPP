@@ -638,3 +638,41 @@ margin:14px 0;
 .ai-message-user{
     font-size:14px;
 }
+/* ===== CHAT FINAL ALIGN ===== */
+
+/* убираем лишнее место сверху */
+#chat{
+    padding-top:10px;
+    margin-top:0;
+}
+
+
+/* пользователь */
+.ai-message-user{
+    max-width:65%;
+    margin:0 0 8px auto;
+    padding:10px 14px;
+    border-radius:18px 18px 5px 18px;
+}
+
+
+/* AI */
+.ai-message-bot{
+    max-width:88%;
+    margin:0 auto 8px 0;
+    padding:12px 14px;
+}
+
+
+/* текст AI */
+.ai-message-bot p{
+    font-size:14px;
+    line-height:1.4;
+}
+
+
+/* убираем лишние отступы внутри */
+.ai-message-bot,
+.ai-message-user{
+    box-sizing:border-box;
+}
