@@ -764,3 +764,57 @@ margin:14px 0;
 .ai-message-user{
     max-width:55%;
 }
+/* ===== USER MESSAGE FIX ===== */
+
+.ai-message-user{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+
+    max-width:65%;
+    margin-left:auto;
+
+    padding:10px 14px;
+
+    border-radius:18px 18px 5px 18px;
+
+    text-align:right;
+}
+
+
+/* аватар + имя в одну строку */
+
+.user-avatar-line{
+    display:flex;
+    flex-direction:row-reverse;
+    align-items:center;
+    justify-content:flex-start;
+
+    gap:7px;
+
+    margin-bottom:5px;
+}
+
+
+/* сам аватар */
+
+.user-avatar{
+    width:26px;
+    height:26px;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    border-radius:50%;
+
+    font-size:14px;
+}
+
+
+/* текст сообщения */
+
+.ai-message-user div{
+    margin-top:3px;
+    font-size:14px;
+}
