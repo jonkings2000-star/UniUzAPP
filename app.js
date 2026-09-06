@@ -49,6 +49,7 @@ function layout(content,active="home"){app.innerHTML=`<div class="wrap">${conten
 <button class="${active==="schedule"?"active":""}" onclick="showSchedule()">🗓️<br>${tr("schedule")}</button>
 <button class="${active==="homework"?"active":""}" onclick="showHomework()">📝<br>${tr("homework")}</button>
 <button class="${active==="ai"?"active":""}" onclick="showAI()">🤖<br>${tr("ai")}</button>
+<button class="${active==="reminders"?"active":""}" onclick="showReminders()">🔔<br>${tr("reminders")}</button>
 </div>`}
 function brand(){return `<div class="brand"><div class="logo">🎓</div><h1>UniUZ</h1><div class="muted">${profile?.university||""}</div></div>`}
 
@@ -87,6 +88,7 @@ async function home(){
 
 let schedule=[];
 let homework=[];
+let remindersEnabled=true;
 
 try{
  const s=await api("/schedule");
@@ -96,6 +98,11 @@ try{
 try{
  const h=await api("/homework");
  homework=h.items||[];
+}catch(e){}
+
+try{
+ const r=await api("/reminders");
+ remindersEnabled=!!r.enabled;
 }catch(e){}
 
 
@@ -173,6 +180,14 @@ layout(`
 </div>
 
 
+<div class="reminder-card ${remindersEnabled?"is-on":"is-off"}">
+ <div>
+  <div class="reminder-title">🔔 ${tr("reminders")}</div>
+  <div class="reminder-status">${remindersEnabled?tr("enabled"):tr("disabled")}</div>
+ </div>
+ <button class="btn ${remindersEnabled?"":"primary"}" onclick="showReminders()">${remindersEnabled?"⚙️":"Включить"}</button>
+</div>
+
 <div class="ai-card">
  <div class="ai-title">🤖 UniUZ AI</div>
  <p>Ваш персональный помощник</p>
@@ -194,6 +209,10 @@ layout(`
 
  <button class="quick-v2" onclick="showAI()">
   <span>🤖</span>${tr("ai")}
+ </button>
+
+ <button class="quick-v2" onclick="showReminders()">
+  <span>🔔</span>${tr("reminders")}
  </button>
 
  <button class="quick-v2" onclick="showProfile()">
@@ -372,7 +391,7 @@ const AI_CHAT_STORAGE_PREFIX = "uniuz_ai_chat_v1_";
 
 function getAIChatStorageKey(){
  try{
-  const raw = new URLSearchParams(initData || "").get("user");
+  const raw = new URLSearchParams(tg?.initData || "").get("user");
   if(raw){
    const user = JSON.parse(raw);
    if(user?.id) return AI_CHAT_STORAGE_PREFIX + String(user.id);
@@ -635,7 +654,25 @@ async function downloadAIFile(id,name){
  }catch(e){toast(e.message||"Не удалось скачать файл")}
 }
 
-async function showReminders(){try{const d=await api("/reminders");layout(`${brand()}<div class="card"><h2>🔔 ${tr("reminders")}</h2><p>${d.enabled?tr("enabled"):tr("disabled")}</p><button class="btn primary" onclick="toggleReminders(${!d.enabled})">${d.enabled?tr("disabled"):tr("enabled")}</button></div>`)}catch(e){toast(e.message)}}
+async function showReminders(){
+ try{
+  const d=await api("/reminders");
+  layout(`${brand()}
+   <div class="card reminder-settings-card">
+    <div class="reminder-big-icon">🔔</div>
+    <h2>${tr("reminders")}</h2>
+    <p class="reminder-status-large">${d.enabled?tr("enabled"):tr("disabled")}</p>
+    <button class="btn primary reminder-toggle" onclick="toggleReminders(${!d.enabled})">
+      ${d.enabled?"🔕 "+tr("disabled"):"🔔 "+tr("enabled")}
+    </button>
+   </div>
+   <div class="card">
+    <h3>⏰ Что будут присылать напоминания</h3>
+    <div class="list-item">📚 Пары — заранее перед началом</div>
+    <div class="list-item">📝 Домашние задания — о приближении срока</div>
+   </div>` ,"reminders");
+ }catch(e){toast(e.message)}
+}
 async function toggleReminders(enabled){try{await api("/reminders",{method:"POST",body:{enabled}});showReminders()}catch(e){toast(e.message)}}
 
 function showProfile(){layout(`${brand()}<div class="card"><h2>👤 ${tr("profile")}</h2><p><b>${esc(profile.first_name)} ${esc(profile.last_name)}</b></p><p>${esc(profile.university)}</p><p>${esc(profile.department)}</p><p>${esc(profile.group_name)}</p><button class="btn" onclick="chooseLanguage()">${tr("language")}</button><button class="btn danger" onclick="chooseUniversity()">${tr("logout")}</button></div>`)}
