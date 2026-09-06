@@ -156,7 +156,30 @@ async def sleep_until_next_morning():
     await asyncio.sleep(seconds)
 
 
-async def main():
+def start_reminder_worker():
+    """Start the morning schedule reminder in a background daemon thread."""
+    import threading
+
+    if getattr(start_reminder_worker, "_started", False):
+        return
+
+    def runner():
+        try:
+            asyncio.run(morning_reminder_loop())
+        except Exception as exc:
+            print(f"[MORNING] background worker error: {exc}")
+
+    thread = threading.Thread(
+        target=runner,
+        name="uniuz-morning-reminders",
+        daemon=True,
+    )
+    thread.start()
+    start_reminder_worker._started = True
+    print("UniUZ morning reminder background worker started.")
+
+
+async def morning_reminder_loop():
     database.init_db()
 
     bot = Bot(BOT_TOKEN)
@@ -190,6 +213,10 @@ async def main():
 
     finally:
         await bot.session.close()
+
+
+async def main():
+    await morning_reminder_loop()
 
 
 if __name__ == "__main__":

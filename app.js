@@ -719,6 +719,10 @@ const appText = {
         schedule: "Расписание",
         today: "На сегодня",
         homework: "Задания",
+        reminders: "Напоминания",
+        remindersOn: "Утренние напоминания включены",
+        remindersOff: "Утренние напоминания выключены",
+        remindersTime: "Каждое утро в 08:00 по Ташкенту приходит сообщение с парами на сегодня.",
         announcements: "Объявления",
         ai: "AI Assistant",
         quick: "⚡ Быстрые действия",
@@ -735,6 +739,10 @@ const appText = {
         schedule: "Schedule",
         today: "Today",
         homework: "Homework",
+        reminders: "Reminders",
+        remindersOn: "Morning reminders are enabled",
+        remindersOff: "Morning reminders are disabled",
+        remindersTime: "Every morning at 08:00 Tashkent time you receive today’s schedule.",
         announcements: "Announcements",
         ai: "AI Assistant",
         quick: "⚡ Quick actions",
@@ -751,6 +759,10 @@ const appText = {
         schedule: "시간표",
         today: "오늘",
         homework: "과제",
+        reminders: "알림",
+        remindersOn: "아침 수업 알림이 켜져 있습니다",
+        remindersOff: "아침 수업 알림이 꺼져 있습니다",
+        remindersTime: "타슈켄트 시간 매일 08:00에 오늘 수업 시간표를 받습니다.",
         announcements: "공지사항",
         ai: "AI Assistant",
         quick: "⚡ 빠른 실행",
@@ -853,50 +865,88 @@ function renderHomeScreen() {
     bindScreenButtons();
 }
 
-function renderSimplePage(page) {
+async function renderSimplePage(page) {
     const screen = document.querySelector("#screen");
     if (!screen) return;
 
-    // Homework needs a real list container so loadHomework()
-    // can render the assignments returned by /api/homework.
-    if (page === "homework") {
+
+    if (page === "reminders") {
         screen.innerHTML = `
             <section class="page">
                 <div class="page-title">
-                    <span>📝</span>
-                    <h1>${escapeHtml(U("homework"))}</h1>
+                    <span>🔔</span>
+                    <h1>${escapeHtml(U("reminders"))}</h1>
                 </div>
-
                 <div class="info-card">
-                    <div class="row">
-                        <h3>${escapeHtml(U("homework"))}</h3>
-                        <span id="homework-count" class="badge">${cachedHomework.length}</span>
-                    </div>
-                    <div id="homework-list"></div>
+                    <div id="reminders-status">Загрузка...</div>
+                    <p>${escapeHtml(U("remindersTime"))}</p>
+                    <button id="reminders-toggle" class="btn primary" type="button">
+                        🔔 Включить
+                    </button>
                 </div>
             </section>
         `;
 
-        // The initial API load happens before the page exists.
-        // Refresh once after creating #homework-list so assignments
-        // are actually inserted into the visible page.
-        loadHomework().catch(error => {
-            console.error("Homework page loading error:", error);
-            const container = document.querySelector("#homework-list");
-            if (container) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        Не удалось загрузить домашние задания.
-                    </div>
-                `;
+        const status = document.querySelector("#reminders-status");
+        const toggle = document.querySelector("#reminders-toggle");
+
+        try {
+            const response = await fetch(`${API_URL}/api/reminders`, {
+                method: "GET",
+                headers: {"X-Telegram-Init-Data": initData}
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || "API error");
+
+            let enabled = !!data.enabled;
+
+            function renderReminderState() {
+                if (status) {
+                    status.textContent = enabled ? U("remindersOn") : U("remindersOff");
+                }
+                if (toggle) {
+                    toggle.textContent = enabled ? "🔕 Выключить" : "🔔 Включить";
+                }
             }
-        });
+
+            renderReminderState();
+
+            if (toggle) {
+                toggle.onclick = async () => {
+                    toggle.disabled = true;
+                    try {
+                        const res = await fetch(`${API_URL}/api/reminders`, {
+                            method: "POST",
+                            headers: {
+                                "X-Telegram-Init-Data": initData,
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify({enabled: !enabled})
+                        });
+                        const result = await res.json();
+                        if (!res.ok) throw new Error(result.error || "API error");
+
+                        enabled = !!result.enabled;
+                        renderReminderState();
+                    } catch (error) {
+                        showError(error.message || "Не удалось изменить напоминания");
+                    } finally {
+                        toggle.disabled = false;
+                    }
+                };
+            }
+        } catch (error) {
+            if (status) {
+                status.textContent = error.message || "Не удалось загрузить настройки";
+            }
+        }
 
         return;
     }
 
     const data = {
         schedule: ["📅", U("schedule"), "Расписание подключится к базе"],
+        homework: ["📝", U("homework"), `${cachedHomework.length} заданий`],
         announcements: ["📢", U("announcements"), `${cachedAnnouncements.length} новых`],
         ai: ["🤖", U("ai"), "7 запросов/день"],
         profile: ["👤", U("profile"),
@@ -905,7 +955,7 @@ function renderSimplePage(page) {
                 : U("profileDb")]
     };
 
-    const item = data[page] || data.announcements;
+    const item = data[page] || data.homework;
 
     screen.innerHTML = `
         <section class="page">
