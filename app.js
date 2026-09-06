@@ -199,11 +199,6 @@ layout(`
  <button class="quick-v2" onclick="showProfile()">
   <span>👤</span>${tr("profile")}
  </button>
-
- <button class="quick-v2" onclick="showReminders()">
-  <span>🔔</span>${tr("reminders")}
- </button>
-
  ${profile?.is_admin ? `
  <button class="quick-v2 admin-v2" onclick="showAdmin()">
   <span>🔐</span>${tr("admin")}
@@ -705,6 +700,12 @@ async function rejectPayment(id){
 }
 
 async function grant(id,enabled){try{await api("/admin/unlimited",{method:"POST",body:{telegram_id:id,enabled}});showAdmin()}catch(e){toast(e.message)}}
+
+/* ===== LANGUAGE BUTTON FIX =====
+   Keep language selection limited to RU / EN.
+   Expose the handler explicitly for inline onclick buttons.
+*/
+window.setLang = setLang;
 
 start();
 
