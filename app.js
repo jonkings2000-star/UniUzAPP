@@ -7,7 +7,7 @@
 const tg=window.Telegram?.WebApp||null;
 if(tg){try{tg.ready();tg.expand();}catch(e){}}
 const API="/api";
-const app=document.getElementById("app");
+const app=document.getElementById("screen");
 let profile=null, lang="ru";
 
 const T={
